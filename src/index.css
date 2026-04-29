@@ -3,11 +3,34 @@
 @tailwind utilities;
 
 @layer base {
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f5;
+    --bg-card: #ffffff;
+    --bg-soft: #ececed;
+    --bg-hover: #e4e4e7;
+    --border: #d4d4d8;
+    --border-soft: #e4e4e7;
+    --text: #09090b;
+    --text-muted: #71717a;
+    --text-dim: #a1a1aa;
+  }
+  .dark {
+    color-scheme: dark;
+    --bg: #0a0a0a;
+    --bg-card: #141414;
+    --bg-soft: #1a1a1a;
+    --bg-hover: #1f1f1f;
+    --border: #262626;
+    --border-soft: #1f1f1f;
+    --text: #fafafa;
+    --text-muted: #a3a3a3;
+    --text-dim: #737373;
+  }
   html, body, #root { height: 100%; }
   body {
-    background: #0a0a0a;
-    color: #fafafa;
+    background: var(--bg);
+    color: var(--text);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-tap-highlight-color: transparent;
   }

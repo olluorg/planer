@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Bell, Timer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Bell, Timer, Sun, Moon } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
+import { useTheme } from '@/lib/theme';
 
 interface Props {
   date: Date;
@@ -16,6 +16,7 @@ interface Props {
 export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd }) => {
   const labelFull = format(date, 'd MMMM, EEEE', { locale: ru });
   const labelShort = format(date, 'd MMM', { locale: ru });
+  const { theme, toggle } = useTheme();
   return (
     <header className="shrink-0 border-b border-border bg-bg-card">
       {/* Desktop */}
@@ -40,6 +41,9 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd })
           <Button variant="ghost" size="icon" onClick={onAdd}><Plus /></Button>
           <Button variant="ghost" size="icon"><Timer /></Button>
           <Button variant="ghost" size="icon"><Bell /></Button>
+          <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
           <div className="h-8 w-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-semibold">A</div>
         </div>
       </div>
@@ -53,6 +57,9 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd })
             <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </div>
           <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={toggle}>
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" size="icon" onClick={onAdd}><Plus className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button>
             <div className="h-7 w-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-semibold">A</div>

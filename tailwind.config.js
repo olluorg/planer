@@ -5,9 +5,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: { DEFAULT: '#0a0a0a', card: '#141414', soft: '#1a1a1a', hover: '#1f1f1f' },
-        border: { DEFAULT: '#262626', soft: '#1f1f1f' },
-        text: { DEFAULT: '#fafafa', muted: '#a3a3a3', dim: '#737373' },
+        bg: {
+          DEFAULT: 'var(--bg)',
+          card: 'var(--bg-card)',
+          soft: 'var(--bg-soft)',
+          hover: 'var(--bg-hover)',
+        },
+        border: { DEFAULT: 'var(--border)', soft: 'var(--border-soft)' },
+        text: { DEFAULT: 'var(--text)', muted: 'var(--text-muted)', dim: 'var(--text-dim)' },
         accent: { DEFAULT: '#22c55e', soft: '#16a34a' },
         warn: '#eab308',
         danger: '#ef4444',

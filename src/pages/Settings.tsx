@@ -2,11 +2,13 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { resetDB, persist } from '@/lib/db';
 import { useStore } from '@/lib/store';
-import { Download, Upload, RefreshCw } from 'lucide-react';
+import { useTheme } from '@/lib/theme';
+import { Download, Upload, RefreshCw, Sun, Moon } from 'lucide-react';
 import { get, set } from 'idb-keyval';
 
 export const SettingsPage = () => {
   const reload = useStore((s) => s.reload);
+  const { theme, setTheme } = useTheme();
 
   const exportDb = async () => {
     await persist();
@@ -36,6 +38,24 @@ export const SettingsPage = () => {
   return (
     <div className="p-4 max-w-2xl space-y-4">
       <h1 className="text-xl font-semibold">Настройки</h1>
+
+      <Card>
+        <CardTitle>Внешний вид</CardTitle>
+        <div className="flex gap-2">
+          <Button
+            variant={theme === 'light' ? 'default' : 'soft'}
+            onClick={() => setTheme('light')}
+          >
+            <Sun className="h-4 w-4" /> Светлая
+          </Button>
+          <Button
+            variant={theme === 'dark' ? 'default' : 'soft'}
+            onClick={() => setTheme('dark')}
+          >
+            <Moon className="h-4 w-4" /> Тёмная
+          </Button>
+        </div>
+      </Card>
 
       <Card>
         <CardTitle>База данных (SQLite WASM)</CardTitle>
