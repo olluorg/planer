@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,12 +6,12 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Plus, Trash2, TrendingUp } from 'lucide-react';
+import { Camera, Plus, Trash2, TrendingUp, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { fmtNum } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
 import { ECharts } from '@/components/charts/ECharts';
-import type { GoalType } from '@/lib/types';
+import type { Goal, GoalType } from '@/lib/types';
 
 export const GoalsPage = () => {
   const { goals, progress, addGoal, removeGoal, updateGoal, addProgress } = useStore();
@@ -50,7 +50,9 @@ export const GoalsPage = () => {
           const typeLabel = { long: 'долгосрочная', mid: 'среднесрочная', short: 'краткосрочная' }[g.type];
 
           return (
-            <Card key={g.id}>
+            <Card key={g.id} className="overflow-hidden !p-0">
+              <CoverImage goal={g} onUpdate={(cover) => updateGoal(g.id, { cover })} />
+              <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -82,6 +84,7 @@ export const GoalsPage = () => {
               </div>
 
               <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
+              </div>
             </Card>
           );
         })}
@@ -113,6 +116,52 @@ export const GoalsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+const CoverImage: React.FC<{ goal: Goal; onUpdate: (cover: string | null) => void }> = ({ goal, onUpdate }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onUpdate(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  if (goal.cover) {
+    return (
+      <div className="relative w-full h-36 group">
+        <img src={goal.cover} alt="" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+        <button
+          onClick={() => onUpdate(null)}
+          className="absolute top-2 right-2 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="absolute bottom-2 right-2 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+        >
+          <Camera className="h-3.5 w-3.5" />
+        </button>
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => inputRef.current?.click()}
+      className="w-full h-10 flex items-center justify-center gap-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-1 cursor-pointer transition-colors border-b border-border"
+    >
+      <Camera className="h-3.5 w-3.5" />
+      Добавить обложку
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
     </div>
   );
 };

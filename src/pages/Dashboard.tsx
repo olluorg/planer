@@ -236,18 +236,23 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
             const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
             const monthLabel = g.deadline ? format(new Date(g.deadline), 'LLLL yyyy', { locale: ru }) : '—';
             return (
-              <div key={g.id} className="rounded-lg border border-border bg-bg-soft p-3 hover:border-accent/40 transition-colors">
-                <div className="text-[11px] text-text-muted">{monthLabel}</div>
-                <div className="text-sm font-medium mt-1 truncate">{g.title}</div>
-                <div className="mt-3 text-2xl font-semibold tabular-nums">
-                  {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
-                </div>
-                <div className="text-[11px] text-text-muted mt-0.5">
-                  цель {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}
-                </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <Progress value={r} className="flex-1" />
-                  <span className="text-[11px] text-text-muted tabular-nums">{r}%</span>
+              <div key={g.id} className="rounded-lg border border-border bg-bg-soft hover:border-accent/40 transition-colors overflow-hidden">
+                {g.cover && (
+                  <img src={g.cover} alt="" className="w-full h-20 object-cover" />
+                )}
+                <div className="p-3">
+                  <div className="text-[11px] text-text-muted">{monthLabel}</div>
+                  <div className="text-sm font-medium mt-1 truncate">{g.title}</div>
+                  <div className="mt-3 text-2xl font-semibold tabular-nums">
+                    {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
+                  </div>
+                  <div className="text-[11px] text-text-muted mt-0.5">
+                    цель {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Progress value={r} className="flex-1" />
+                    <span className="text-[11px] text-text-muted tabular-nums">{r}%</span>
+                  </div>
                 </div>
               </div>
             );
