@@ -42,7 +42,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Задачи</h1>
         <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="today">Сегодня</SelectItem>
             <SelectItem value="open">Активные</SelectItem>
@@ -53,10 +53,10 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
       </div>
 
       <Card>
-        <div className="flex gap-2">
-          <Input placeholder="Новая задача..." value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+        <div className="flex flex-wrap gap-2">
+          <Input className="flex-1 min-w-[160px]" placeholder="Новая задача..." value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
           <Select value={block} onValueChange={setBlock}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="morning">Утро</SelectItem>
               <SelectItem value="day">День</SelectItem>
@@ -65,7 +65,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             </SelectContent>
           </Select>
           <Select value={goalId} onValueChange={setGoalId}>
-            <SelectTrigger className="w-48"><SelectValue placeholder="Цель" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Цель" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__none">Без цели</SelectItem>
               {goals.map((g) => <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}

@@ -61,7 +61,7 @@ const DayView: React.FC<{ date: Date; tasks: any[]; onToggle: (id: string) => vo
   const d = isoDate(date);
   const today = tasks.filter((t) => t.date === d);
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {BLOCKS.map((b) => (
         <Column key={b.key} id={`${d}|${b.key}`} title={b.label}>
           {today.filter((t) => t.time_block === b.key).map((t) => (
@@ -77,7 +77,8 @@ const WeekView: React.FC<{ date: Date; tasks: any[]; onToggle: (id: string) => v
   const start = startOfWeek(date, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   return (
-    <div className="grid grid-cols-7 gap-2">
+    <div className="overflow-x-auto">
+    <div className="grid grid-cols-7 gap-2 min-w-[560px]">
       {days.map((d) => {
         const iso = isoDate(d);
         return (
@@ -88,6 +89,7 @@ const WeekView: React.FC<{ date: Date; tasks: any[]; onToggle: (id: string) => v
           </Column>
         );
       })}
+    </div>
     </div>
   );
 };

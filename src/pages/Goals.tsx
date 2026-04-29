@@ -40,7 +40,7 @@ export const GoalsPage = () => {
         <Button onClick={() => setOpen(true)}><Plus /> Новая цель</Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {goals.map((g) => {
           const recs = progress.filter((p) => p.goal_id === g.id);
           const f = forecastGoal(g, recs, 30);

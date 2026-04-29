@@ -37,7 +37,7 @@ export default function App() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar date={date} onDate={setDate} range={range} onRange={setRange} onAdd={() => setQuickOpen(true)} />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pb-16 sm:pb-0">
           <Routes>
             <Route path="/" element={<Dashboard date={date} />} />
             <Route path="/goals" element={<GoalsPage />} />

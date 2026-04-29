@@ -107,10 +107,10 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="p-4 grid grid-cols-12 gap-4">
+    <div className="p-4 grid grid-cols-2 lg:grid-cols-12 gap-4">
       {/* ROW 1: Goals/Stats/Chart + Progress ring */}
-      <Card className="col-span-9 grid grid-cols-12 gap-6">
-        <div className="col-span-4">
+      <Card className="col-span-2 lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 lg:gap-6">
+        <div className="sm:col-span-2 lg:col-span-4">
           <CardTitle>Цели на неделю</CardTitle>
           <ol className="space-y-2.5">
             {goals.slice(0, 5).map((g, i) => {
@@ -128,7 +128,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
           </ol>
         </div>
 
-        <div className="col-span-3 flex flex-col items-center justify-center">
+        <div className="lg:col-span-3 flex flex-col items-center justify-center">
           <Ring value={weekDoneRatio} size={140} stroke={10} color="#fafafa" trackColor="#262626">
             <div className="text-center">
               <div className="text-2xl font-semibold">{weekDoneRatio}%</div>
@@ -137,7 +137,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
           </Ring>
         </div>
 
-        <div className="col-span-2 flex flex-col justify-center text-sm space-y-2">
+        <div className="lg:col-span-2 flex flex-col justify-center text-sm space-y-2">
           <Row label="Всего задач" value={String(weekStats.total)} />
           <Row label="Выполнено" value={String(weekStats.done)} />
           <Row label="Осталось" value={String(weekStats.total - weekStats.done)} />
@@ -145,12 +145,12 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
           <Row label="Худший день" value={dayName(weekStats.worstI)} valueClass="text-danger" />
         </div>
 
-        <div className="col-span-3">
+        <div className="sm:col-span-2 lg:col-span-3">
           <ECharts option={weekChartOpt} height={170} />
         </div>
       </Card>
 
-      <Card className="col-span-3">
+      <Card className="col-span-2 lg:col-span-3">
         <CardTitle>Прогресс целей</CardTitle>
         <div className="flex flex-col items-center">
           <Ring value={overallGoalProgress} size={140} stroke={10}>
@@ -171,7 +171,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         const done = blockTasks.filter((t) => t.status === 'done').length;
         const ratio = blockTasks.length ? Math.round((done / blockTasks.length) * 100) : 0;
         return (
-          <Card key={b.key} className="col-span-2 flex flex-col">
+          <Card key={b.key} className="col-span-1 lg:col-span-2 flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm">{b.label}</div>
               <b.icon className="h-4 w-4 text-text-muted" />
@@ -198,7 +198,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         );
       })}
 
-      <Card className="col-span-2">
+      <Card className="col-span-1 lg:col-span-2">
         <div className="text-sm mb-3">Заметки на день</div>
         <textarea
           className="w-full h-24 bg-transparent text-xs text-text-muted resize-none outline-none"
@@ -209,7 +209,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         </Button>
       </Card>
 
-      <Card className="col-span-2">
+      <Card className="col-span-1 lg:col-span-2">
         <CardTitle>Статистика</CardTitle>
         <div className="space-y-3">
           {fitnessStats.map((s) => (
@@ -228,9 +228,9 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       </Card>
 
       {/* ROW 3: long term goals */}
-      <Card className="col-span-9">
+      <Card className="col-span-2 lg:col-span-9">
         <CardTitle>План на будущее</CardTitle>
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {planGoals.map((g) => {
             const denom = g.target_value - g.start_value || 1;
             const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
@@ -255,7 +255,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         </div>
       </Card>
 
-      <Card className="col-span-3">
+      <Card className="col-span-2 lg:col-span-3">
         <div className="flex items-center justify-between mb-3">
           <CardTitle className="mb-0">Привычки</CardTitle>
           <Button variant="ghost" size="sm" className="text-text-muted">Изменить</Button>
@@ -283,14 +283,14 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       </Card>
 
       {/* ROW 4: focus / quick add / reflection / reminders */}
-      <Card className="col-span-3">
+      <Card className="col-span-1 lg:col-span-3">
         <CardTitle>Фокус дня</CardTitle>
         <p className="text-sm text-text-muted leading-relaxed">
           Сделай сегодня немного больше, чем вчера, и это изменит твоё завтра.
         </p>
       </Card>
 
-      <Card className="col-span-3">
+      <Card className="col-span-1 lg:col-span-3">
         <CardTitle>Быстрое добавление</CardTitle>
         <div className="flex justify-around">
           {[
@@ -310,7 +310,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         </div>
       </Card>
 
-      <Card className="col-span-3">
+      <Card className="col-span-1 lg:col-span-3">
         <CardTitle>Рефлексия</CardTitle>
         <div className="text-sm mb-3">Как прошёл твой день?</div>
         <div className="flex justify-between">
@@ -320,7 +320,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         </div>
       </Card>
 
-      <Card className="col-span-3">
+      <Card className="col-span-1 lg:col-span-3">
         <div className="flex items-center justify-between mb-3">
           <CardTitle className="mb-0">Напоминания</CardTitle>
           <Button variant="ghost" size="icon"><Plus className="h-4 w-4" /></Button>

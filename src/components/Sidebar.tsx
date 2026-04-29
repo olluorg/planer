@@ -14,11 +14,34 @@ const items = [
 ];
 
 export const Sidebar = () => (
-  <aside className="w-[88px] shrink-0 border-r border-border bg-bg-card flex flex-col">
-    <div className="h-16 flex items-center justify-center border-b border-border">
-      <div className="text-[15px] font-bold tracking-wider">REFORM</div>
-    </div>
-    <nav className="flex-1 py-4 flex flex-col gap-1 px-2">
+  <>
+    {/* Desktop sidebar */}
+    <aside className="hidden sm:flex w-[88px] shrink-0 border-r border-border bg-bg-card flex-col">
+      <div className="h-16 flex items-center justify-center border-b border-border">
+        <div className="text-[15px] font-bold tracking-wider">REFORM</div>
+      </div>
+      <nav className="flex-1 py-4 flex flex-col gap-1 px-2">
+        {items.map((it) => (
+          <NavLink
+            key={it.to}
+            to={it.to}
+            end={it.end}
+            className={({ isActive }) =>
+              cn(
+                'flex flex-col items-center justify-center gap-1 py-3 rounded-md text-[11px] transition-colors',
+                isActive ? 'bg-bg-hover text-text' : 'text-text-muted hover:bg-bg-soft hover:text-text',
+              )
+            }
+          >
+            <it.icon className="h-5 w-5" strokeWidth={1.5} />
+            <span>{it.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    </aside>
+
+    {/* Mobile bottom navigation */}
+    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-card border-t border-border flex justify-around py-1 safe-area-inset-bottom">
       {items.map((it) => (
         <NavLink
           key={it.to}
@@ -26,15 +49,15 @@ export const Sidebar = () => (
           end={it.end}
           className={({ isActive }) =>
             cn(
-              'flex flex-col items-center justify-center gap-1 py-3 rounded-md text-[11px] transition-colors',
-              isActive ? 'bg-bg-hover text-text' : 'text-text-muted hover:bg-bg-soft hover:text-text',
+              'flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-md text-[9px] min-w-0 transition-colors',
+              isActive ? 'text-text' : 'text-text-muted',
             )
           }
         >
-          <it.icon className="h-5 w-5" strokeWidth={1.5} />
-          <span>{it.label}</span>
+          <it.icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+          <span className="truncate">{it.label}</span>
         </NavLink>
       ))}
     </nav>
-  </aside>
+  </>
 );

@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useStore } from '@/lib/store';
+import { persist } from '@/lib/db';
 import { isoDate } from '@/lib/utils';
 import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -19,16 +20,21 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   const [done, setDone] = useState(cur?.done ?? '');
   const [notDone, setNotDone] = useState(cur?.not_done ?? '');
   const [reason, setReason] = useState(cur?.reason ?? '');
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setMood(cur?.mood ?? null);
     setDone(cur?.done ?? '');
     setNotDone(cur?.not_done ?? '');
     setReason(cur?.reason ?? '');
+    setSaved(false);
   }, [today]);
 
-  const save = () => {
+  const save = async () => {
     upsertReflection({ date: today, mood, done, not_done: notDone, reason });
+    await persist();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const week = useMemo(() => {
@@ -49,8 +55,8 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   const moodAvg = week.filter((d) => d.mood !== null).reduce((s, d, _, a) => s + (d.mood as number) / (a.length || 1), 0);
 
   return (
-    <div className="p-4 grid grid-cols-12 gap-4">
-      <Card className="col-span-7">
+    <div className="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <Card className="lg:col-span-7">
         <CardTitle>Рефлексия · {format(date, 'd MMMM yyyy', { locale: ru })}</CardTitle>
 
         <div className="text-sm mb-2 text-text-muted">Как прошёл день?</div>
@@ -79,10 +85,10 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
           </div>
         </div>
 
-        <Button onClick={save} className="mt-4">Сохранить</Button>
+        <Button onClick={save} className="mt-4">{saved ? '✓ Сохранено' : 'Сохранить'}</Button>
       </Card>
 
-      <div className="col-span-5 space-y-4">
+      <div className="lg:col-span-5 space-y-4">
         <Card>
           <CardTitle>Недельный обзор</CardTitle>
           <ECharts height={200} option={{

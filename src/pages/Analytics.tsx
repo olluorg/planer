@@ -49,17 +49,17 @@ export const AnalyticsPage = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Аналитика</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-semibold flex-1">Аналитика</h1>
+        <div className="flex flex-wrap gap-2">
           <Select value={goalId} onValueChange={setGoalId}>
-            <SelectTrigger className="w-64"><SelectValue placeholder="Цель" /></SelectTrigger>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Цель" /></SelectTrigger>
             <SelectContent>
               {goals.map((g) => <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={scenario} onValueChange={(v: any) => setScenario(v)}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="as-is">Текущий темп</SelectItem>
               <SelectItem value="plus20">+20% активности</SelectItem>
@@ -85,8 +85,8 @@ export const AnalyticsPage = () => {
         </Card>
       )}
 
-      <div className="grid grid-cols-12 gap-4">
-        <Card className="col-span-3 flex flex-col items-center justify-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+        <Card className="sm:col-span-2 lg:col-span-3 flex flex-col items-center justify-center">
           <CardTitle>Прогресс цели</CardTitle>
           {goal && (
             <Ring
@@ -102,7 +102,7 @@ export const AnalyticsPage = () => {
           )}
         </Card>
 
-        <Card className="col-span-5">
+        <Card className="lg:col-span-5">
           <CardTitle>Привычки за неделю</CardTitle>
           <ECharts height={240} option={{
             grid: { left: 100, right: 20, top: 10, bottom: 24 },
@@ -116,7 +116,7 @@ export const AnalyticsPage = () => {
           }} />
         </Card>
 
-        <Card className="col-span-4">
+        <Card className="sm:col-span-2 lg:col-span-4">
           <CardTitle>Тепловая карта выполнения</CardTitle>
           <ECharts height={240} option={{
             tooltip: { position: 'top' },
