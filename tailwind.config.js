@@ -21,7 +21,7 @@ export default {
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
       },
-      borderRadius: { lg: '12px', md: '10px', sm: '8px' },
+      borderRadius: { none: '0', sm: '0', DEFAULT: '0', md: '0', lg: '0', xl: '0', '2xl': '0', '3xl': '0', full: '9999px' },
       keyframes: {
         'fade-in': { from: { opacity: 0 }, to: { opacity: 1 } },
         'slide-up': { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },

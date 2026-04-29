@@ -16,7 +16,7 @@ const items = [
 export const Sidebar = () => (
   <>
     {/* Desktop sidebar */}
-    <aside className="hidden sm:flex w-[88px] shrink-0 border-r border-border bg-bg-card flex-col">
+    <aside className="hidden sm:flex w-[88px] shrink-0 border-r border-border flex-col">
       <div className="h-16 flex items-center justify-center border-b border-border">
         <div className="text-[15px] font-bold tracking-wider">REFORM</div>
       </div>
@@ -41,7 +41,7 @@ export const Sidebar = () => (
     </aside>
 
     {/* Mobile bottom navigation */}
-    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-card border-t border-border flex justify-around py-1 safe-area-inset-bottom">
+    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg border-t border-border flex justify-around py-1 safe-area-inset-bottom">
       {items.map((it) => (
         <NavLink
           key={it.to}

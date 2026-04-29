@@ -18,7 +18,7 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd })
   const labelShort = format(date, 'd MMM', { locale: ru });
   const { theme, toggle } = useTheme();
   return (
-    <header className="shrink-0 border-b border-border bg-bg-card">
+    <header className="shrink-0 border-b border-border">
       {/* Desktop */}
       <div className="hidden sm:flex items-center h-16 px-6 gap-4">
         <Tabs value={range} onValueChange={(v) => onRange(v as any)}>

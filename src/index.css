@@ -42,10 +42,10 @@
 
 @layer components {
   .card {
-    @apply bg-bg-card border border-border rounded-lg;
+    @apply border border-transparent hover:border-border transition-colors;
   }
   .card-hover {
-    @apply hover:bg-bg-hover transition-colors;
+    @apply hover:bg-bg-soft transition-colors;
   }
   .label-up {
     @apply text-[11px] uppercase tracking-wider text-text-muted font-medium;
@@ -57,3 +57,22 @@
     @apply border-t border-border-soft;
   }
 }
+
+/* react-grid-layout overrides */
+.react-grid-item.react-grid-placeholder {
+  background: var(--bg-hover) !important;
+  border: 1px dashed var(--border) !important;
+  border-radius: 0 !important;
+  opacity: 0.6;
+}
+.react-grid-item > .react-resizable-handle {
+  background: none;
+}
+.react-grid-item > .react-resizable-handle::after {
+  border-color: var(--text-muted) !important;
+  width: 8px; height: 8px;
+}
+.editing .bento-item { user-select: none; }
+.bento-item { transition: box-shadow 150ms; }
+.editing .bento-item:hover { box-shadow: 0 0 0 1px var(--border); }
+

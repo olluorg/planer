@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from './ui/dialog';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -11,16 +11,18 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   date: Date;
+  initialTab?: 'task' | 'habit' | 'goal' | 'progress';
 }
 
-export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date }) => {
+export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date, initialTab }) => {
   const goals = useStore((s) => s.goals);
   const addTask = useStore((s) => s.addTask);
   const addHabit = useStore((s) => s.addHabit);
   const addGoal = useStore((s) => s.addGoal);
   const addProgress = useStore((s) => s.addProgress);
 
-  const [tab, setTab] = useState('task');
+  const [tab, setTab] = useState<string>(initialTab ?? 'task');
+  useEffect(() => { if (open && initialTab) setTab(initialTab); }, [open, initialTab]);
   const [title, setTitle] = useState('');
   const [goalId, setGoalId] = useState<string | undefined>(undefined);
   const [block, setBlock] = useState<string>('day');
