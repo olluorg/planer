@@ -12,7 +12,7 @@ export const SettingsPage = () => {
     await persist();
     const blob = await get<Uint8Array>('reform.sqlite.v1');
     if (!blob) return;
-    const url = URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' }));
+    const url = URL.createObjectURL(new Blob([blob.buffer as ArrayBuffer], { type: 'application/octet-stream' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `reform-${new Date().toISOString().slice(0, 10)}.sqlite`;
