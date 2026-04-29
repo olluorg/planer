@@ -10,6 +10,8 @@ import { isoDate, pct, fmtNum } from '@/lib/utils';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ECharts } from '@/components/charts/ECharts';
+import { useTheme } from '@/lib/theme';
+import { getChartColors } from '@/lib/chart-theme';
 
 const BLOCKS = [
   { key: 'morning', label: '06:00 – 12:00', icon: Sun },
@@ -20,6 +22,8 @@ const BLOCKS = [
 
 export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const { goals, tasks, habits, habitLogs, progress, toggleTask } = useStore();
+  const { theme } = useTheme();
+  const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
   const dayTasks = tasks.filter((t) => t.date === today);
@@ -79,16 +83,16 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     xAxis: {
       type: 'category',
       data: ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'],
-      axisLine: { lineStyle: { color: '#262626' } },
-      axisLabel: { color: '#a3a3a3', fontSize: 11 },
+      axisLine: { lineStyle: { color: cc.axisLine } },
+      axisLabel: { color: cc.axis, fontSize: 11 },
     },
     yAxis: {
       type: 'value',
       max: 100,
       axisLine: { show: false },
       axisTick: { show: false },
-      splitLine: { lineStyle: { color: '#1f1f1f' } },
-      axisLabel: { color: '#a3a3a3', fontSize: 11, formatter: '{value}%' },
+      splitLine: { lineStyle: { color: cc.splitLine } },
+      axisLabel: { color: cc.axis, fontSize: 11, formatter: '{value}%' },
     },
     series: [
       {
@@ -96,7 +100,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         barWidth: 22,
         data: weekStats.arr.map((x, i) => {
           const v = x.total ? Math.round((x.done / x.total) * 100) : 0;
-          let color = '#262626';
+          let color = cc.emptyBar;
           if (i === weekStats.bestI && x.total) color = '#22c55e';
           else if (i === weekStats.worstI && x.total) color = '#ef4444';
           else if (v >= 60) color = '#eab308';
@@ -129,7 +133,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         </div>
 
         <div className="lg:col-span-3 flex flex-col items-center justify-center">
-          <Ring value={weekDoneRatio} size={140} stroke={10} color="#fafafa" trackColor="#262626">
+          <Ring value={weekDoneRatio} size={140} stroke={10} color="var(--text)">
             <div className="text-center">
               <div className="text-2xl font-semibold">{weekDoneRatio}%</div>
               <div className="text-[11px] text-text-muted">Неделя</div>
@@ -190,7 +194,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                 <div className="text-[11px] text-text-muted">Выполнено</div>
                 <div className="text-sm">{done}/{blockTasks.length}</div>
               </div>
-              <Ring value={ratio} size={48} stroke={5} color="#fafafa">
+              <Ring value={ratio} size={48} stroke={5} color="var(--text)">
                 <div className="text-[11px]">{ratio}%</div>
               </Ring>
             </div>
@@ -274,7 +278,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                   <div
                     key={i}
                     className="h-2 w-2 rounded-full"
-                    style={{ background: m ? habit.color ?? '#22c55e' : '#262626' }}
+                    style={{ background: m ? habit.color ?? '#22c55e' : 'var(--border)' }}
                   />
                 ))}
               </div>

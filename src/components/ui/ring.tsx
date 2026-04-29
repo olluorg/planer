@@ -15,7 +15,7 @@ export const Ring: React.FC<RingProps> = ({
   size = 120,
   stroke = 10,
   color = '#22c55e',
-  trackColor = '#262626',
+  trackColor = 'var(--border)',
   children,
   className,
 }) => {
@@ -26,18 +26,17 @@ export const Ring: React.FC<RingProps> = ({
   return (
     <div className={`relative inline-flex items-center justify-center ${className ?? ''}`} style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={stroke} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} style={{ stroke: trackColor }} strokeWidth={stroke} fill="none" />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={color}
+          style={{ stroke: color, transition: 'stroke-dashoffset 300ms ease-out' }}
           strokeWidth={stroke}
           strokeLinecap="round"
           fill="none"
           strokeDasharray={c}
           strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 300ms ease-out' }}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">{children}</div>

@@ -9,9 +9,13 @@ import { forecastGoal } from '@/lib/predict';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { isoDate, fmtNum } from '@/lib/utils';
+import { useTheme } from '@/lib/theme';
+import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 
 export const AnalyticsPage = () => {
   const { goals, progress, tasks, habits, habitLogs } = useStore();
+  const { theme } = useTheme();
+  const cc = getChartColors(theme === 'dark');
   const [goalId, setGoalId] = useState<string>(goals[0]?.id ?? '');
   const [scenario, setScenario] = useState<'as-is' | 'plus20' | 'plus50' | 'minus20'>('as-is');
   const goal = goals.find((g) => g.id === goalId);
@@ -81,7 +85,7 @@ export const AnalyticsPage = () => {
               <span>точность: <b className="text-text">{Math.round(f.etaConfidence * 100)}%</b></span>
             </div>
           </div>
-          <ECharts height={340} option={mainChart(goal, recs, f)} />
+          <ECharts height={340} option={mainChart(goal, recs, f, cc)} />
         </Card>
       )}
 
@@ -106,12 +110,12 @@ export const AnalyticsPage = () => {
           <CardTitle>Привычки за неделю</CardTitle>
           <ECharts height={240} option={{
             grid: { left: 100, right: 20, top: 10, bottom: 24 },
-            xAxis: { type: 'value', max: 7, axisLabel: { color: '#a3a3a3' }, splitLine: { lineStyle: { color: '#1f1f1f' } } },
-            yAxis: { type: 'category', data: habitsBar.map((h) => h.title), axisLabel: { color: '#a3a3a3' }, axisLine: { lineStyle: { color: '#262626' } } },
+            xAxis: { type: 'value', max: 7, axisLabel: { color: cc.axis }, splitLine: { lineStyle: { color: cc.splitLine } } },
+            yAxis: { type: 'category', data: habitsBar.map((h) => h.title), axisLabel: { color: cc.axis }, axisLine: { lineStyle: { color: cc.axisLine } } },
             series: [{
               type: 'bar', barWidth: 14,
               data: habitsBar.map((h) => ({ value: h.done, itemStyle: { color: '#22c55e', borderRadius: [0, 4, 4, 0] } })),
-              markLine: { silent: true, symbol: 'none', data: [{ xAxis: 7, lineStyle: { color: '#a3a3a3', type: 'dashed' } }] },
+              markLine: { silent: true, symbol: 'none', data: [{ xAxis: 7, lineStyle: { color: cc.axis, type: 'dashed' } }] },
             }],
           }} />
         </Card>
@@ -121,9 +125,9 @@ export const AnalyticsPage = () => {
           <ECharts height={240} option={{
             tooltip: { position: 'top' },
             grid: { left: 30, right: 10, top: 10, bottom: 20 },
-            xAxis: { type: 'category', data: Array.from({ length: heat.weeks }, (_, i) => `н${i + 1}`), splitArea: { show: true }, axisLabel: { color: '#a3a3a3', fontSize: 10 } },
-            yAxis: { type: 'category', data: ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'], splitArea: { show: true }, axisLabel: { color: '#a3a3a3', fontSize: 10 } },
-            visualMap: { min: 0, max: heat.max, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, show: false, inRange: { color: ['#1a1a1a', '#16a34a', '#22c55e'] } },
+            xAxis: { type: 'category', data: Array.from({ length: heat.weeks }, (_, i) => `н${i + 1}`), splitArea: { show: true }, axisLabel: { color: cc.axis, fontSize: 10 } },
+            yAxis: { type: 'category', data: ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'], splitArea: { show: true }, axisLabel: { color: cc.axis, fontSize: 10 } },
+            visualMap: { min: 0, max: heat.max, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, show: false, inRange: { color: [cc.heatmapEmpty, '#16a34a', '#22c55e'] } },
             series: [{ type: 'heatmap', data: heat.data, itemStyle: { borderRadius: 2 }, progressive: 0 }],
           }} />
         </Card>
@@ -132,7 +136,7 @@ export const AnalyticsPage = () => {
   );
 };
 
-function mainChart(goal: any, recs: any[], f: any) {
+function mainChart(goal: any, recs: any[], f: any, cc: ChartColors) {
   const histDates = recs.map((r) => r.date);
   const histVals = recs.map((r) => r.value);
   const fcDates = f.forecast.map((p: any) => p.date);
@@ -142,15 +146,15 @@ function mainChart(goal: any, recs: any[], f: any) {
   const xs = [...histDates, ...fcDates];
   return {
     grid: { left: 50, right: 20, top: 20, bottom: 30 },
-    tooltip: { trigger: 'axis', backgroundColor: '#141414', borderColor: '#262626', textStyle: { color: '#fafafa' } },
-    legend: { textStyle: { color: '#a3a3a3' }, top: 0, right: 10 },
+    tooltip: { trigger: 'axis', backgroundColor: cc.tooltipBg, borderColor: cc.tooltipBorder, textStyle: { color: cc.tooltipText } },
+    legend: { textStyle: { color: cc.axis }, top: 0, right: 10 },
     xAxis: {
-      type: 'category', data: xs, axisLabel: { color: '#a3a3a3' },
-      axisLine: { lineStyle: { color: '#262626' } },
+      type: 'category', data: xs, axisLabel: { color: cc.axis },
+      axisLine: { lineStyle: { color: cc.axisLine } },
     },
     yAxis: {
-      type: 'value', axisLabel: { color: '#a3a3a3' },
-      splitLine: { lineStyle: { color: '#1f1f1f' } },
+      type: 'value', axisLabel: { color: cc.axis },
+      splitLine: { lineStyle: { color: cc.splitLine } },
       axisLine: { show: false }, axisTick: { show: false },
     },
     series: [
@@ -159,7 +163,7 @@ function mainChart(goal: any, recs: any[], f: any) {
         data: [...histVals, ...new Array(fcDates.length).fill(null)],
         lineStyle: { color: '#22c55e', width: 2.5 },
         areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(34,197,94,0.3)' }, { offset: 1, color: 'rgba(34,197,94,0)' }] } },
-        markLine: { silent: true, symbol: 'none', lineStyle: { color: '#fafafa', type: 'dashed', opacity: 0.5 }, data: [{ yAxis: goal.target_value, label: { color: '#fafafa', formatter: 'цель' } }] },
+        markLine: { silent: true, symbol: 'none', lineStyle: { color: cc.axis, type: 'dashed', opacity: 0.7 }, data: [{ yAxis: goal.target_value, label: { color: cc.axis, formatter: 'цель' } }] },
       },
       {
         name: 'Прогноз', type: 'line', smooth: true, showSymbol: false,

@@ -11,10 +11,14 @@ import { useStore } from '@/lib/store';
 import { fmtNum } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
 import { ECharts } from '@/components/charts/ECharts';
+import { useTheme } from '@/lib/theme';
+import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 import type { Goal, GoalType } from '@/lib/types';
 
 export const GoalsPage = () => {
   const { goals, progress, addGoal, removeGoal, updateGoal, addProgress } = useStore();
+  const { theme } = useTheme();
+  const cc = getChartColors(theme === 'dark');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: '', type: 'mid' as GoalType, start_value: '0', target_value: '100', unit: '', deadline: '' });
 
@@ -80,7 +84,7 @@ export const GoalsPage = () => {
               </div>
 
               <div className="mt-3">
-                <ECharts height={140} option={forecastChart(g, recs, f)} />
+                <ECharts height={140} option={forecastChart(g, recs, f, cc)} />
               </div>
 
               <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
@@ -176,7 +180,7 @@ const QuickProgress: React.FC<{ goal: any; onAdd: (v: number) => void }> = ({ go
   );
 };
 
-function forecastChart(goal: any, recs: any[], f: any) {
+function forecastChart(goal: any, recs: any[], f: any, cc: ChartColors) {
   const histDates = recs.map((r) => r.date);
   const histVals = recs.map((r) => r.value);
   const fcDates = f.forecast.map((p: any) => p.date);
@@ -186,12 +190,12 @@ function forecastChart(goal: any, recs: any[], f: any) {
   const xs = [...histDates, ...fcDates];
   return {
     grid: { left: 35, right: 10, top: 10, bottom: 24 },
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: xs, axisLabel: { color: '#a3a3a3', fontSize: 10 }, axisLine: { lineStyle: { color: '#262626' } } },
+    tooltip: { trigger: 'axis', backgroundColor: cc.tooltipBg, borderColor: cc.tooltipBorder, textStyle: { color: cc.tooltipText } },
+    xAxis: { type: 'category', data: xs, axisLabel: { color: cc.axis, fontSize: 10 }, axisLine: { lineStyle: { color: cc.axisLine } } },
     yAxis: {
       type: 'value',
-      axisLabel: { color: '#a3a3a3', fontSize: 10 },
-      splitLine: { lineStyle: { color: '#1f1f1f' } },
+      axisLabel: { color: cc.axis, fontSize: 10 },
+      splitLine: { lineStyle: { color: cc.splitLine } },
       axisLine: { show: false }, axisTick: { show: false },
     },
     series: [
@@ -199,7 +203,7 @@ function forecastChart(goal: any, recs: any[], f: any) {
         name: 'История', type: 'line', smooth: true, showSymbol: false,
         data: [...histVals, ...new Array(fcDates.length).fill(null)],
         lineStyle: { color: '#22c55e', width: 2 }, areaStyle: { color: 'rgba(34,197,94,0.15)' },
-        markLine: { silent: true, symbol: 'none', lineStyle: { color: '#a3a3a3', type: 'dashed' }, data: [{ yAxis: goal.target_value, label: { color: '#a3a3a3', formatter: 'цель' } }] },
+        markLine: { silent: true, symbol: 'none', lineStyle: { color: cc.axis, type: 'dashed' }, data: [{ yAxis: goal.target_value, label: { color: cc.axis, formatter: 'цель' } }] },
       },
       {
         name: 'Прогноз', type: 'line', smooth: true, showSymbol: false,

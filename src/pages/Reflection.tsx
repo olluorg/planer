@@ -9,11 +9,15 @@ import { isoDate } from '@/lib/utils';
 import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ECharts } from '@/components/charts/ECharts';
+import { useTheme } from '@/lib/theme';
+import { getChartColors } from '@/lib/chart-theme';
 
 const MOODS = ['😞', '😕', '😐', '🙂', '😊'];
 
 export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   const { reflections, tasks, upsertReflection } = useStore();
+  const { theme } = useTheme();
+  const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
   const cur = reflections.find((r) => r.date === today);
   const [mood, setMood] = useState<number | null>(cur?.mood ?? null);
@@ -93,11 +97,11 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
           <CardTitle>Недельный обзор</CardTitle>
           <ECharts height={200} option={{
             grid: { left: 30, right: 10, top: 20, bottom: 30 },
-            tooltip: { trigger: 'axis', backgroundColor: '#141414', borderColor: '#262626', textStyle: { color: '#fafafa' } },
-            xAxis: { type: 'category', data: week.map((w) => format(new Date(w.date), 'EEE', { locale: ru })), axisLabel: { color: '#a3a3a3' }, axisLine: { lineStyle: { color: '#262626' } } },
+            tooltip: { trigger: 'axis', backgroundColor: cc.tooltipBg, borderColor: cc.tooltipBorder, textStyle: { color: cc.tooltipText } },
+            xAxis: { type: 'category', data: week.map((w) => format(new Date(w.date), 'EEE', { locale: ru })), axisLabel: { color: cc.axis }, axisLine: { lineStyle: { color: cc.axisLine } } },
             yAxis: [
-              { type: 'value', max: 100, axisLabel: { color: '#a3a3a3', formatter: '{value}%' }, splitLine: { lineStyle: { color: '#1f1f1f' } }, axisLine: { show: false }, axisTick: { show: false } },
-              { type: 'value', min: 0, max: 4, axisLabel: { color: '#a3a3a3' }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
+              { type: 'value', max: 100, axisLabel: { color: cc.axis, formatter: '{value}%' }, splitLine: { lineStyle: { color: cc.splitLine } }, axisLine: { show: false }, axisTick: { show: false } },
+              { type: 'value', min: 0, max: 4, axisLabel: { color: cc.axis }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
             ],
             series: [
               { name: 'Выполнено', type: 'bar', barWidth: 16, data: week.map((w) => w.total ? Math.round((w.done / w.total) * 100) : 0), itemStyle: { color: '#22c55e', borderRadius: [4, 4, 0, 0] } },

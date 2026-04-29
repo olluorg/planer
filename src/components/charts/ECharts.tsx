@@ -20,14 +20,20 @@ interface Props {
   className?: string;
 }
 
-export const ECharts: React.FC<Props> = ({ option, height = 240, className }) => (
-  <ReactEChartsCore
-    echarts={echarts}
-    option={option}
-    style={{ height, width: '100%' }}
-    className={className}
-    notMerge
-    lazyUpdate
-    theme="dark"
-  />
-);
+import { useTheme } from '@/lib/theme';
+
+export const ECharts: React.FC<Props> = ({ option, height = 240, className }) => {
+  const { theme } = useTheme();
+  return (
+    <ReactEChartsCore
+      key={theme}
+      echarts={echarts}
+      option={{ backgroundColor: 'transparent', ...option }}
+      style={{ height, width: '100%' }}
+      className={className}
+      notMerge
+      lazyUpdate
+      theme={theme === 'dark' ? 'dark' : undefined}
+    />
+  );
+};
