@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { useStore } from './lib/store';
@@ -39,6 +39,7 @@ export default function App() {
         <Topbar date={date} onDate={setDate} range={range} onRange={setRange} onAdd={() => setQuickOpen(true)} />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
           <Routes>
+            <Route path="/index.html" element={<Navigate to="/" replace />} />
             <Route path="/" element={<Dashboard date={date} />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/tasks" element={<TasksPage date={date} />} />

@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
@@ -6,35 +6,33 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
-  build:
+  # ── Web app → GitHub Pages ──────────────────────────────────────────────
+  build-pages:
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
-
       - uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build
-        run: bun run build
-
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+        name: Build (GitHub Pages)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-  deploy:
-    needs: build
+  deploy-pages:
+    needs: build-pages
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -42,3 +40,36 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+
+  # ── Chrome extension → GitHub Releases ──────────────────────────────────
+  release-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Build Chrome extension
+        run: bun run build:ext
+
+      - name: Zip extension
+        run: cd dist && zip -r ../planer-extension.zip .
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          NOTES="Установка: \`chrome://extensions\` → Режим разработчика → Загрузить распакованное — или распаковать zip.
+
+          Сборка: \`${{ github.sha }}\`"
+
+          if gh release view "$TAG" &>/dev/null; then
+            gh release upload "$TAG" planer-extension.zip --clobber
+          else
+            gh release create "$TAG" \
+              --title "Planer Extension ${TAG}" \
+              --notes "$NOTES" \
+              planer-extension.zip
+          fi

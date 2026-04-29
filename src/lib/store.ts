@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { exec, getDB, query } from './db';
 import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task } from './types';
 import { todayISO } from './utils';
+import { syncTasksToExtension } from './extension';
 
 interface State {
   ready: boolean;
@@ -54,14 +55,16 @@ export const useStore = create<State>((set, get) => ({
   },
 
   reload: () => {
+    const tasks = query<Task>('SELECT * FROM tasks ORDER BY date DESC, priority ASC');
     set({
       goals: query<Goal>('SELECT * FROM goals ORDER BY created_at DESC'),
-      tasks: query<Task>('SELECT * FROM tasks ORDER BY date DESC, priority ASC'),
+      tasks,
       habits: query<Habit>('SELECT * FROM habits ORDER BY created_at ASC'),
       habitLogs: query<HabitLog>('SELECT * FROM habit_logs'),
       progress: query<ProgressRecord>('SELECT * FROM progress_records ORDER BY date ASC'),
       reflections: query<Reflection>('SELECT * FROM reflections ORDER BY date DESC'),
     });
+    syncTasksToExtension(tasks);
   },
 
   addGoal: (g) => {

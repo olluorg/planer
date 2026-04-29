@@ -1,11 +1,12 @@
 {
-  "name": "reform-planer",
+  "name": "thedad-planer",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:ext": "node scripts/build-ext.mjs",
     "preview": "vite preview",
     "lint": "tsc -b --noEmit"
   },
