@@ -14,7 +14,7 @@ export const Ring: React.FC<RingProps> = ({
   value,
   size = 120,
   stroke = 10,
-  color = '#22c55e',
+  color = 'var(--accent)',
   trackColor = 'var(--border)',
   children,
   className,

@@ -6,12 +6,12 @@ const EVENT = 'reform-theme';
 const ACCENT_EVENT = 'reform-accent';
 
 export const ACCENTS = [
-  { id: 'green',  label: 'Зелёный',  color: '#22c55e', soft: '#16a34a' },
-  { id: 'blue',   label: 'Синий',    color: '#3b82f6', soft: '#2563eb' },
+  { id: 'green',  label: 'Лайм',       color: '#84CC16', soft: '#A3E635' },
+  { id: 'blue',   label: 'Синий',      color: '#3b82f6', soft: '#2563eb' },
   { id: 'purple', label: 'Фиолетовый', color: '#a855f7', soft: '#9333ea' },
-  { id: 'pink',   label: 'Розовый',  color: '#ec4899', soft: '#db2777' },
-  { id: 'orange', label: 'Оранжевый', color: '#f97316', soft: '#ea580c' },
-  { id: 'cyan',   label: 'Бирюзовый', color: '#06b6d4', soft: '#0891b2' },
+  { id: 'pink',   label: 'Розовый',    color: '#ec4899', soft: '#db2777' },
+  { id: 'orange', label: 'Оранжевый',  color: '#f97316', soft: '#ea580c' },
+  { id: 'cyan',   label: 'Бирюзовый',  color: '#06b6d4', soft: '#0891b2' },
 ] as const;
 
 export type AccentId = typeof ACCENTS[number]['id'];

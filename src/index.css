@@ -19,15 +19,17 @@
   }
   .dark {
     color-scheme: dark;
-    --bg: #0a0a0a;
-    --bg-card: #141414;
-    --bg-soft: #1a1a1a;
-    --bg-hover: #1f1f1f;
-    --border: #262626;
-    --border-soft: #1f1f1f;
-    --text: #fafafa;
-    --text-muted: #a3a3a3;
-    --text-dim: #737373;
+    --accent: #84CC16;
+    --accent-soft: #A3E635;
+    --bg: #0B0D0F;
+    --bg-card: #131820;
+    --bg-soft: #0f1318;
+    --bg-hover: #1c2230;
+    --border: #1f2633;
+    --border-soft: #181e2a;
+    --text: #F0F2F5;
+    --text-muted: #8892A4;
+    --text-dim: #4E5A6B;
   }
   html, body, #root { height: 100%; }
   body {
@@ -36,21 +38,21 @@
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-tap-highlight-color: transparent;
   }
-  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
   *::-webkit-scrollbar-track { background: transparent; }
-  *::-webkit-scrollbar-thumb { background: #262626; border-radius: 8px; }
-  *::-webkit-scrollbar-thumb:hover { background: #333; }
+  *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 }
 
 @layer components {
   .card {
-    @apply border border-border hover:bg-bg-hover transition-colors;
+    @apply border border-border bg-bg-card transition-colors;
   }
   .card-hover {
     @apply hover:bg-bg-soft transition-colors;
   }
   .label-up {
-    @apply text-[11px] uppercase tracking-wider text-text-muted font-medium;
+    @apply text-[10px] uppercase tracking-widest text-text-muted font-semibold;
   }
   .stat-num {
     @apply text-3xl font-semibold tabular-nums;
@@ -58,23 +60,46 @@
   .row-divide > * + * {
     @apply border-t border-border-soft;
   }
+  .section-title {
+    @apply text-[10px] uppercase tracking-widest text-text-muted font-semibold mb-3;
+  }
 }
 
-/* react-grid-layout overrides */
+/* Карточки: тень для визуального выделения на тёмном фоне */
+.dark .bento-item > div {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes check-done {
+  0%   { opacity: 1; }
+  50%  { background: rgba(132, 204, 22, 0.12); }
+  100% { opacity: 0.65; }
+}
+@keyframes fade-in  { from { opacity: 0 }               to { opacity: 1 } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes pulse-ok {
+  0%   { background-color: transparent }
+  40%  { background-color: rgba(132, 204, 22, 0.15) }
+  100% { background-color: transparent }
+}
+@keyframes check-pop {
+  0%   { transform: scale(0.8) }
+  55%  { transform: scale(1.15) }
+  100% { transform: scale(1) }
+}
+
+/* react-grid-layout */
 .react-grid-item.react-grid-placeholder {
   background: var(--bg-hover) !important;
   border: 1px dashed var(--border) !important;
   border-radius: 0 !important;
-  opacity: 0.6;
+  opacity: 0.5;
 }
-.react-grid-item > .react-resizable-handle {
-  background: none;
-}
+.react-grid-item > .react-resizable-handle { background: none; }
 .react-grid-item > .react-resizable-handle::after {
-  border-color: var(--text-muted) !important;
-  width: 8px; height: 8px;
+  border-color: var(--text-dim) !important;
+  width: 6px; height: 6px;
 }
 .editing .bento-item { user-select: none; }
 .bento-item { transition: box-shadow 150ms; }
-.editing .bento-item:hover { box-shadow: 0 0 0 1px var(--border); }
-
+.editing .bento-item:hover { box-shadow: 0 0 0 2px var(--accent) !important; }

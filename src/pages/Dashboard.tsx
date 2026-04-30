@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GridLayout, { WidthProvider, type Layout } from 'react-grid-layout';
+import { Responsive, WidthProvider, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
-const RGL = WidthProvider(GridLayout);
+const RGL = WidthProvider(Responsive);
 import { CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Ring } from '@/components/ui/ring';
@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import {
   Plus, ChevronRight, Sun, Moon, Lock, Unlock, RotateCcw, Trash2,
-  CheckSquare, Repeat, Activity, NotebookPen, Gauge,
+  CheckSquare, Repeat, NotebookPen, Dumbbell, Timer, Target,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { isoDate, fmtNum, colorByPct } from '@/lib/utils';
@@ -34,21 +34,32 @@ const BLOCKS = [
 ] as const;
 
 const DEFAULT_LAYOUT: Layout[] = [
-  { i: 'goals-week',    x: 0,  y: 0,  w: 9, h: 6 },
-  { i: 'progress-ring', x: 9,  y: 0,  w: 3, h: 6 },
-  { i: 'block-morning', x: 0,  y: 6,  w: 2, h: 6 },
-  { i: 'block-day',     x: 2,  y: 6,  w: 2, h: 6 },
-  { i: 'block-evening', x: 4,  y: 6,  w: 2, h: 6 },
-  { i: 'block-night',   x: 6,  y: 6,  w: 2, h: 6 },
-  { i: 'notes',         x: 8,  y: 6,  w: 2, h: 6 },
-  { i: 'stats',         x: 10, y: 6,  w: 2, h: 6 },
-  { i: 'plan-future',   x: 0,  y: 12, w: 9, h: 8 },
-  { i: 'habits',        x: 9,  y: 12, w: 3, h: 8 },
-  { i: 'focus',         x: 0,  y: 20, w: 3, h: 4 },
-  { i: 'quick-add',     x: 3,  y: 20, w: 3, h: 4 },
-  { i: 'reflection',    x: 6,  y: 20, w: 3, h: 4 },
-  { i: 'reminders',     x: 9,  y: 20, w: 3, h: 4 },
-  { i: 'kpi-grid',      x: 0,  y: 24, w: 12, h: 5 },
+  { i: 'goals-week',    x: 0,  y: 0,  w: 12, h: 6 },
+  { i: 'block-morning', x: 0,  y: 6,  w: 2,  h: 7 },
+  { i: 'block-day',     x: 2,  y: 6,  w: 2,  h: 7 },
+  { i: 'block-evening', x: 4,  y: 6,  w: 2,  h: 7 },
+  { i: 'block-night',   x: 6,  y: 6,  w: 2,  h: 7 },
+  { i: 'notes',         x: 8,  y: 6,  w: 4,  h: 7 },
+  { i: 'plan-future',   x: 0,  y: 13, w: 12, h: 9 },
+  { i: 'focus',         x: 0,  y: 22, w: 4,  h: 4 },
+  { i: 'quick-add',     x: 4,  y: 22, w: 4,  h: 4 },
+  { i: 'reflection',    x: 8,  y: 22, w: 4,  h: 4 },
+  { i: 'kpi-grid',      x: 0,  y: 26, w: 12, h: 5 },
+];
+
+// Mobile layout: single-column (4 cols), stacked vertically
+const MOBILE_LAYOUT: Layout[] = [
+  { i: 'goals-week',    x: 0, y: 0,  w: 4, h: 7  },
+  { i: 'block-morning', x: 0, y: 7,  w: 4, h: 7  },
+  { i: 'block-day',     x: 0, y: 14, w: 4, h: 7  },
+  { i: 'block-evening', x: 0, y: 21, w: 4, h: 7  },
+  { i: 'block-night',   x: 0, y: 28, w: 4, h: 7  },
+  { i: 'plan-future',   x: 0, y: 35, w: 4, h: 8  },
+  { i: 'focus',         x: 0, y: 43, w: 4, h: 4  },
+  { i: 'quick-add',     x: 0, y: 47, w: 4, h: 4  },
+  { i: 'reflection',    x: 0, y: 51, w: 4, h: 4  },
+  { i: 'notes',         x: 0, y: 55, w: 4, h: 5  },
+  { i: 'kpi-grid',      x: 0, y: 60, w: 4, h: 5  },
 ];
 
 const ROW_HEIGHT = 48;
@@ -60,9 +71,9 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v4', DEFAULT_LAYOUT);
+  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v5', DEFAULT_LAYOUT);
   const [editing, setEditing] = useState(false);
-  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v2', []);
+  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v3', []);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
   const [reminders, setReminders] = useLocalStorage<{ id: string; text: string; done: boolean }[]>(
     'dashboard.reminders',
@@ -71,7 +82,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       { id: 'r2', text: 'Медитация в 21:30', done: false },
     ],
   );
-  const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
+  const [quickTab, setQuickTab] = useState<'task' | 'habit' | null>(null);
   const [kpiGoals, setKpiGoals] = useLocalStorage<string[]>('dashboard.kpiGoals', []);
 
   const applyPreset = (id: string) => {
@@ -202,16 +213,27 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const widgets: Record<string, () => React.ReactNode> = {
     'goals-week': () => (
       <WidgetCard title="Цели на неделю" editing={editing} onHide={() => hideWidget('goals-week')} onClick={() => !editing && nav('/goals')}>
-        <div className="grid grid-cols-12 gap-4 h-full items-center">
-          <div className="col-span-4 flex flex-col justify-center">
-            <ol className="space-y-2.5">
+        {/* Mobile: стек, Desktop: 4-колоночная сетка */}
+        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-12 sm:gap-4 h-full sm:items-center">
+          {/* Ring — на мобильных сверху */}
+          <div className="sm:col-span-3 flex justify-center items-center order-first sm:order-none">
+            <Ring value={weekDoneRatio} size={110} stroke={10} color={colorByPct(weekDoneRatio)}>
+              <div className="text-center">
+                <div className="text-xl font-semibold">{weekDoneRatio}%</div>
+                <div className="text-[10px] text-text-muted">Неделя</div>
+              </div>
+            </Ring>
+          </div>
+          {/* Goals list */}
+          <div className="sm:col-span-4 flex flex-col justify-center">
+            <ol className="space-y-2">
               {goals.slice(0, 5).map((g, i) => {
                 const denom = g.target_value - g.start_value || 1;
                 const r = Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom));
                 const done = r >= 1;
                 return (
-                  <li key={g.id} className="flex items-center gap-3 text-sm">
-                    <span className="text-text-dim w-3">{i + 1}</span>
+                  <li key={g.id} className="flex items-center gap-2 text-sm">
+                    <span className="text-text-dim w-3 shrink-0">{i + 1}</span>
                     <span className="flex-1 truncate">{g.title}</span>
                     <span onClick={(e) => e.stopPropagation()}>
                       <Checkbox checked={done} onCheckedChange={() => toggleGoalDone(g.id)} />
@@ -221,23 +243,17 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
               })}
             </ol>
           </div>
-          <div className="col-span-3 flex justify-center items-center">
-            <Ring value={weekDoneRatio} size={130} stroke={10} color={colorByPct(weekDoneRatio)}>
-              <div className="text-center">
-                <div className="text-2xl font-semibold">{weekDoneRatio}%</div>
-                <div className="text-[11px] text-text-muted">Неделя</div>
-              </div>
-            </Ring>
-          </div>
-          <div className="col-span-2 flex flex-col justify-center text-sm space-y-1.5">
+          {/* Stats — hidden on mobile */}
+          <div className="hidden sm:flex sm:col-span-2 flex-col justify-center text-sm space-y-1.5">
             <Row label="Всего" value={String(weekStats.total)} />
             <Row label="Готово" value={String(weekStats.done)} />
             <Row label="Осталось" value={String(weekStats.total - weekStats.done)} />
             <Row label="Лучший" value={dayName(weekStats.bestI)} valueClass="text-accent" />
             <Row label="Худший" value={dayName(weekStats.worstI)} valueClass="text-danger" />
           </div>
-          <div className="col-span-3 min-w-0 flex items-center">
-            <ECharts option={weekChartOpt} height={160} />
+          {/* Bar chart — hidden on mobile */}
+          <div className="hidden sm:flex sm:col-span-3 min-w-0 items-center">
+            <ECharts option={weekChartOpt} height={140} />
           </div>
         </div>
       </WidgetCard>
@@ -286,7 +302,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                 {[...blockTasks].sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')).map((t) => (
                   <label
                     key={t.id}
-                    className={`flex items-center gap-3 px-2 py-2 cursor-pointer transition-colors hover:bg-bg-hover ${t.status === 'done' ? 'animate-pulse-ok' : ''}`}
+                    className={`flex items-center gap-2.5 px-2 py-2.5 min-h-[44px] cursor-pointer transition-colors hover:bg-bg-hover rounded-sm ${t.status === 'done' ? 'animate-pulse-ok' : ''}`}
                   >
                     <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
                     {t.start_time && <span className="text-text-dim text-[11px] tabular-nums w-10">{t.start_time}</span>}
@@ -310,13 +326,23 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     ])) as Record<string, () => React.ReactNode>,
 
     'notes': () => (
-      <WidgetCard title="Заметка на день" editing={editing} onHide={() => hideWidget('notes')}>
-        <textarea
-          className="w-full h-full bg-transparent text-xs text-text resize-none outline-none border-0"
-          value={notes[today] ?? ''}
-          onChange={(e) => setNotes({ ...notes, [today]: e.target.value })}
-          placeholder="Запиши мысли дня..."
-        />
+      <WidgetCard editing={editing} onHide={() => hideWidget('notes')}>
+        <div className="flex flex-col h-full">
+          <div className="text-[10px] uppercase tracking-widest text-text-muted font-medium mb-3">Заметка на день</div>
+          <div className="text-text-muted text-lg mb-2 leading-none">"</div>
+          <textarea
+            className="flex-1 w-full bg-transparent text-sm text-text resize-none outline-none border-0 leading-relaxed"
+            value={notes[today] ?? ''}
+            onChange={(e) => setNotes({ ...notes, [today]: e.target.value })}
+            placeholder="Запиши мысли дня..."
+          />
+          <button
+            className="mt-2 flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors"
+            onClick={() => setNotes({ ...notes, [today]: (notes[today] ?? '') })}
+          >
+            <Plus className="h-3.5 w-3.5" /> Новая заметка
+          </button>
+        </div>
       </WidgetCard>
     ),
 
@@ -343,7 +369,12 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
 
     'plan-future': () => (
       <WidgetCard title="План на будущее" editing={editing} onHide={() => hideWidget('plan-future')}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 h-full">
+        <div className="flex gap-3 overflow-x-auto pb-2 h-full" style={{ scrollbarWidth: 'thin' }}>
+          {planGoals.length === 0 && (
+            <div className="flex-1 flex items-center justify-center text-xs text-text-dim">
+              Нет целей. Добавь первую цель.
+            </div>
+          )}
           {planGoals.map((g) => {
             const denom = g.target_value - g.start_value || 1;
             const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
@@ -352,23 +383,23 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
               <button
                 key={g.id}
                 onClick={() => !editing && nav('/goals')}
-                className="group text-left border border-border hover:border-text transition-all overflow-hidden flex flex-col"
+                className="group text-left border border-border hover:border-accent/50 transition-all overflow-hidden flex flex-col shrink-0 w-[260px] shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
               >
-                <div className="relative w-full aspect-[16/10] bg-bg-soft overflow-hidden">
+                <div className="relative w-full h-32 bg-bg-soft overflow-hidden">
                   {g.cover ? (
                     <img src={g.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-dim text-3xl font-bold">
+                    <div className="w-full h-full flex items-center justify-center text-text-dim text-4xl font-bold">
                       {g.title.slice(0, 1).toUpperCase()}
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-bg/90 via-bg/20 to-transparent" />
-                  <div className="absolute bottom-2 left-2 right-2">
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg-card/95 via-bg/30 to-transparent" />
+                  <div className="absolute bottom-2 left-3 right-3">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">{monthLabel}</div>
-                    <div className="text-base font-semibold leading-tight truncate">{g.title}</div>
+                    <div className="text-sm font-semibold leading-tight truncate">{g.title}</div>
                   </div>
                 </div>
-                <div className="p-3 flex-1 flex flex-col justify-between">
+                <div className="p-3 flex-1 flex flex-col justify-between bg-bg-card">
                   <div>
                     <div className="text-2xl font-bold tabular-nums" style={{ color: colorByPct(r) }}>
                       {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
@@ -376,7 +407,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                     <div className="text-[11px] text-text-muted">из {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}</div>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <Progress value={r} className="flex-1 h-2" barColor={colorByPct(r)} />
+                    <Progress value={r} className="flex-1 h-1.5" barColor={colorByPct(r)} />
                     <span className="text-xs font-semibold tabular-nums" style={{ color: colorByPct(r) }}>{r}%</span>
                   </div>
                 </div>
@@ -417,35 +448,19 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     ),
 
     'focus': () => {
-      const top = [...dayTasks]
-        .filter((t) => t.status === 'active')
-        .sort((a, b) => (a.priority - b.priority) || (a.start_time ?? '').localeCompare(b.start_time ?? ''))
-        .slice(0, 3);
+      const top = [...dayTasks].filter(t => t.status === 'active')
+        .sort((a, b) => a.priority - b.priority).slice(0, 1);
+      const focusText = top.length > 0 ? top[0].title : 'Сделай сегодня немного больше, чем вчера.';
       return (
         <WidgetCard editing={editing} onHide={() => hideWidget('focus')}>
           <div className="flex flex-col h-full">
-            <div className="text-[11px] uppercase tracking-wider text-text-muted">Фокус дня</div>
-            {top.length === 0 ? (
-              <div className="flex-1 flex flex-col justify-center">
-                <div className="text-xl font-bold leading-tight">Нет активных задач</div>
-                <div className="text-xs text-text-muted mt-1">Добавь главное на сегодня</div>
+            <div className="text-[10px] uppercase tracking-widest text-text-muted font-medium mb-3">Фокус дня</div>
+            <div className="flex-1 flex items-center gap-3">
+              <div className="h-10 w-10 shrink-0 rounded-full bg-accent/10 flex items-center justify-center">
+                <Target className="h-5 w-5 text-accent" />
               </div>
-            ) : (
-              <ol className="flex-1 flex flex-col justify-center gap-2 mt-1">
-                {top.map((t, i) => (
-                  <li key={t.id} className="flex items-start gap-3">
-                    <span className="text-2xl font-bold text-text-dim leading-none w-5">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-base font-semibold leading-snug truncate">{t.title}</div>
-                      {t.start_time && <div className="text-[11px] text-text-muted tabular-nums">{t.start_time}</div>}
-                    </div>
-                    <span onClick={(e) => e.stopPropagation()}>
-                      <Checkbox checked={false} onCheckedChange={() => toggleTask(t.id)} />
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
+              <p className="text-base font-semibold leading-snug text-text">{focusText}</p>
+            </div>
           </div>
         </WidgetCard>
       );
@@ -455,12 +470,12 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       <WidgetCard title="Быстрое добавление" editing={editing} onHide={() => hideWidget('quick-add')}>
         <div className="grid grid-cols-5 gap-2">
           {([
-            { l: 'Задача', i: CheckSquare, t: 'task' as const },
-            { l: 'Привычка', i: Repeat, t: 'habit' as const },
-            { l: 'Цель', i: Activity, t: 'goal' as const },
-            { l: 'Заметка', i: NotebookPen, t: null },
-            { l: 'Показатель', i: Gauge, t: 'progress' as const },
-          ]).map((q) => (
+            { l: 'Задача',     i: CheckSquare, t: 'task' as const },
+            { l: 'Привычка',   i: Repeat,      t: 'habit' as const },
+            { l: 'Тренировка', i: Dumbbell,    t: null },
+            { l: 'Заметка',    i: NotebookPen, t: null },
+            { l: 'Помодоро',   i: Timer,       t: null },
+          ] as { l: string; i: React.ElementType; t: 'task' | 'habit' | null }[]).map((q) => (
             <button
               key={q.l}
               onClick={() => {
@@ -567,60 +582,173 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="text-sm text-text-muted">
-          {editing ? 'Перетаскивай и меняй размер. Нажми «Готово» чтобы сохранить.' : ''}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {editing && (
-            <>
-              <Select onValueChange={applyPreset}>
-                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Пресет" /></SelectTrigger>
-                <SelectContent>
-                  {PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {hidden.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={showAll}>Показать скрытые ({hidden.length})</Button>
+    <div className="sm:flex sm:items-start">
+      {/* Main area */}
+      <div className="sm:flex-1 min-w-0">
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="text-sm text-text-muted">
+              {editing ? 'Перетаскивай и меняй размер. Нажми «Готово» чтобы сохранить.' : ''}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {editing && (
+                <>
+                  <Select onValueChange={applyPreset}>
+                    <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Пресет" /></SelectTrigger>
+                    <SelectContent>
+                      {PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {hidden.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={showAll}>Показать скрытые ({hidden.length})</Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={resetLayout}>
+                    <RotateCcw className="h-3.5 w-3.5" /> Сбросить
+                  </Button>
+                </>
               )}
-              <Button variant="ghost" size="sm" onClick={resetLayout}>
-                <RotateCcw className="h-3.5 w-3.5" /> Сбросить
+              <Button
+                variant={editing ? 'default' : 'soft'}
+                size="sm"
+                onClick={() => setEditing((v) => !v)}
+              >
+                {editing ? <><Unlock className="h-3.5 w-3.5" /> Готово</> : <><Lock className="h-3.5 w-3.5" /> Редактор</>}
               </Button>
-            </>
-          )}
-          <Button
-            variant={editing ? 'default' : 'soft'}
-            size="sm"
-            onClick={() => setEditing((v) => !v)}
+            </div>
+          </div>
+
+          <RGL
+            className={editing ? 'editing' : ''}
+            breakpoints={{ sm: 640, xs: 0 }}
+            cols={{ sm: 12, xs: 4 }}
+            layouts={{
+              sm: visibleLayout,
+              xs: MOBILE_LAYOUT.filter((l) => !hidden.includes(l.i)),
+            }}
+            rowHeight={ROW_HEIGHT}
+            margin={[10, 10]}
+            containerPadding={[0, 0]}
+            isDraggable={editing}
+            isResizable={editing}
+            onLayoutChange={(_cur: Layout[], all: Record<string, Layout[]>) => {
+              if (!editing) return;
+              const next = all.sm ?? [];
+              const merged = layout.map((it) => next.find((n: Layout) => n.i === it.i) ?? it);
+              setLayout(merged);
+            }}
+            draggableCancel="button,input,textarea,label,a,select"
           >
-            {editing ? <><Unlock className="h-3.5 w-3.5" /> Готово</> : <><Lock className="h-3.5 w-3.5" /> Редактор</>}
-          </Button>
+            {visibleLayout.map((l) => (
+              <div key={l.i} className="bento-item">
+                {widgets[l.i]?.()}
+              </div>
+            ))}
+          </RGL>
         </div>
       </div>
 
-      <RGL
-        className={editing ? 'editing' : ''}
-        layout={visibleLayout}
-        cols={12}
-        rowHeight={ROW_HEIGHT}
-        margin={[12, 12]}
-        containerPadding={[0, 0]}
-        isDraggable={editing}
-        isResizable={editing}
-        onLayoutChange={(next) => {
-          if (!editing) return;
-          const merged = layout.map((it) => next.find((n) => n.i === it.i) ?? it);
-          setLayout(merged);
-        }}
-        draggableCancel="button,input,textarea,label,a,select"
-      >
-        {visibleLayout.map((l) => (
-          <div key={l.i} className="bento-item">
-            {widgets[l.i]?.()}
+      {/* Sticky right panel */}
+      <div className="hidden lg:flex w-[300px] shrink-0 border-l border-border flex-col bg-bg-card sticky top-0 max-h-[calc(100vh-64px)] overflow-y-auto">
+        {/* Progress Goals */}
+        <div className="p-4 border-b border-border">
+          <div className="text-[11px] uppercase tracking-wider text-text-muted mb-3 font-medium">Прогресс целей</div>
+          <div className="flex flex-col items-center gap-3">
+            <Ring value={overallGoalProgress} size={120} stroke={10} color={colorByPct(overallGoalProgress)}>
+              <div className="text-center">
+                <div className="text-2xl font-semibold">{overallGoalProgress}%</div>
+                <div className="text-[11px] text-text-muted">Общий</div>
+              </div>
+            </Ring>
+            {velocityHint !== null && (
+              <div className="text-center text-xs">
+                {velocityHint > 0 && <span className="text-accent">↗ ускорение +{velocityHint}% к прошлой неделе</span>}
+                {velocityHint === 0 && <span className="text-text-muted">→ темп без изменений</span>}
+                {velocityHint < 0 && <span className="text-danger">↘ отстаёшь {velocityHint}% от прошлой недели</span>}
+              </div>
+            )}
           </div>
-        ))}
-      </RGL>
+          <Button variant="ghost" className="w-full justify-between mt-3 text-text-muted" onClick={() => nav('/goals')}>
+            Все цели <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Statistics */}
+        <div className="p-4 border-b border-border">
+          <div className="text-[11px] uppercase tracking-wider text-text-muted mb-3 font-medium">Статистика</div>
+          <div className="space-y-3">
+            {fitnessStats.map((s) => (
+              <div key={s.label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-text-muted">{s.label}</span>
+                  <span className="tabular-nums text-text">{fmtNum(s.cur, 1)} / {fmtNum(s.max, 0)}{s.unit ?? ''}</span>
+                </div>
+                <Progress value={(s.cur / s.max) * 100} barColor={colorByPct((s.cur / s.max) * 100)} />
+              </div>
+            ))}
+          </div>
+          <Button variant="ghost" className="w-full justify-between mt-3 text-text-muted" onClick={() => nav('/analytics')}>
+            Вся статистика <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Habits */}
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Привычки</div>
+            <Button variant="ghost" size="sm" className="text-text-muted h-6 px-2 text-xs" onClick={() => nav('/habits')}>
+              Изменить
+            </Button>
+          </div>
+          <div className="space-y-2.5">
+            {habitWeek.slice(0, 6).map(({ habit, marks, done }) => (
+              <div key={habit.id} className="flex items-center gap-2">
+                <div className="text-[12px] flex-1 truncate text-text">{habit.title}</div>
+                <div className="flex gap-0.5">
+                  {marks.map((m, i) => (
+                    <div key={i} className="h-2 w-2 rounded-full"
+                      style={{ background: m ? habit.color ?? 'var(--accent)' : 'var(--border)' }} />
+                  ))}
+                </div>
+                <div className="text-[10px] text-text-muted tabular-nums w-6 text-right">{done}/7</div>
+              </div>
+            ))}
+            {habitWeek.length === 0 && <div className="text-xs text-text-dim">Нет привычек</div>}
+          </div>
+          {habitWeek.length > 0 && (
+            <Button variant="ghost" className="w-full justify-between mt-3 text-text-muted" onClick={() => nav('/habits')}>
+              Все привычки <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* Reminders */}
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Напоминания</div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addReminder}>
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="space-y-2 text-sm">
+            {reminders.length === 0 && <div className="text-xs text-text-dim">Нет напоминаний</div>}
+            {reminders.map((r) => (
+              <div key={r.id} className="flex items-center gap-2 group">
+                <Checkbox
+                  checked={r.done}
+                  onCheckedChange={() => setReminders((rs) => rs.map((x) => x.id === r.id ? { ...x, done: !x.done } : x))}
+                />
+                <span className={r.done ? 'flex-1 line-through text-text-muted text-[13px]' : 'flex-1 text-[13px]'}>{r.text}</span>
+                <button
+                  className="opacity-0 group-hover:opacity-100 text-text-dim hover:text-danger transition-opacity"
+                  onClick={() => setReminders((rs) => rs.filter((x) => x.id !== r.id))}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <QuickAddDialog
         open={quickTab !== null}
@@ -640,10 +768,10 @@ const WidgetCard: React.FC<{
   children: React.ReactNode;
 }> = ({ title, editing, onHide, onClick, children }) => (
   <div
-    className={`relative h-full p-4 border flex flex-col overflow-hidden transition-colors ${editing ? 'border-dashed border-border bg-bg-soft/30' : 'border-border hover:bg-bg-hover'} ${onClick ? 'cursor-pointer' : ''}`}
+    className={`relative h-full p-4 border flex flex-col overflow-hidden transition-all ${editing ? 'border-dashed border-border/50 bg-bg-soft/20' : 'bg-bg-card border-border hover:border-border-soft/80'} ${onClick ? 'cursor-pointer' : ''}`}
     onClick={onClick}
   >
-    {title && <CardTitle className="shrink-0">{title}</CardTitle>}
+    {title && <div className="text-[10px] uppercase tracking-widest text-text-muted font-medium mb-3 shrink-0">{title}</div>}
     <div className="flex-1 min-h-0">{children}</div>
     {editing && onHide && (
       <button
