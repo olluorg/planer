@@ -7,9 +7,9 @@ import { useStore } from '@/lib/store';
 import type { Task } from '@/lib/types';
 
 const PRESETS = [
-  { label: 'Pomodoro 25', work: 25, rest: 5 },
-  { label: 'Long 50', work: 50, rest: 10 },
-  { label: 'Short 15', work: 15, rest: 3 },
+  { label: 'Помодоро 25', work: 25, rest: 5 },
+  { label: 'Длинный 50', work: 50, rest: 10 },
+  { label: 'Короткий 15', work: 15, rest: 3 },
 ];
 
 export const PomodoroTimer: React.FC<{ task: Task | null; onClose: () => void }> = ({ task, onClose }) => {

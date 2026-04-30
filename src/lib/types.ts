@@ -33,6 +33,7 @@ export interface Task {
   status: TaskStatus;
   tags: string | null;
   estimate_min: number | null;
+  start_time: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;

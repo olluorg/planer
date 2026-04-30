@@ -15,7 +15,7 @@ import {
   CheckSquare, Repeat, Activity, NotebookPen, Gauge,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { isoDate, fmtNum } from '@/lib/utils';
+import { isoDate, fmtNum, colorByPct } from '@/lib/utils';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ECharts } from '@/components/charts/ECharts';
@@ -34,21 +34,21 @@ const BLOCKS = [
 ] as const;
 
 const DEFAULT_LAYOUT: Layout[] = [
-  { i: 'goals-week',    x: 0,  y: 0,  w: 9, h: 5 },
-  { i: 'progress-ring', x: 9,  y: 0,  w: 3, h: 5 },
-  { i: 'block-morning', x: 0,  y: 5,  w: 2, h: 5 },
-  { i: 'block-day',     x: 2,  y: 5,  w: 2, h: 5 },
-  { i: 'block-evening', x: 4,  y: 5,  w: 2, h: 5 },
-  { i: 'block-night',   x: 6,  y: 5,  w: 2, h: 5 },
-  { i: 'notes',         x: 8,  y: 5,  w: 2, h: 5 },
-  { i: 'stats',         x: 10, y: 5,  w: 2, h: 5 },
-  { i: 'plan-future',   x: 0,  y: 10, w: 9, h: 5 },
-  { i: 'habits',        x: 9,  y: 10, w: 3, h: 5 },
-  { i: 'focus',         x: 0,  y: 15, w: 3, h: 4 },
-  { i: 'quick-add',     x: 3,  y: 15, w: 3, h: 4 },
-  { i: 'reflection',    x: 6,  y: 15, w: 3, h: 4 },
-  { i: 'reminders',     x: 9,  y: 15, w: 3, h: 4 },
-  { i: 'kpi-grid',      x: 0,  y: 19, w: 12, h: 5 },
+  { i: 'goals-week',    x: 0,  y: 0,  w: 9, h: 6 },
+  { i: 'progress-ring', x: 9,  y: 0,  w: 3, h: 6 },
+  { i: 'block-morning', x: 0,  y: 6,  w: 2, h: 6 },
+  { i: 'block-day',     x: 2,  y: 6,  w: 2, h: 6 },
+  { i: 'block-evening', x: 4,  y: 6,  w: 2, h: 6 },
+  { i: 'block-night',   x: 6,  y: 6,  w: 2, h: 6 },
+  { i: 'notes',         x: 8,  y: 6,  w: 2, h: 6 },
+  { i: 'stats',         x: 10, y: 6,  w: 2, h: 6 },
+  { i: 'plan-future',   x: 0,  y: 12, w: 9, h: 5 },
+  { i: 'habits',        x: 9,  y: 12, w: 3, h: 5 },
+  { i: 'focus',         x: 0,  y: 17, w: 3, h: 4 },
+  { i: 'quick-add',     x: 3,  y: 17, w: 3, h: 4 },
+  { i: 'reflection',    x: 6,  y: 17, w: 3, h: 4 },
+  { i: 'reminders',     x: 9,  y: 17, w: 3, h: 4 },
+  { i: 'kpi-grid',      x: 0,  y: 21, w: 12, h: 5 },
 ];
 
 const ROW_HEIGHT = 48;
@@ -60,7 +60,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v2', DEFAULT_LAYOUT);
+  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v3', DEFAULT_LAYOUT);
   const [editing, setEditing] = useState(false);
   const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v2', []);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
@@ -146,12 +146,9 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     },
     series: [{
       type: 'bar', barWidth: 22,
-      data: weekStats.arr.map((x, i) => {
+      data: weekStats.arr.map((x) => {
         const v = x.total ? Math.round((x.done / x.total) * 100) : 0;
-        let color = cc.emptyBar;
-        if (i === weekStats.bestI && x.total) color = '#22c55e';
-        else if (i === weekStats.worstI && x.total) color = '#ef4444';
-        else if (v >= 60) color = '#eab308';
+        const color = x.total === 0 ? cc.emptyBar : colorByPct(v);
         return { value: v, itemStyle: { color } };
       }),
     }],
@@ -193,8 +190,8 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const widgets: Record<string, () => React.ReactNode> = {
     'goals-week': () => (
       <WidgetCard title="Цели на неделю" editing={editing} onHide={() => hideWidget('goals-week')} onClick={() => !editing && nav('/goals')}>
-        <div className="grid grid-cols-12 gap-4 h-full">
-          <div className="col-span-4">
+        <div className="grid grid-cols-12 gap-4 h-full items-center">
+          <div className="col-span-4 flex flex-col justify-center">
             <ol className="space-y-2.5">
               {goals.slice(0, 5).map((g, i) => {
                 const denom = g.target_value - g.start_value || 1;
@@ -204,14 +201,16 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                   <li key={g.id} className="flex items-center gap-3 text-sm">
                     <span className="text-text-dim w-3">{i + 1}</span>
                     <span className="flex-1 truncate">{g.title}</span>
-                    <Checkbox checked={done} onCheckedChange={() => toggleGoalDone(g.id)} />
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <Checkbox checked={done} onCheckedChange={() => toggleGoalDone(g.id)} />
+                    </span>
                   </li>
                 );
               })}
             </ol>
           </div>
-          <div className="col-span-3 flex flex-col items-center justify-center">
-            <Ring value={weekDoneRatio} size={130} stroke={10} color="var(--text)">
+          <div className="col-span-3 flex justify-center items-center">
+            <Ring value={weekDoneRatio} size={130} stroke={10} color={colorByPct(weekDoneRatio)}>
               <div className="text-center">
                 <div className="text-2xl font-semibold">{weekDoneRatio}%</div>
                 <div className="text-[11px] text-text-muted">Неделя</div>
@@ -225,7 +224,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
             <Row label="Лучший" value={dayName(weekStats.bestI)} valueClass="text-accent" />
             <Row label="Худший" value={dayName(weekStats.worstI)} valueClass="text-danger" />
           </div>
-          <div className="col-span-3 min-w-0">
+          <div className="col-span-3 min-w-0 flex items-center">
             <ECharts option={weekChartOpt} height={160} />
           </div>
         </div>
@@ -236,7 +235,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       <WidgetCard title="Прогресс целей" editing={editing} onHide={() => hideWidget('progress-ring')}>
         <div className="flex flex-col h-full">
           <div className="flex-1 flex items-center justify-center">
-            <Ring value={overallGoalProgress} size={140} stroke={10}>
+            <Ring value={overallGoalProgress} size={140} stroke={10} color={colorByPct(overallGoalProgress)}>
               <div className="text-center">
                 <div className="text-2xl font-semibold">{overallGoalProgress}%</div>
                 <div className="text-[11px] text-text-muted">Общий</div>
@@ -265,9 +264,10 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
               </div>
               <div className="space-y-2 flex-1 overflow-auto">
                 {blockTasks.length === 0 && <div className="text-xs text-text-dim">Нет задач</div>}
-                {blockTasks.map((t) => (
+                {[...blockTasks].sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')).map((t) => (
                   <label key={t.id} className="flex items-center gap-2.5 text-[13px] cursor-pointer">
                     <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                    {t.start_time && <span className="text-text-dim text-[11px] tabular-nums w-9">{t.start_time}</span>}
                     <span className={t.status === 'done' ? 'text-text-muted line-through' : ''}>{t.title}</span>
                   </label>
                 ))}
@@ -277,7 +277,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                   <div className="text-[11px] text-text-muted">Выполнено</div>
                   <div className="text-sm">{done}/{blockTasks.length}</div>
                 </div>
-                <Ring value={ratio} size={42} stroke={4} color="var(--text)">
+                <Ring value={ratio} size={42} stroke={4} color={blockTasks.length ? colorByPct(ratio) : 'var(--text)'}>
                   <div className="text-[10px]">{ratio}%</div>
                 </Ring>
               </div>
@@ -308,7 +308,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                   <span className="text-text-muted">{s.label}</span>
                   <span className="tabular-nums">{fmtNum(s.cur, 1)} / {fmtNum(s.max, 0)}{s.unit ?? ''}</span>
                 </div>
-                <Progress value={(s.cur / s.max) * 100} className="mt-1.5" />
+                <Progress value={(s.cur / s.max) * 100} className="mt-1.5" barColor={colorByPct((s.cur / s.max) * 100)} />
               </div>
             ))}
           </div>
@@ -341,7 +341,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                   </div>
                   <div className="text-[11px] text-text-muted">цель {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}</div>
                   <div className="flex items-center gap-2 mt-2">
-                    <Progress value={r} className="flex-1" />
+                    <Progress value={r} className="flex-1" barColor={colorByPct(r)} />
                     <span className="text-[11px] text-text-muted tabular-nums">{r}%</span>
                   </div>
                 </div>
@@ -460,7 +460,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
             const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
             return (
               <div key={id} className="border border-border p-3 flex flex-col items-center gap-2">
-                <Ring value={r} size={70} stroke={6}>
+                <Ring value={r} size={70} stroke={6} color={colorByPct(r)}>
                   <div className="text-xs font-semibold tabular-nums">{r}%</div>
                 </Ring>
                 <div className="text-[11px] text-center text-text-muted truncate w-full">{g.title}</div>
@@ -578,11 +578,11 @@ const WidgetCard: React.FC<{
   children: React.ReactNode;
 }> = ({ title, editing, onHide, onClick, children }) => (
   <div
-    className={`relative h-full p-4 border transition-colors ${editing ? 'border-dashed border-border bg-bg-soft/30' : 'border-transparent hover:border-border'} ${onClick ? 'cursor-pointer' : ''}`}
+    className={`relative h-full p-4 border flex flex-col overflow-hidden transition-colors ${editing ? 'border-dashed border-border bg-bg-soft/30' : 'border-border hover:bg-bg-hover'} ${onClick ? 'cursor-pointer' : ''}`}
     onClick={onClick}
   >
-    {title && <CardTitle>{title}</CardTitle>}
-    <div className="h-full">{children}</div>
+    {title && <CardTitle className="shrink-0">{title}</CardTitle>}
+    <div className="flex-1 min-h-0">{children}</div>
     {editing && onHide && (
       <button
         type="button"

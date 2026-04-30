@@ -44,7 +44,7 @@
 
 @layer components {
   .card {
-    @apply border border-transparent hover:border-border transition-colors;
+    @apply border border-border hover:bg-bg-hover transition-colors;
   }
   .card-hover {
     @apply hover:bg-bg-soft transition-colors;

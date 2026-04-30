@@ -104,7 +104,13 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
               { type: 'value', min: 0, max: 4, axisLabel: { color: cc.axis }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
             ],
             series: [
-              { name: 'Выполнено', type: 'bar', barWidth: 16, data: week.map((w) => w.total ? Math.round((w.done / w.total) * 100) : 0), itemStyle: { color: '#22c55e', borderRadius: [4, 4, 0, 0] } },
+              { name: 'Выполнено', type: 'bar', barWidth: 16,
+                data: week.map((w) => {
+                  const v = w.total ? Math.round((w.done / w.total) * 100) : 0;
+                  const hue = Math.round((Math.max(0, Math.min(100, v)) / 100) * 130);
+                  return { value: v, itemStyle: { color: `hsl(${hue} 70% 50%)` } };
+                }),
+              },
               { name: 'Настроение', type: 'line', yAxisIndex: 1, smooth: true, data: week.map((w) => w.mood), lineStyle: { color: '#eab308' }, itemStyle: { color: '#eab308' } },
             ],
           }} />

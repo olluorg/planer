@@ -26,21 +26,33 @@ export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date, init
   const [title, setTitle] = useState('');
   const [goalId, setGoalId] = useState<string | undefined>(undefined);
   const [block, setBlock] = useState<string>('day');
+  const [startTime, setStartTime] = useState<string>('');
   const [target, setTarget] = useState('100');
   const [progressValue, setProgressValue] = useState('');
 
   const reset = () => {
     setTitle('');
     setProgressValue('');
+    setStartTime('');
+  };
+
+  const blockFromTime = (hhmm: string): 'morning' | 'day' | 'evening' | 'night' => {
+    const h = Number(hhmm.split(':')[0] || '12');
+    if (h >= 6 && h < 12) return 'morning';
+    if (h >= 12 && h < 16) return 'day';
+    if (h >= 16 && h < 20) return 'evening';
+    return 'night';
   };
 
   const submit = () => {
     if (tab === 'task' && title.trim()) {
+      const inferredBlock = startTime ? blockFromTime(startTime) : (block as any);
       addTask({
         title: title.trim(),
         goal_id: goalId ?? null,
         date: isoDate(date),
-        time_block: block as any,
+        time_block: inferredBlock,
+        start_time: startTime || null,
         priority: 2,
       });
     } else if (tab === 'habit' && title.trim()) {
@@ -71,7 +83,7 @@ export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date, init
 
           <TabsContent value="task" className="space-y-3 pt-4">
             <Input placeholder="Название задачи" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Select value={block} onValueChange={setBlock}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -81,6 +93,7 @@ export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date, init
                   <SelectItem value="night">20:00–23:00</SelectItem>
                 </SelectContent>
               </Select>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} placeholder="Время" />
               <Select value={goalId ?? '__none'} onValueChange={(v) => setGoalId(v === '__none' ? undefined : v)}>
                 <SelectTrigger><SelectValue placeholder="Цель" /></SelectTrigger>
                 <SelectContent>
@@ -89,6 +102,7 @@ export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date, init
                 </SelectContent>
               </Select>
             </div>
+            <div className="text-[11px] text-text-muted">Если задано конкретное время — блок выбирается автоматически.</div>
           </TabsContent>
 
           <TabsContent value="habit" className="space-y-3 pt-4">

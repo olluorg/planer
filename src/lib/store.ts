@@ -142,13 +142,14 @@ export const useStore = create<State>((set, get) => ({
       status: t.status ?? 'active',
       tags: t.tags ?? null,
       estimate_min: t.estimate_min ?? null,
+      start_time: t.start_time ?? null,
       completed_at: null,
       created_at: now(),
       updated_at: now(),
     };
     exec(
-      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.tags, task.estimate_min, task.completed_at, task.created_at, task.updated_at],
+      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, start_time, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.tags, task.estimate_min, task.start_time, task.completed_at, task.created_at, task.updated_at],
     );
     get().reload();
     return task;
@@ -159,8 +160,8 @@ export const useStore = create<State>((set, get) => ({
     if (!cur) return;
     const next = { ...cur, ...p, updated_at: now() };
     exec(
-      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, tags=?, estimate_min=?, completed_at=?, updated_at=? WHERE id=?`,
-      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.tags, next.estimate_min, next.completed_at, next.updated_at, id],
+      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, tags=?, estimate_min=?, start_time=?, completed_at=?, updated_at=? WHERE id=?`,
+      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.tags, next.estimate_min, next.start_time, next.completed_at, next.updated_at, id],
     );
     get().reload();
   },

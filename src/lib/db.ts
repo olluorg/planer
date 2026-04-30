@@ -104,11 +104,14 @@ CREATE TABLE IF NOT EXISTS change_log (
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date);
 CREATE INDEX IF NOT EXISTS idx_tasks_goal ON tasks(goal_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(date);
 CREATE INDEX IF NOT EXISTS idx_progress_goal ON progress_records(goal_id);
 CREATE INDEX IF NOT EXISTS idx_time_entries_task ON time_entries(task_id);
 CREATE INDEX IF NOT EXISTS idx_change_log_entity ON change_log(entity, entity_id);
+`;
+
+const POST_MIGRATE_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
 `;
 
 function columnExists(d: Database, table: string, col: string): boolean {
@@ -126,6 +129,8 @@ function migrate(d: Database) {
   if (!columnExists(d, 'tasks', 'parent_id')) d.exec(`ALTER TABLE tasks ADD COLUMN parent_id TEXT`);
   if (!columnExists(d, 'tasks', 'tags')) d.exec(`ALTER TABLE tasks ADD COLUMN tags TEXT`);
   if (!columnExists(d, 'tasks', 'estimate_min')) d.exec(`ALTER TABLE tasks ADD COLUMN estimate_min INTEGER`);
+  if (!columnExists(d, 'tasks', 'start_time')) d.exec(`ALTER TABLE tasks ADD COLUMN start_time TEXT`);
+  d.exec(POST_MIGRATE_INDEXES);
 }
 
 export async function getDB(): Promise<Database> {

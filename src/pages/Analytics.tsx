@@ -155,7 +155,10 @@ export const AnalyticsPage = () => {
             yAxis: { type: 'category', data: habitsBar.map((h) => h.title), axisLabel: { color: cc.axis }, axisLine: { lineStyle: { color: cc.axisLine } } },
             series: [{
               type: 'bar', barWidth: 14,
-              data: habitsBar.map((h) => ({ value: h.done, itemStyle: { color: '#22c55e', borderRadius: [0, 4, 4, 0] } })),
+              data: habitsBar.map((h) => {
+                const hue = Math.round((Math.max(0, Math.min(7, h.done)) / 7) * 130);
+                return { value: h.done, itemStyle: { color: `hsl(${hue} 70% 50%)` } };
+              }),
               markLine: { silent: true, symbol: 'none', data: [{ xAxis: 7, lineStyle: { color: cc.axis, type: 'dashed' } }] },
             }],
           }} />
@@ -184,7 +187,7 @@ export const AnalyticsPage = () => {
             xAxis: { type: 'category', data: Array.from({ length: heat.weeks }, (_, i) => `н${i + 1}`), splitArea: { show: true }, axisLabel: { color: cc.axis, fontSize: 10 } },
             yAxis: { type: 'category', data: ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'], splitArea: { show: true }, axisLabel: { color: cc.axis, fontSize: 10 } },
             visualMap: { min: 0, max: heat.max, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, show: false, inRange: { color: [cc.heatmapEmpty, '#16a34a', '#22c55e'] } },
-            series: [{ type: 'heatmap', data: heat.data, itemStyle: { borderRadius: 2 }, progressive: 0 }],
+            series: [{ type: 'heatmap', data: heat.data, progressive: 0 }],
           }} />
         </Card>
       </div>

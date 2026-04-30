@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Camera, Plus, Trash2, TrendingUp, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { fmtNum } from '@/lib/utils';
+import { fmtNum, colorByPct } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
 import { ECharts } from '@/components/charts/ECharts';
 import { useTheme } from '@/lib/theme';
@@ -74,7 +74,7 @@ export const GoalsPage = () => {
               </div>
 
               <div className="flex items-center gap-3 mt-3">
-                <Progress value={r} className="flex-1" />
+                <Progress value={r} className="flex-1" barColor={colorByPct(r)} />
                 <span className="text-sm tabular-nums">{r}%</span>
               </div>
 

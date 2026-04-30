@@ -25,3 +25,13 @@ export function pct(done: number, total: number): number {
 export function fmtNum(n: number, frac = 0): string {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: frac });
 }
+
+// Smooth color ramp: 0% red → 50% yellow → 100% green.
+export function colorByPct(v: number): string {
+  const x = clamp(v, 0, 100) / 100;
+  // HSL: red 0°, yellow 50°, green 130°
+  const hue = x * 130;
+  const sat = 70;
+  const light = 50;
+  return `hsl(${Math.round(hue)} ${sat}% ${light}%)`;
+}

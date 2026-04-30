@@ -19,6 +19,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
   const [tagInput, setTagInput] = useState('');
   const [goalId, setGoalId] = useState<string>('__none');
   const [block, setBlock] = useState<string>('day');
+  const [startTime, setStartTime] = useState<string>('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [pomodoroFor, setPomodoroFor] = useState<Task | null>(null);
   const today = isoDate(date);
@@ -53,18 +54,28 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
 
   const roots = filtered.filter((t) => !t.parent_id);
 
+  const blockFromTime = (hhmm: string): 'morning' | 'day' | 'evening' | 'night' => {
+    const h = Number(hhmm.split(':')[0] || '12');
+    if (h >= 6 && h < 12) return 'morning';
+    if (h >= 12 && h < 16) return 'day';
+    if (h >= 16 && h < 20) return 'evening';
+    return 'night';
+  };
+
   const submit = (parentId: string | null = null) => {
     if (!title.trim()) return;
     addTask({
       title: title.trim(),
       date: today,
-      time_block: block as any,
+      time_block: (startTime ? blockFromTime(startTime) : block) as any,
+      start_time: startTime || null,
       goal_id: goalId === '__none' ? null : goalId,
       parent_id: parentId,
       tags: tagInput.trim() || null,
     });
     setTitle('');
     setTagInput('');
+    setStartTime('');
   };
 
   const TaskRow: React.FC<{ task: Task; depth: number }> = ({ task, depth }) => {
@@ -89,7 +100,8 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             <div className={task.status === 'done' ? 'line-through text-text-muted' : ''}>{task.title}</div>
             <div className="text-[11px] text-text-muted flex flex-wrap items-center gap-2 mt-0.5">
               <span>{task.date}</span>
-              {task.time_block && <span>· {task.time_block}</span>}
+              {task.start_time && <span className="text-text">· {task.start_time}</span>}
+              {!task.start_time && task.time_block && <span>· {task.time_block}</span>}
               {task.estimate_min && <span>· ~{task.estimate_min} мин</span>}
               {goal && <Badge tone="accent">{goal.title}</Badge>}
               {tags.map((tg) => <Badge key={tg} tone="info">#{tg}</Badge>)}
@@ -141,8 +153,9 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
         <div className="flex flex-wrap gap-2">
           <Input className="flex-1 min-w-[160px]" placeholder="Новая задача..." value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
           <Input className="w-40" placeholder="теги через ," value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
+          <Input type="time" className="w-28" value={startTime} onChange={(e) => setStartTime(e.target.value)} title="Точное время" />
           <Select value={block} onValueChange={setBlock}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="morning">Утро</SelectItem>
               <SelectItem value="day">День</SelectItem>
