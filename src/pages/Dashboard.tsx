@@ -291,33 +291,66 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         const done = blockTasks.filter((t) => t.status === 'done').length;
         const ratio = blockTasks.length ? Math.round((done / blockTasks.length) * 100) : 0;
         return (
-          <WidgetCard editing={editing} onHide={() => hideWidget(`block-${b.key}`)}>
+          <WidgetCard editing={editing} onHide={() => hideWidget(`block-${b.key}`)} primary>
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm">{b.label}</div>
-                <b.icon className="h-4 w-4 text-text-muted" />
-              </div>
-              <div className="space-y-1 flex-1 overflow-auto -mx-2">
-                {blockTasks.length === 0 && <div className="text-xs text-text-dim px-2">Нет задач</div>}
-                {[...blockTasks].sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')).map((t) => (
-                  <label
-                    key={t.id}
-                    className={`flex items-center gap-2.5 px-2 py-2.5 min-h-[44px] cursor-pointer transition-colors hover:bg-bg-hover rounded-sm ${t.status === 'done' ? 'animate-pulse-ok' : ''}`}
-                  >
-                    <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
-                    {t.start_time && <span className="text-text-dim text-[11px] tabular-nums w-10">{t.start_time}</span>}
-                    <span className={`text-sm font-medium transition-all ${t.status === 'done' ? 'text-text-muted line-through' : ''}`}>{t.title}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-soft">
-                <div>
-                  <div className="text-[11px] text-text-muted">Выполнено</div>
-                  <div className="text-sm">{done}/{blockTasks.length}</div>
+              {/* Block header */}
+              <div className="flex items-center justify-between mb-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <b.icon className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                  <span className="text-[11px] font-semibold text-text-muted tracking-wider uppercase">{b.label}</span>
                 </div>
-                <Ring value={ratio} size={42} stroke={4} color={blockTasks.length ? colorByPct(ratio) : 'var(--text)'}>
-                  <div className="text-[10px]">{ratio}%</div>
-                </Ring>
+                <span className="text-[10px] text-text-dim tabular-nums">{done}/{blockTasks.length}</span>
+              </div>
+
+              {/* Task list */}
+              <div className="flex-1 overflow-auto -mx-1 space-y-0.5">
+                {blockTasks.length === 0 && (
+                  <div className="flex items-center justify-center h-16 text-xs text-text-dim">
+                    Нет задач
+                  </div>
+                )}
+                {[...blockTasks]
+                  .sort((a, bT) => (a.start_time ?? '').localeCompare(bT.start_time ?? ''))
+                  .map((t) => (
+                    <label
+                      key={t.id}
+                      className={`task-row${t.status === 'done' ? ' task-done' : ''}`}
+                    >
+                      <Checkbox
+                        checked={t.status === 'done'}
+                        onCheckedChange={() => toggleTask(t.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-medium leading-none truncate transition-all duration-200 ${t.status === 'done' ? 'line-through text-text-dim' : 'text-text'}`}>
+                          {t.title}
+                        </div>
+                        {t.start_time && (
+                          <div className="text-[10px] text-text-dim tabular-nums mt-1">{t.start_time}</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+              </div>
+
+              {/* Footer progress */}
+              <div className="shrink-0 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-1 bg-white/5 overflow-hidden" style={{ borderRadius: '2px' }}>
+                    <div
+                      className="h-full progress-bar"
+                      style={{
+                        width: `${ratio}%`,
+                        background: ratio === 100
+                          ? 'var(--accent)'
+                          : `linear-gradient(90deg, var(--accent) 0%, rgba(132,204,22,0.6) 100%)`,
+                        boxShadow: ratio > 0 ? '0 0 8px rgba(132,204,22,0.4)' : undefined,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: ratio > 0 ? 'var(--accent)' : 'var(--text-dim)' }}>
+                    {ratio}%
+                  </span>
+                </div>
               </div>
             </div>
           </WidgetCard>
@@ -369,46 +402,86 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
 
     'plan-future': () => (
       <WidgetCard title="План на будущее" editing={editing} onHide={() => hideWidget('plan-future')}>
-        <div className="flex gap-3 overflow-x-auto pb-2 h-full" style={{ scrollbarWidth: 'thin' }}>
+        <div className="flex gap-4 overflow-x-auto h-full pb-1" style={{ scrollbarWidth: 'none' }}>
           {planGoals.length === 0 && (
             <div className="flex-1 flex items-center justify-center text-xs text-text-dim">
-              Нет целей. Добавь первую цель.
+              Нет целей — добавь первую цель
             </div>
           )}
           {planGoals.map((g) => {
             const denom = g.target_value - g.start_value || 1;
             const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
-            const monthLabel = g.deadline ? format(new Date(g.deadline), 'LLLL yyyy', { locale: ru }) : '—';
+            const monthLabel = g.deadline ? format(new Date(g.deadline), 'LLLL yyyy', { locale: ru }) : '';
+            const colorHex = r >= 80 ? '#84CC16' : r >= 50 ? '#F59E0B' : r >= 20 ? '#F97316' : '#6B7280';
             return (
               <button
                 key={g.id}
                 onClick={() => !editing && nav('/goals')}
-                className="group text-left border border-border hover:border-accent/50 transition-all overflow-hidden flex flex-col shrink-0 w-[260px] shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                className="shrink-0 text-left relative overflow-hidden hover-lift"
+                style={{
+                  width: '240px',
+                  height: '200px',
+                  borderRadius: '14px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                  transition: 'transform 280ms cubic-bezier(0.4,0,0.2,1), box-shadow 280ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = 'scale(1.03) translateY(-3px)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = `0 20px 50px rgba(0,0,0,0.7), 0 0 0 1px ${colorHex}40`;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = 'scale(1) translateY(0)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+                }}
               >
-                <div className="relative w-full h-32 bg-bg-soft overflow-hidden">
+                {/* Background */}
+                <div className="absolute inset-0">
                   {g.cover ? (
-                    <img src={g.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img src={g.cover} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-dim text-4xl font-bold">
+                    <div
+                      className="w-full h-full flex items-center justify-center text-5xl font-black"
+                      style={{
+                        background: `linear-gradient(135deg, ${colorHex}22 0%, ${colorHex}08 100%)`,
+                        color: `${colorHex}40`,
+                      }}
+                    >
                       {g.title.slice(0, 1).toUpperCase()}
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-bg-card/95 via-bg/30 to-transparent" />
-                  <div className="absolute bottom-2 left-3 right-3">
-                    <div className="text-[10px] uppercase tracking-wider text-text-muted">{monthLabel}</div>
-                    <div className="text-sm font-semibold leading-tight truncate">{g.title}</div>
-                  </div>
                 </div>
-                <div className="p-3 flex-1 flex flex-col justify-between bg-bg-card">
-                  <div>
-                    <div className="text-2xl font-bold tabular-nums" style={{ color: colorByPct(r) }}>
-                      {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
+                {/* Dark gradient overlay */}
+                <div
+                  className="absolute inset-0"
+                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.15) 100%)' }}
+                />
+                {/* Content */}
+                <div className="absolute inset-0 flex flex-col justify-end p-4">
+                  {monthLabel && (
+                    <div className="text-[9px] uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      {monthLabel}
                     </div>
-                    <div className="text-[11px] text-text-muted">из {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}</div>
+                  )}
+                  <div className="text-sm font-semibold text-white mb-1 truncate leading-tight">{g.title}</div>
+                  <div className="text-2xl font-bold tabular-nums mb-3" style={{ color: colorHex }}>
+                    {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
+                    <span className="text-xs font-normal ml-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      / {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Progress value={r} className="flex-1 h-1.5" barColor={colorByPct(r)} />
-                    <span className="text-xs font-semibold tabular-nums" style={{ color: colorByPct(r) }}>{r}%</span>
+                  {/* Progress bar */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1 overflow-hidden" style={{ borderRadius: '1px', background: 'rgba(255,255,255,0.12)' }}>
+                      <div
+                        className="h-full progress-bar"
+                        style={{
+                          width: `${r}%`,
+                          background: colorHex,
+                          boxShadow: `0 0 8px ${colorHex}80`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold tabular-nums" style={{ color: colorHex }}>{r}%</span>
                   </div>
                 </div>
               </button>
@@ -648,98 +721,128 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       </div>
 
       {/* Sticky right panel */}
-      <div className="hidden lg:flex w-[300px] shrink-0 border-l border-border flex-col bg-bg-card sticky top-0 max-h-[calc(100vh-64px)] overflow-y-auto">
+      <div
+        className="hidden lg:flex w-[290px] shrink-0 flex-col sticky top-0 max-h-[calc(100vh-64px)] overflow-y-auto"
+        style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)' }}
+      >
         {/* Progress Goals */}
-        <div className="p-4 border-b border-border">
-          <div className="text-[11px] uppercase tracking-wider text-text-muted mb-3 font-medium">Прогресс целей</div>
-          <div className="flex flex-col items-center gap-3">
-            <Ring value={overallGoalProgress} size={120} stroke={10} color={colorByPct(overallGoalProgress)}>
-              <div className="text-center">
-                <div className="text-2xl font-semibold">{overallGoalProgress}%</div>
-                <div className="text-[11px] text-text-muted">Общий</div>
-              </div>
-            </Ring>
+        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="section-label">Прогресс целей</div>
+          <div className="flex flex-col items-center gap-4">
+            <div style={{ filter: overallGoalProgress > 0 ? 'drop-shadow(0 0 20px rgba(132,204,22,0.25))' : undefined }}>
+              <Ring value={overallGoalProgress} size={130} stroke={11} glow>
+                <div className="text-center">
+                  <div className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent)' }}>{overallGoalProgress}%</div>
+                  <div className="text-[10px] text-text-dim mt-0.5">общий</div>
+                </div>
+              </Ring>
+            </div>
             {velocityHint !== null && (
-              <div className="text-center text-xs">
-                {velocityHint > 0 && <span className="text-accent">↗ ускорение +{velocityHint}% к прошлой неделе</span>}
-                {velocityHint === 0 && <span className="text-text-muted">→ темп без изменений</span>}
-                {velocityHint < 0 && <span className="text-danger">↘ отстаёшь {velocityHint}% от прошлой недели</span>}
+              <div className="text-center text-xs px-4">
+                {velocityHint > 0 && <span className="text-accent font-medium">↗ +{velocityHint}% к прошлой неделе</span>}
+                {velocityHint === 0 && <span className="text-text-dim">→ темп без изменений</span>}
+                {velocityHint < 0 && <span style={{ color: 'var(--danger)' }}>↘ {velocityHint}% от прошлой недели</span>}
               </div>
             )}
           </div>
-          <Button variant="ghost" className="w-full justify-between mt-3 text-text-muted" onClick={() => nav('/goals')}>
-            Все цели <ChevronRight className="h-4 w-4" />
-          </Button>
+          <button
+            onClick={() => nav('/goals')}
+            className="mt-4 w-full flex items-center justify-between text-xs text-text-dim hover:text-accent transition-colors"
+          >
+            <span>Все цели</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         {/* Statistics */}
-        <div className="p-4 border-b border-border">
-          <div className="text-[11px] uppercase tracking-wider text-text-muted mb-3 font-medium">Статистика</div>
-          <div className="space-y-3">
-            {fitnessStats.map((s) => (
+        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="section-label">Статистика</div>
+          <div className="space-y-4">
+            {fitnessStats.map((s) => {
+              const pct = Math.round((s.cur / s.max) * 100);
+              return (
               <div key={s.label}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-text-muted">{s.label}</span>
-                  <span className="tabular-nums text-text">{fmtNum(s.cur, 1)} / {fmtNum(s.max, 0)}{s.unit ?? ''}</span>
+                <div className="flex justify-between mb-1.5">
+                  <span className="text-xs text-text-muted">{s.label}</span>
+                  <span className="text-xs font-semibold tabular-nums text-text">{fmtNum(s.cur, 1)}<span className="text-text-dim font-normal"> / {fmtNum(s.max, 0)}{s.unit ?? ''}</span></span>
                 </div>
-                <Progress value={(s.cur / s.max) * 100} barColor={colorByPct((s.cur / s.max) * 100)} />
+                <div className="h-1.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
+                  <div
+                    className="h-full progress-bar"
+                    style={{
+                      width: `${pct}%`,
+                      background: pct >= 80 ? 'var(--accent)' : pct >= 50 ? '#F59E0B' : '#6B7280',
+                      boxShadow: pct >= 80 ? '0 0 6px rgba(132,204,22,0.5)' : undefined,
+                    }}
+                  />
+                </div>
               </div>
-            ))}
+            );
+          })}
           </div>
-          <Button variant="ghost" className="w-full justify-between mt-3 text-text-muted" onClick={() => nav('/analytics')}>
-            Вся статистика <ChevronRight className="h-4 w-4" />
-          </Button>
+          <button onClick={() => nav('/analytics')} className="mt-3 w-full flex items-center justify-between text-xs text-text-dim hover:text-accent transition-colors">
+            <span>Вся статистика</span><ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         {/* Habits */}
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Привычки</div>
-            <Button variant="ghost" size="sm" className="text-text-muted h-6 px-2 text-xs" onClick={() => nav('/habits')}>
-              Изменить
-            </Button>
+        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="section-label !mb-0">Привычки</div>
+            <button onClick={() => nav('/habits')} className="text-[10px] text-text-dim hover:text-accent transition-colors">Изменить</button>
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {habitWeek.slice(0, 6).map(({ habit, marks, done }) => (
               <div key={habit.id} className="flex items-center gap-2">
-                <div className="text-[12px] flex-1 truncate text-text">{habit.title}</div>
-                <div className="flex gap-0.5">
+                <div className="text-[12px] flex-1 truncate" style={{ color: 'var(--text)' }}>{habit.title}</div>
+                <div className="flex gap-1">
                   {marks.map((m, i) => (
-                    <div key={i} className="h-2 w-2 rounded-full"
-                      style={{ background: m ? habit.color ?? 'var(--accent)' : 'var(--border)' }} />
+                    <div
+                      key={i}
+                      className="h-2 w-2"
+                      style={{
+                        borderRadius: '3px',
+                        background: m ? (habit.color ?? 'var(--accent)') : 'rgba(255,255,255,0.07)',
+                        boxShadow: m ? `0 0 5px ${habit.color ?? 'rgba(132,204,22,0.5)'}` : undefined,
+                      }}
+                    />
                   ))}
                 </div>
-                <div className="text-[10px] text-text-muted tabular-nums w-6 text-right">{done}/7</div>
+                <div className="text-[10px] tabular-nums w-6 text-right" style={{ color: done >= 5 ? 'var(--accent)' : 'var(--text-dim)' }}>{done}/7</div>
               </div>
             ))}
-            {habitWeek.length === 0 && <div className="text-xs text-text-dim">Нет привычек</div>}
+            {habitWeek.length === 0 && <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Нет привычек</div>}
           </div>
-          {habitWeek.length > 0 && (
-            <Button variant="ghost" className="w-full justify-between mt-3 text-text-muted" onClick={() => nav('/habits')}>
-              Все привычки <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
         </div>
 
         {/* Reminders */}
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Напоминания</div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addReminder}>
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="section-label !mb-0">Напоминания</div>
+            <button onClick={addReminder} className="h-5 w-5 flex items-center justify-center text-text-dim hover:text-accent transition-colors">
               <Plus className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
-          <div className="space-y-2 text-sm">
-            {reminders.length === 0 && <div className="text-xs text-text-dim">Нет напоминаний</div>}
+          <div className="space-y-2">
+            {reminders.length === 0 && <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Нет напоминаний</div>}
             {reminders.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 group">
+              <div
+                key={r.id}
+                className="flex items-center gap-2 group"
+                style={{ padding: '8px 10px', borderRadius: '7px', transition: 'background 160ms' }}
+                onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
+                onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              >
                 <Checkbox
                   checked={r.done}
                   onCheckedChange={() => setReminders((rs) => rs.map((x) => x.id === r.id ? { ...x, done: !x.done } : x))}
                 />
-                <span className={r.done ? 'flex-1 line-through text-text-muted text-[13px]' : 'flex-1 text-[13px]'}>{r.text}</span>
+                <span className={`flex-1 text-xs ${r.done ? 'line-through' : ''}`} style={{ color: r.done ? 'var(--text-dim)' : 'var(--text-muted)' }}>{r.text}</span>
                 <button
-                  className="opacity-0 group-hover:opacity-100 text-text-dim hover:text-danger transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: 'var(--text-dim)' }}
+                  onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
+                  onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}
                   onClick={() => setReminders((rs) => rs.filter((x) => x.id !== r.id))}
                 >
                   <Trash2 className="h-3 w-3" />
@@ -763,24 +866,39 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
 const WidgetCard: React.FC<{
   title?: string;
   editing: boolean;
+  primary?: boolean;
   onHide?: () => void;
   onClick?: () => void;
   children: React.ReactNode;
-}> = ({ title, editing, onHide, onClick, children }) => (
+}> = ({ title, editing, primary, onHide, onClick, children }) => (
   <div
-    className={`relative h-full p-4 border flex flex-col overflow-hidden transition-all ${editing ? 'border-dashed border-border/50 bg-bg-soft/20' : 'bg-bg-card border-border hover:border-border-soft/80'} ${onClick ? 'cursor-pointer' : ''}`}
+    className={`relative h-full flex flex-col overflow-hidden transition-all duration-200 ${onClick ? 'cursor-pointer' : ''}`}
+    style={editing ? {
+      border: '1px dashed rgba(255,255,255,0.08)',
+      background: 'rgba(255,255,255,0.02)',
+      padding: '16px',
+    } : {
+      background: primary ? 'var(--bg-elevated, #111927)' : 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      boxShadow: primary
+        ? '0 12px 36px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)'
+        : '0 6px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03)',
+      padding: '16px',
+    }}
     onClick={onClick}
   >
-    {title && <div className="text-[10px] uppercase tracking-widest text-text-muted font-medium mb-3 shrink-0">{title}</div>}
+    {title && (
+      <div className="section-label shrink-0">{title}</div>
+    )}
     <div className="flex-1 min-h-0">{children}</div>
     {editing && onHide && (
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onHide(); }}
-        className="absolute top-1 right-1 p-1 text-text-muted hover:text-danger bg-bg z-10"
+        className="absolute top-1 right-1 p-1 text-text-dim hover:text-danger z-10"
         title="Скрыть"
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash2 className="h-3 w-3" />
       </button>
     )}
   </div>

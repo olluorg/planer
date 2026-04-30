@@ -10,15 +10,20 @@ export const Checkbox = React.forwardRef<
   <RC.Root
     ref={ref}
     className={cn(
-      'peer h-6 w-6 shrink-0 border border-border bg-bg-soft transition-colors',
-      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-      'data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-black',
+      'peer h-5 w-5 shrink-0 border transition-all duration-200',
+      'border-[rgba(255,255,255,0.15)] bg-transparent',
+      'focus-visible:outline-none',
+      'data-[state=checked]:bg-accent data-[state=checked]:border-accent',
+      'data-[state=checked]:shadow-[0_0_0_1px_rgba(132,204,22,0.5),0_0_14px_rgba(132,204,22,0.35)]',
+      'hover:border-accent/50',
+      'animate-[check-pop_220ms_ease]',
       className,
     )}
+    style={{ borderRadius: '4px' }}
     {...props}
   >
-    <RC.Indicator className="flex items-center justify-center animate-check-pop">
-      <Check className="h-4 w-4" strokeWidth={3} />
+    <RC.Indicator className="flex items-center justify-center">
+      <Check className="h-3 w-3 text-black" strokeWidth={3} />
     </RC.Indicator>
   </RC.Root>
 ));
