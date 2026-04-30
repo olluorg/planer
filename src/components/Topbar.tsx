@@ -11,9 +11,12 @@ interface Props {
   range: 'day' | 'week' | 'month' | 'year';
   onRange: (r: 'day' | 'week' | 'month' | 'year') => void;
   onAdd?: () => void;
+  onTimer?: () => void;
+  onBell?: () => void;
+  bellCount?: number;
 }
 
-export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd }) => {
+export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, onTimer, onBell, bellCount = 0 }) => {
   const labelFull = format(date, 'd MMMM, EEEE', { locale: ru });
   const labelShort = format(date, 'd MMM', { locale: ru });
   const { theme, toggle } = useTheme();
@@ -38,9 +41,14 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd })
           <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, 1))}><ChevronRight /></Button>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onAdd}><Plus /></Button>
-          <Button variant="ghost" size="icon"><Timer /></Button>
-          <Button variant="ghost" size="icon"><Bell /></Button>
+          <Button variant="ghost" size="icon" onClick={onAdd} title="Добавить (Ctrl+K)"><Plus /></Button>
+          <Button variant="ghost" size="icon" onClick={onTimer} title="Таймер Pomodoro"><Timer /></Button>
+          <Button variant="ghost" size="icon" onClick={onBell} title="Напоминания" className="relative">
+            <Bell />
+            {bellCount > 0 && (
+              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" />
+            )}
+          </Button>
           <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -61,7 +69,11 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd })
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             <Button variant="ghost" size="icon" onClick={onAdd}><Plus className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={onTimer}><Timer className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={onBell} className="relative">
+              <Bell className="h-4 w-4" />
+              {bellCount > 0 && <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" />}
+            </Button>
             <div className="h-7 w-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-semibold">A</div>
           </div>
         </div>

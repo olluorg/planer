@@ -10,15 +10,15 @@ export const Checkbox = React.forwardRef<
   <RC.Root
     ref={ref}
     className={cn(
-      'peer h-5 w-5 shrink-0 rounded border border-border bg-bg-soft transition-colors',
+      'peer h-6 w-6 shrink-0 border border-border bg-bg-soft transition-colors',
       'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
       'data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-black',
       className,
     )}
     {...props}
   >
-    <RC.Indicator className="flex items-center justify-center">
-      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+    <RC.Indicator className="flex items-center justify-center animate-check-pop">
+      <Check className="h-4 w-4" strokeWidth={3} />
     </RC.Indicator>
   </RC.Root>
 ));

@@ -26,12 +26,22 @@ export function fmtNum(n: number, frac = 0): string {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: frac });
 }
 
-// Smooth color ramp: 0% red → 50% yellow → 100% green.
+// Strict 3-level system: <34% red, <70% yellow, ≥70% green.
+export const STATE = {
+  fail: '#ef4444',
+  progress: '#eab308',
+  done: '#22c55e',
+} as const;
+
+export type StateLevel = 'fail' | 'progress' | 'done';
+
+export function levelByPct(v: number): StateLevel {
+  const x = clamp(v, 0, 100);
+  if (x >= 70) return 'done';
+  if (x >= 34) return 'progress';
+  return 'fail';
+}
+
 export function colorByPct(v: number): string {
-  const x = clamp(v, 0, 100) / 100;
-  // HSL: red 0°, yellow 50°, green 130°
-  const hue = x * 130;
-  const sat = 70;
-  const light = 50;
-  return `hsl(${Math.round(hue)} ${sat}% ${light}%)`;
+  return STATE[levelByPct(v)];
 }

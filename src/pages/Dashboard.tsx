@@ -42,13 +42,13 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: 'block-night',   x: 6,  y: 6,  w: 2, h: 6 },
   { i: 'notes',         x: 8,  y: 6,  w: 2, h: 6 },
   { i: 'stats',         x: 10, y: 6,  w: 2, h: 6 },
-  { i: 'plan-future',   x: 0,  y: 12, w: 9, h: 5 },
-  { i: 'habits',        x: 9,  y: 12, w: 3, h: 5 },
-  { i: 'focus',         x: 0,  y: 17, w: 3, h: 4 },
-  { i: 'quick-add',     x: 3,  y: 17, w: 3, h: 4 },
-  { i: 'reflection',    x: 6,  y: 17, w: 3, h: 4 },
-  { i: 'reminders',     x: 9,  y: 17, w: 3, h: 4 },
-  { i: 'kpi-grid',      x: 0,  y: 21, w: 12, h: 5 },
+  { i: 'plan-future',   x: 0,  y: 12, w: 9, h: 8 },
+  { i: 'habits',        x: 9,  y: 12, w: 3, h: 8 },
+  { i: 'focus',         x: 0,  y: 20, w: 3, h: 4 },
+  { i: 'quick-add',     x: 3,  y: 20, w: 3, h: 4 },
+  { i: 'reflection',    x: 6,  y: 20, w: 3, h: 4 },
+  { i: 'reminders',     x: 9,  y: 20, w: 3, h: 4 },
+  { i: 'kpi-grid',      x: 0,  y: 24, w: 12, h: 5 },
 ];
 
 const ROW_HEIGHT = 48;
@@ -60,7 +60,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v3', DEFAULT_LAYOUT);
+  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v4', DEFAULT_LAYOUT);
   const [editing, setEditing] = useState(false);
   const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v2', []);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
@@ -113,6 +113,18 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   }, [goals]);
 
   const weekDoneRatio = weekStats.total ? Math.round((weekStats.done / weekStats.total) * 100) : 0;
+
+  const velocityHint = useMemo(() => {
+    const prevStart = addDays(weekStart, -7);
+    const prev = Array.from({ length: 7 }, (_, i) => isoDate(addDays(prevStart, i)));
+    const prevTotal = tasks.filter((t) => prev.includes(t.date)).length;
+    const prevDone = tasks.filter((t) => prev.includes(t.date) && t.status === 'done').length;
+    const prevR = prevTotal ? prevDone / prevTotal : 0;
+    const curR = weekStats.total ? weekStats.done / weekStats.total : 0;
+    if (prevTotal === 0) return null;
+    const delta = Math.round((curR - prevR) * 100);
+    return delta;
+  }, [tasks, weekStart, weekStats]);
 
   const habitWeek = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, i) => isoDate(addDays(weekStart, i)));
@@ -242,6 +254,13 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
               </div>
             </Ring>
           </div>
+          {velocityHint !== null && (
+            <div className="text-center text-xs mb-2">
+              {velocityHint > 0 && <span className="text-accent">↗ ускорение {velocityHint > 0 ? '+' : ''}{velocityHint}% к прошлой неделе</span>}
+              {velocityHint === 0 && <span className="text-text-muted">→ темп без изменений</span>}
+              {velocityHint < 0 && <span className="text-danger">↘ отстаёшь {velocityHint}% от прошлой недели</span>}
+            </div>
+          )}
           <Button variant="ghost" className="w-full justify-between text-text-muted" onClick={() => nav('/goals')}>
             Все цели <ChevronRight className="h-4 w-4" />
           </Button>
@@ -262,13 +281,16 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                 <div className="text-sm">{b.label}</div>
                 <b.icon className="h-4 w-4 text-text-muted" />
               </div>
-              <div className="space-y-2 flex-1 overflow-auto">
-                {blockTasks.length === 0 && <div className="text-xs text-text-dim">Нет задач</div>}
+              <div className="space-y-1 flex-1 overflow-auto -mx-2">
+                {blockTasks.length === 0 && <div className="text-xs text-text-dim px-2">Нет задач</div>}
                 {[...blockTasks].sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? '')).map((t) => (
-                  <label key={t.id} className="flex items-center gap-2.5 text-[13px] cursor-pointer">
+                  <label
+                    key={t.id}
+                    className={`flex items-center gap-3 px-2 py-2 cursor-pointer transition-colors hover:bg-bg-hover ${t.status === 'done' ? 'animate-pulse-ok' : ''}`}
+                  >
                     <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
-                    {t.start_time && <span className="text-text-dim text-[11px] tabular-nums w-9">{t.start_time}</span>}
-                    <span className={t.status === 'done' ? 'text-text-muted line-through' : ''}>{t.title}</span>
+                    {t.start_time && <span className="text-text-dim text-[11px] tabular-nums w-10">{t.start_time}</span>}
+                    <span className={`text-sm font-medium transition-all ${t.status === 'done' ? 'text-text-muted line-through' : ''}`}>{t.title}</span>
                   </label>
                 ))}
               </div>
@@ -330,19 +352,32 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
               <button
                 key={g.id}
                 onClick={() => !editing && nav('/goals')}
-                className="text-left border border-transparent hover:border-border transition-colors overflow-hidden"
+                className="group text-left border border-border hover:border-text transition-all overflow-hidden flex flex-col"
               >
-                {g.cover && <img src={g.cover} alt="" className="w-full h-20 object-cover" />}
-                <div className="p-3">
-                  <div className="text-[11px] text-text-muted">{monthLabel}</div>
-                  <div className="text-sm font-medium mt-1 truncate">{g.title}</div>
-                  <div className="mt-2 text-2xl font-semibold tabular-nums">
-                    {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
+                <div className="relative w-full aspect-[16/10] bg-bg-soft overflow-hidden">
+                  {g.cover ? (
+                    <img src={g.cover} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-text-dim text-3xl font-bold">
+                      {g.title.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg/90 via-bg/20 to-transparent" />
+                  <div className="absolute bottom-2 left-2 right-2">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">{monthLabel}</div>
+                    <div className="text-base font-semibold leading-tight truncate">{g.title}</div>
                   </div>
-                  <div className="text-[11px] text-text-muted">цель {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}</div>
+                </div>
+                <div className="p-3 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="text-2xl font-bold tabular-nums" style={{ color: colorByPct(r) }}>
+                      {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
+                    </div>
+                    <div className="text-[11px] text-text-muted">из {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}</div>
+                  </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <Progress value={r} className="flex-1" barColor={colorByPct(r)} />
-                    <span className="text-[11px] text-text-muted tabular-nums">{r}%</span>
+                    <Progress value={r} className="flex-1 h-2" barColor={colorByPct(r)} />
+                    <span className="text-xs font-semibold tabular-nums" style={{ color: colorByPct(r) }}>{r}%</span>
                   </div>
                 </div>
               </button>
@@ -381,13 +416,40 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       </WidgetCard>
     ),
 
-    'focus': () => (
-      <WidgetCard title="Фокус дня" editing={editing} onHide={() => hideWidget('focus')}>
-        <p className="text-sm text-text-muted leading-relaxed">
-          Сделай сегодня немного больше, чем вчера, и это изменит твоё завтра.
-        </p>
-      </WidgetCard>
-    ),
+    'focus': () => {
+      const top = [...dayTasks]
+        .filter((t) => t.status === 'active')
+        .sort((a, b) => (a.priority - b.priority) || (a.start_time ?? '').localeCompare(b.start_time ?? ''))
+        .slice(0, 3);
+      return (
+        <WidgetCard editing={editing} onHide={() => hideWidget('focus')}>
+          <div className="flex flex-col h-full">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">Фокус дня</div>
+            {top.length === 0 ? (
+              <div className="flex-1 flex flex-col justify-center">
+                <div className="text-xl font-bold leading-tight">Нет активных задач</div>
+                <div className="text-xs text-text-muted mt-1">Добавь главное на сегодня</div>
+              </div>
+            ) : (
+              <ol className="flex-1 flex flex-col justify-center gap-2 mt-1">
+                {top.map((t, i) => (
+                  <li key={t.id} className="flex items-start gap-3">
+                    <span className="text-2xl font-bold text-text-dim leading-none w-5">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-base font-semibold leading-snug truncate">{t.title}</div>
+                      {t.start_time && <div className="text-[11px] text-text-muted tabular-nums">{t.start_time}</div>}
+                    </div>
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <Checkbox checked={false} onCheckedChange={() => toggleTask(t.id)} />
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </WidgetCard>
+      );
+    },
 
     'quick-add': () => (
       <WidgetCard title="Быстрое добавление" editing={editing} onHide={() => hideWidget('quick-add')}>

@@ -12,7 +12,12 @@ const PRESETS = [
   { label: 'Короткий 15', work: 15, rest: 3 },
 ];
 
-export const PomodoroTimer: React.FC<{ task: Task | null; onClose: () => void }> = ({ task, onClose }) => {
+export const PomodoroTimer: React.FC<{
+  task: Task | null;
+  open?: boolean;
+  onClose: () => void;
+}> = ({ task, open: openProp, onClose }) => {
+  const open = openProp ?? task !== null;
   const startTimeEntry = useStore((s) => s.startTimeEntry);
   const finishTimeEntry = useStore((s) => s.finishTimeEntry);
 
@@ -28,13 +33,9 @@ export const PomodoroTimer: React.FC<{ task: Task | null; onClose: () => void }>
   const pct = total ? Math.round(((total - secondsLeft) / total) * 100) : 0;
 
   useEffect(() => {
-    if (!task) {
-      stop();
-    } else {
-      reset(preset);
-    }
+    if (open) reset(preset); else stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task]);
+  }, [open, task?.id]);
 
   useEffect(() => {
     if (!running) return;
@@ -69,9 +70,8 @@ export const PomodoroTimer: React.FC<{ task: Task | null; onClose: () => void }>
   };
 
   const start = () => {
-    if (!task) return;
     if (!entryIdRef.current && phase === 'work') {
-      const e = startTimeEntry(task.id, 'pomodoro');
+      const e = startTimeEntry(task?.id ?? null, 'pomodoro');
       entryIdRef.current = e.id;
       elapsedRef.current = 0;
     }
@@ -99,10 +99,10 @@ export const PomodoroTimer: React.FC<{ task: Task | null; onClose: () => void }>
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   return (
-    <Dialog open={task !== null} onOpenChange={(v) => !v && (stop(), onClose())}>
+    <Dialog open={open} onOpenChange={(v) => !v && (stop(), onClose())}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{task?.title ?? 'Таймер'}</DialogTitle>
+          <DialogTitle>{task?.title ?? 'Свободный таймер'}</DialogTitle>
           <div className="text-xs text-text-muted">{phase === 'work' ? 'Работа' : 'Отдых'}</div>
         </DialogHeader>
 

@@ -25,10 +25,14 @@ export default {
       keyframes: {
         'fade-in': { from: { opacity: 0 }, to: { opacity: 1 } },
         'slide-up': { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+        'pulse-ok': { '0%': { backgroundColor: 'transparent' }, '40%': { backgroundColor: 'rgba(34,197,94,0.18)' }, '100%': { backgroundColor: 'transparent' } },
+        'check-pop': { '0%': { transform: 'scale(0.85)' }, '50%': { transform: 'scale(1.15)' }, '100%': { transform: 'scale(1)' } },
       },
       animation: {
         'fade-in': 'fade-in 200ms ease-out',
         'slide-up': 'slide-up 250ms ease-out',
+        'pulse-ok': 'pulse-ok 600ms ease-out',
+        'check-pop': 'check-pop 220ms ease-out',
       },
     },
   },
