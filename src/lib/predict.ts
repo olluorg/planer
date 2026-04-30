@@ -6,7 +6,7 @@ export interface Forecast {
   etaDate: string | null;
   etaConfidence: number;
   velocity: number;
-  method: 'linreg' | 'ema' | 'flat';
+  method: 'linreg' | 'ema' | 'flat' | 'holt';
 }
 
 function dayDiff(a: string, b: string): number {

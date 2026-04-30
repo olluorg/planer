@@ -1,21 +1,21 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { resetDB, persist } from "@/lib/db";
+import { resetDB, persist, DB_KEY } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import {
-  Download,
-  Upload,
-  RefreshCw,
-  Sun,
-  Moon,
-  Bell,
-  BellOff,
-  Puzzle,
+  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson,
 } from "lucide-react";
 import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
 import { isExtension, getExtSetting, setExtSetting } from "@/lib/extension";
+import { parseCsv, readFileText } from "@/lib/importCsv";
+import { ACCENTS } from "@/lib/theme";
+import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
+import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
+import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
+import { Input } from "@/components/ui/input";
+import { nanoid } from "nanoid";
 
 const BLOCK_SCHEDULE = [
   { key: "morning", label: "Утро", time: "07:00" },
@@ -26,7 +26,7 @@ const BLOCK_SCHEDULE = [
 
 export const SettingsPage = () => {
   const reload = useStore((s) => s.reload);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accent, setAccent } = useTheme();
   const [notifEnabled, setNotifEnabled] = useState(true);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export const SettingsPage = () => {
 
   const exportDb = async () => {
     await persist();
-    const blob = await get<Uint8Array>("thedad.sqlite.v1");
+    const blob = await get<Uint8Array>(DB_KEY);
     if (!blob) return;
     const url = URL.createObjectURL(
       new Blob([blob.buffer as ArrayBuffer], {
@@ -59,7 +59,7 @@ export const SettingsPage = () => {
 
   const importDb = async (file: File) => {
     const buf = new Uint8Array(await file.arrayBuffer());
-    await set("thedad.sqlite.v1", buf);
+    await set(DB_KEY, buf);
     location.reload();
   };
 
@@ -68,6 +68,118 @@ export const SettingsPage = () => {
     await resetDB();
     reload();
     location.reload();
+  };
+
+  const [importMsg, setImportMsg] = useState<string>("");
+  const [reminders, setReminders] = useState<Reminder[]>(() => loadReminders());
+  const [reminderText, setReminderText] = useState("");
+  const [reminderTime, setReminderTime] = useState("18:00");
+  const [permission, setPermission] = useState<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'denied',
+  );
+
+  useEffect(() => { scheduleAll(); }, []);
+
+  const persistReminders = (r: Reminder[]) => { setReminders(r); saveReminders(r); };
+  const askPermission = async () => { setPermission(await requestPermission()); scheduleAll(); };
+  const addReminder = () => {
+    if (!reminderText.trim()) return;
+    persistReminders([...reminders, { id: nanoid(8), text: reminderText.trim(), time: reminderTime, enabled: true }]);
+    setReminderText("");
+  };
+  const addTask = useStore((s) => s.addTask);
+  const addHabit = useStore((s) => s.addHabit);
+  const addGoal = useStore((s) => s.addGoal);
+
+  const importCsvFile = async (file: File, kind: "tasks" | "habits" | "goals") => {
+    try {
+      const text = await readFileText(file);
+      const rows = parseCsv(text);
+      let imported = 0;
+      for (const r of rows) {
+        if (kind === "tasks" && r.title) {
+          addTask({
+            title: r.title,
+            date: r.date || new Date().toISOString().slice(0, 10),
+            time_block: (r.time_block as any) || null,
+            priority: r.priority ? Number(r.priority) : 2,
+            tags: r.tags || null,
+            notes: r.notes || null,
+            estimate_min: r.estimate_min ? Number(r.estimate_min) : null,
+          });
+          imported++;
+        } else if (kind === "habits" && r.title) {
+          addHabit({ title: r.title, color: r.color || null, schedule: (r.schedule as any) || "daily" });
+          imported++;
+        } else if (kind === "goals" && r.title) {
+          addGoal({
+            title: r.title,
+            type: (r.type as any) || "mid",
+            start_value: r.start_value ? Number(r.start_value) : 0,
+            target_value: r.target_value ? Number(r.target_value) : 100,
+            unit: r.unit || null,
+            deadline: r.deadline || null,
+          });
+          imported++;
+        }
+      }
+      setImportMsg(`✓ Импортировано: ${imported}`);
+    } catch (e: any) {
+      setImportMsg(`✗ Ошибка: ${e?.message ?? e}`);
+    }
+    setTimeout(() => setImportMsg(""), 3000);
+  };
+
+  const exportWeeklyReport = () => {
+    const s = useStore.getState();
+    const md = buildWeeklyMarkdown(new Date(), {
+      goals: s.goals, tasks: s.tasks, habits: s.habits,
+      habitLogs: s.habitLogs, progress: s.progress, reflections: s.reflections,
+    });
+    downloadText(`thedad-week-${new Date().toISOString().slice(0, 10)}.md`, md);
+  };
+
+  const exportEncrypted = async () => {
+    const pass = window.prompt('Пароль для шифрования (минимум 8 символов):');
+    if (!pass || pass.length < 8) { alert('Слишком короткий пароль'); return; }
+    await persist();
+    const blob = await get<Uint8Array>(DB_KEY);
+    if (!blob) return;
+    const enc = await encryptBytes(blob, pass);
+    const url = URL.createObjectURL(new Blob([enc.buffer as ArrayBuffer], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `thedad-${new Date().toISOString().slice(0, 10)}.sqlite.enc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importEncrypted = async (file: File) => {
+    const pass = window.prompt('Пароль для расшифровки:');
+    if (!pass) return;
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const dec = await decryptBytes(buf, pass);
+      await set(DB_KEY, dec);
+      location.reload();
+    } catch (e: any) {
+      alert('Не удалось расшифровать: ' + (e?.message ?? e));
+    }
+  };
+
+  const importJsonFile = async (file: File) => {
+    try {
+      const text = await readFileText(file);
+      const data = JSON.parse(text);
+      let imported = 0;
+      if (Array.isArray(data?.goals)) data.goals.forEach((g: any) => g.title && (addGoal(g), imported++));
+      if (Array.isArray(data?.habits)) data.habits.forEach((h: any) => h.title && (addHabit(h), imported++));
+      if (Array.isArray(data?.tasks)) data.tasks.forEach((t: any) => t.title && (addTask(t), imported++));
+      setImportMsg(`✓ Импортировано из JSON: ${imported}`);
+    } catch (e: any) {
+      setImportMsg(`✗ Ошибка: ${e?.message ?? e}`);
+    }
+    setTimeout(() => setImportMsg(""), 3000);
   };
 
   return (
@@ -89,6 +201,18 @@ export const SettingsPage = () => {
           >
             <Moon className="h-4 w-4" /> Тёмная
           </Button>
+        </div>
+        <div className="text-[11px] text-text-muted mt-4 mb-2">Акцентный цвет</div>
+        <div className="flex gap-2 flex-wrap">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => setAccent(a.id)}
+              title={a.label}
+              className={`h-8 w-8 border ${accent === a.id ? 'border-text' : 'border-border'} transition-colors`}
+              style={{ background: a.color }}
+            />
+          ))}
         </div>
       </Card>
 
@@ -117,6 +241,21 @@ export const SettingsPage = () => {
               </span>
             </Button>
           </label>
+          <Button variant="soft" onClick={exportEncrypted}>
+            <Download /> Зашифровать .sqlite.enc
+          </Button>
+          <label>
+            <input
+              type="file" accept=".enc,application/octet-stream" className="hidden"
+              onChange={(e) => e.target.files?.[0] && importEncrypted(e.target.files[0])}
+            />
+            <Button variant="soft" asChild>
+              <span><Upload /> Импорт .sqlite.enc</span>
+            </Button>
+          </label>
+          <Button variant="soft" onClick={exportWeeklyReport}>
+            <FileText /> Отчёт за неделю (.md)
+          </Button>
           <Button variant="danger" onClick={reset}>
             <RefreshCw /> Сбросить
           </Button>
@@ -124,7 +263,73 @@ export const SettingsPage = () => {
       </Card>
 
       <Card>
-        <CardTitle>Уведомления</CardTitle>
+        <CardTitle>Импорт данных</CardTitle>
+        <div className="text-sm text-text-muted mb-3">
+          CSV-колонки для задач: <code>title, date, time_block, priority, tags, notes, estimate_min</code>.<br />
+          Для привычек: <code>title, color, schedule</code>. Для целей: <code>title, type, start_value, target_value, unit, deadline</code>.<br />
+          JSON: объект с массивами <code>{`{ goals, habits, tasks }`}</code>.
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {(["tasks", "habits", "goals"] as const).map((kind) => (
+            <label key={kind}>
+              <input
+                type="file" accept=".csv,text/csv" className="hidden"
+                onChange={(e) => e.target.files?.[0] && importCsvFile(e.target.files[0], kind)}
+              />
+              <Button variant="soft" asChild>
+                <span><FileText /> CSV: {kind}</span>
+              </Button>
+            </label>
+          ))}
+          <label>
+            <input
+              type="file" accept=".json,application/json" className="hidden"
+              onChange={(e) => e.target.files?.[0] && importJsonFile(e.target.files[0])}
+            />
+            <Button variant="soft" asChild>
+              <span><FileJson /> JSON</span>
+            </Button>
+          </label>
+        </div>
+        {importMsg && <div className="text-xs text-text-muted mt-3">{importMsg}</div>}
+      </Card>
+
+      <Card>
+        <CardTitle>Локальные напоминания</CardTitle>
+        <div className="text-sm text-text-muted mb-3">
+          {permission === 'granted'
+            ? 'Разрешение получено. Напоминания приходят пока вкладка открыта.'
+            : permission === 'denied'
+              ? 'Уведомления заблокированы в настройках браузера.'
+              : 'Нужно разрешить уведомления.'}
+        </div>
+        {permission !== 'granted' && (
+          <Button variant="soft" size="sm" onClick={askPermission} className="mb-3"><Bell /> Разрешить</Button>
+        )}
+        <div className="flex gap-2 flex-wrap mb-3">
+          <Input className="flex-1 min-w-[160px]" placeholder="Текст напоминания" value={reminderText}
+            onChange={(e) => setReminderText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addReminder()} />
+          <Input type="time" className="w-32" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} />
+          <Button onClick={addReminder} size="sm"><Bell /> Добавить</Button>
+        </div>
+        <div className="space-y-1">
+          {reminders.length === 0 && <div className="text-xs text-text-dim">Нет напоминаний</div>}
+          {reminders.map((r) => (
+            <div key={r.id} className="flex items-center gap-3 text-sm">
+              <input type="checkbox" checked={r.enabled} onChange={() =>
+                persistReminders(reminders.map((x) => x.id === r.id ? { ...x, enabled: !x.enabled } : x))
+              } />
+              <span className="font-mono text-xs w-12">{r.time}</span>
+              <span className="flex-1">{r.text}</span>
+              <button onClick={() => persistReminders(reminders.filter((x) => x.id !== r.id))}
+                className="text-text-dim hover:text-danger">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <CardTitle className="mt-6">Расширение Chrome (опционально)</CardTitle>
         {isExtension ? (
           <div className="space-y-3">
             <label className="flex items-center gap-3 cursor-pointer">

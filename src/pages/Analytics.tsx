@@ -5,7 +5,7 @@ import { Ring } from '@/components/ui/ring';
 import { Badge } from '@/components/ui/badge';
 import { useStore } from '@/lib/store';
 import { ECharts } from '@/components/charts/ECharts';
-import { forecastGoal } from '@/lib/predict';
+import { forecast as runForecast, type ForecastMethod } from '@/lib/forecast';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { isoDate, fmtNum } from '@/lib/utils';
@@ -13,16 +13,17 @@ import { useTheme } from '@/lib/theme';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 
 export const AnalyticsPage = () => {
-  const { goals, progress, tasks, habits, habitLogs } = useStore();
+  const { goals, progress, tasks, habits, habitLogs, reflections } = useStore();
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const [goalId, setGoalId] = useState<string>(goals[0]?.id ?? '');
-  const [scenario, setScenario] = useState<'as-is' | 'plus20' | 'plus50' | 'minus20'>('as-is');
+  const [method, setMethod] = useState<ForecastMethod>('linreg');
+  const [activity, setActivity] = useState<number>(100); // % activity slider 50..200
   const goal = goals.find((g) => g.id === goalId);
   const recs = useMemo(() => progress.filter((p) => p.goal_id === goalId), [progress, goalId]);
 
-  const multiplier = { 'as-is': 1, plus20: 1.2, plus50: 1.5, minus20: 0.8 }[scenario];
-  const f = useMemo(() => goal ? forecastGoal(goal, recs, 60, multiplier) : null, [goal, recs, multiplier]);
+  const multiplier = activity / 100;
+  const f = useMemo(() => goal ? runForecast(goal, recs, { horizon: 60, multiplier, method }) : null, [goal, recs, multiplier, method]);
 
   // task heatmap: 12 weeks x 7
   const heat = useMemo(() => {
@@ -40,6 +41,37 @@ export const AnalyticsPage = () => {
     const max = Math.max(1, ...data.map((x) => x[2]));
     return { data, max, weeks };
   }, [tasks]);
+
+  // habit correlations vs mood and task completion
+  const correlations = useMemo(() => {
+    if (habits.length === 0) return [];
+    const today = new Date();
+    const days = Array.from({ length: 60 }, (_, i) => isoDate(addDays(today, -59 + i)));
+
+    const moodByDay = new Map<string, number>();
+    reflections.forEach((r) => { if (r.mood !== null) moodByDay.set(r.date, r.mood); });
+    const taskRatioByDay = new Map<string, number>();
+    days.forEach((d) => {
+      const dt = tasks.filter((t) => t.date === d);
+      taskRatioByDay.set(d, dt.length ? dt.filter((t) => t.status === 'done').length / dt.length : 0);
+    });
+
+    return habits.map((h) => {
+      const habitVec = days.map((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d) ? 1 : 0);
+      const moodVec: number[] = [];
+      const moodHabit: number[] = [];
+      const taskVec: number[] = [];
+      days.forEach((d, i) => {
+        if (moodByDay.has(d)) { moodHabit.push(habitVec[i]); moodVec.push(moodByDay.get(d)!); }
+        taskVec.push(taskRatioByDay.get(d) ?? 0);
+      });
+      return {
+        title: h.title,
+        rMood: pearson(moodHabit, moodVec),
+        rTasks: pearson(habitVec, taskVec),
+      };
+    });
+  }, [habits, habitLogs, tasks, reflections]);
 
   // habits weekly bar
   const habitsBar = useMemo(() => {
@@ -62,15 +94,24 @@ export const AnalyticsPage = () => {
               {goals.map((g) => <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={scenario} onValueChange={(v: any) => setScenario(v)}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <Select value={method} onValueChange={(v: any) => setMethod(v)}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Модель" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="as-is">Текущий темп</SelectItem>
-              <SelectItem value="plus20">+20% активности</SelectItem>
-              <SelectItem value="plus50">+50% активности</SelectItem>
-              <SelectItem value="minus20">−20% активности</SelectItem>
+              <SelectItem value="linreg">Лин. регрессия</SelectItem>
+              <SelectItem value="ema">EMA (сглаживание)</SelectItem>
+              <SelectItem value="holt">Holt (тренд)</SelectItem>
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-2 border border-border px-3 py-1.5 text-xs">
+            <span className="text-text-muted">Активность</span>
+            <input
+              type="range" min={50} max={200} step={5}
+              value={activity}
+              onChange={(e) => setActivity(Number(e.target.value))}
+              className="w-32 accent-accent"
+            />
+            <span className="tabular-nums w-12 text-right">{activity}%</span>
+          </div>
         </div>
       </div>
 
@@ -121,6 +162,21 @@ export const AnalyticsPage = () => {
         </Card>
 
         <Card className="sm:col-span-2 lg:col-span-4">
+          <CardTitle>Корреляции привычек</CardTitle>
+          <div className="text-[11px] text-text-muted mb-2">Pearson R за 60 дней</div>
+          <div className="space-y-2 text-sm">
+            {correlations.length === 0 && <div className="text-xs text-text-dim">Нет привычек</div>}
+            {correlations.map((c) => (
+              <div key={c.title} className="flex items-center gap-3">
+                <div className="flex-1 truncate">{c.title}</div>
+                <CorrCell label="настр." value={c.rMood} />
+                <CorrCell label="задачи" value={c.rTasks} />
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="sm:col-span-2 lg:col-span-4">
           <CardTitle>Тепловая карта выполнения</CardTitle>
           <ECharts height={240} option={{
             tooltip: { position: 'top' },
@@ -135,6 +191,28 @@ export const AnalyticsPage = () => {
     </div>
   );
 };
+
+const CorrCell: React.FC<{ label: string; value: number | null }> = ({ label, value }) => {
+  if (value === null) return <span className="text-text-dim text-[11px] tabular-nums w-16 text-right">{label}: —</span>;
+  const tone = value > 0.4 ? 'text-accent' : value < -0.4 ? 'text-danger' : 'text-text-muted';
+  return (
+    <span className={`text-[11px] tabular-nums w-16 text-right ${tone}`}>
+      {label}: {value > 0 ? '+' : ''}{value.toFixed(2)}
+    </span>
+  );
+};
+
+function pearson(a: number[], b: number[]): number | null {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return null;
+  const ma = a.reduce((s, x) => s + x, 0) / n;
+  const mb = b.reduce((s, x) => s + x, 0) / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { num += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; }
+  const den = Math.sqrt(da * db);
+  if (!den) return null;
+  return num / den;
+}
 
 function mainChart(goal: any, recs: any[], f: any, cc: ChartColors) {
   const histDates = recs.map((r) => r.date);

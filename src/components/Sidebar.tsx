@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings } from 'lucide-react';
+import { LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
@@ -10,6 +10,7 @@ const items = [
   { to: '/plan', label: 'План', icon: Calendar },
   { to: '/analytics', label: 'Аналитика', icon: BarChart3 },
   { to: '/reflection', label: 'Рефлексия', icon: NotebookPen },
+  { to: '/history', label: 'История', icon: History },
   { to: '/settings', label: 'Настройки', icon: Settings },
 ];
 

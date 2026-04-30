@@ -11,18 +11,31 @@ import { PlanPage } from './pages/Plan';
 import { AnalyticsPage } from './pages/Analytics';
 import { ReflectionPage } from './pages/Reflection';
 import { SettingsPage } from './pages/Settings';
+import { HistoryPage } from './pages/History';
 import { QuickAddDialog } from './components/QuickAddDialog';
+import { CommandPalette } from './components/CommandPalette';
+import { applyAccent, getAccent } from './lib/theme';
 
 export default function App() {
   const ready = useStore((s) => s.ready);
   const init = useStore((s) => s.init);
   const [date, setDate] = useState(new Date());
   const [range, setRange] = useState<'day' | 'week' | 'month' | 'year'>('day');
-  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => { void init(); applyAccent(getAccent()); }, [init]);
 
   useEffect(() => {
-    void init();
-  }, [init]);
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   if (!ready) {
     return (
@@ -36,7 +49,7 @@ export default function App() {
     <div className="h-full flex bg-bg">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <Topbar date={date} onDate={setDate} range={range} onRange={setRange} onAdd={() => setQuickOpen(true)} />
+        <Topbar date={date} onDate={setDate} range={range} onRange={setRange} onAdd={() => setQuickTab('task')} />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
           <Routes>
             <Route path="/index.html" element={<Navigate to="/" replace />} />
@@ -47,11 +60,25 @@ export default function App() {
             <Route path="/plan" element={<PlanPage date={date} />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/reflection" element={<ReflectionPage date={date} />} />
+            <Route path="/history" element={<HistoryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>
-      <QuickAddDialog open={quickOpen} onOpenChange={setQuickOpen} date={date} />
+      <QuickAddDialog
+        open={quickTab !== null}
+        onOpenChange={(v) => !v && setQuickTab(null)}
+        date={date}
+        initialTab={quickTab ?? undefined}
+      />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onAddTask={() => setQuickTab('task')}
+        onAddHabit={() => setQuickTab('habit')}
+        onAddGoal={() => setQuickTab('goal')}
+        onAddProgress={() => setQuickTab('progress')}
+      />
     </div>
   );
 }

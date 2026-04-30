@@ -24,15 +24,39 @@ export interface Goal {
 export interface Task {
   id: string;
   goal_id: string | null;
+  parent_id: string | null;
   title: string;
   notes: string | null;
   date: string;
   time_block: TimeBlock;
   priority: number;
   status: TaskStatus;
+  tags: string | null;
+  estimate_min: number | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  task_id: string | null;
+  goal_id: string | null;
+  type: 'pomodoro' | 'free';
+  started_at: string;
+  ended_at: string | null;
+  duration: number;
+  note: string | null;
+}
+
+export interface ChangeLog {
+  id: string;
+  entity: string;
+  entity_id: string;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  ts: string;
 }
 
 export interface Habit {

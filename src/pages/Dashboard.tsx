@@ -23,6 +23,8 @@ import { useTheme } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { QuickAddDialog } from '@/components/QuickAddDialog';
+import { PRESETS } from '@/lib/dashboardPresets';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 const BLOCKS = [
   { key: 'morning', label: '06:00 – 12:00', icon: Sun },
@@ -46,6 +48,7 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: 'quick-add',     x: 3,  y: 15, w: 3, h: 4 },
   { i: 'reflection',    x: 6,  y: 15, w: 3, h: 4 },
   { i: 'reminders',     x: 9,  y: 15, w: 3, h: 4 },
+  { i: 'kpi-grid',      x: 0,  y: 19, w: 12, h: 5 },
 ];
 
 const ROW_HEIGHT = 48;
@@ -69,6 +72,14 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     ],
   );
   const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
+  const [kpiGoals, setKpiGoals] = useLocalStorage<string[]>('dashboard.kpiGoals', []);
+
+  const applyPreset = (id: string) => {
+    const p = PRESETS.find((x) => x.id === id);
+    if (!p) return;
+    setLayout(p.layout);
+    setHidden(p.hidden);
+  };
 
   const dayTasks = tasks.filter((t) => t.date === today);
   const weekStart = startOfWeek(date, { weekStartsOn: 1 });
@@ -423,6 +434,44 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
       </WidgetCard>
     ),
 
+    'kpi-grid': () => (
+      <WidgetCard editing={editing} onHide={() => hideWidget('kpi-grid')}>
+        <div className="flex items-center justify-between mb-3">
+          <CardTitle className="mb-0">KPI-плитки</CardTitle>
+          {editing && (
+            <Select onValueChange={(id) => setKpiGoals((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])}>
+              <SelectTrigger className="w-44 h-8 text-xs"><SelectValue placeholder="Добавить/убрать цель" /></SelectTrigger>
+              <SelectContent>
+                {goals.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {kpiGoals.includes(g.id) ? '✓ ' : ''}{g.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {kpiGoals.length === 0 && <div className="text-xs text-text-dim col-span-full">Нет KPI. В режиме редактора выбери цели.</div>}
+          {kpiGoals.map((id) => {
+            const g = goals.find((x) => x.id === id);
+            if (!g) return null;
+            const denom = g.target_value - g.start_value || 1;
+            const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
+            return (
+              <div key={id} className="border border-border p-3 flex flex-col items-center gap-2">
+                <Ring value={r} size={70} stroke={6}>
+                  <div className="text-xs font-semibold tabular-nums">{r}%</div>
+                </Ring>
+                <div className="text-[11px] text-center text-text-muted truncate w-full">{g.title}</div>
+                <div className="text-sm tabular-nums">{fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}</div>
+              </div>
+            );
+          })}
+        </div>
+      </WidgetCard>
+    ),
+
     'reminders': () => (
       <WidgetCard editing={editing} onHide={() => hideWidget('reminders')}>
         <div className="flex flex-col h-full">
@@ -461,9 +510,15 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         <div className="text-sm text-text-muted">
           {editing ? 'Перетаскивай и меняй размер. Нажми «Готово» чтобы сохранить.' : ''}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {editing && (
             <>
+              <Select onValueChange={applyPreset}>
+                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Пресет" /></SelectTrigger>
+                <SelectContent>
+                  {PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
               {hidden.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={showAll}>Показать скрытые ({hidden.length})</Button>
               )}

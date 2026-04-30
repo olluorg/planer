@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { exec, getDB, query } from './db';
-import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task } from './types';
+import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task, TimeEntry, ChangeLog } from './types';
 import { todayISO } from './utils';
 import { syncTasksToExtension } from './extension';
 
@@ -13,8 +13,15 @@ interface State {
   habitLogs: HabitLog[];
   progress: ProgressRecord[];
   reflections: Reflection[];
+  timeEntries: TimeEntry[];
+  changeLog: ChangeLog[];
   init: () => Promise<void>;
   reload: () => void;
+  // time entries
+  startTimeEntry: (taskId: string | null, type?: 'pomodoro' | 'free') => TimeEntry;
+  finishTimeEntry: (id: string, duration: number) => void;
+  // change log
+  logChange: (entity: string, entity_id: string, field: string, oldV: any, newV: any) => void;
   // goals
   addGoal: (g: Partial<Goal> & { title: string }) => Goal;
   updateGoal: (id: string, p: Partial<Goal>) => void;
@@ -45,6 +52,8 @@ export const useStore = create<State>((set, get) => ({
   habitLogs: [],
   progress: [],
   reflections: [],
+  timeEntries: [],
+  changeLog: [],
 
   init: async () => {
     await getDB();
@@ -63,6 +72,8 @@ export const useStore = create<State>((set, get) => ({
       habitLogs: query<HabitLog>('SELECT * FROM habit_logs'),
       progress: query<ProgressRecord>('SELECT * FROM progress_records ORDER BY date ASC'),
       reflections: query<Reflection>('SELECT * FROM reflections ORDER BY date DESC'),
+      timeEntries: query<TimeEntry>('SELECT * FROM time_entries ORDER BY started_at DESC'),
+      changeLog: query<ChangeLog>('SELECT * FROM change_log ORDER BY ts DESC LIMIT 500'),
     });
     syncTasksToExtension(tasks);
   },
@@ -97,6 +108,12 @@ export const useStore = create<State>((set, get) => ({
     const cur = query<Goal>('SELECT * FROM goals WHERE id = ?', [id])[0];
     if (!cur) return;
     const next = { ...cur, ...p, updated_at: now() };
+    (Object.keys(p) as (keyof Goal)[]).forEach((k) => {
+      if (k === 'updated_at') return;
+      if ((cur as any)[k] !== (next as any)[k]) {
+        get().logChange('goal', id, String(k), (cur as any)[k], (next as any)[k]);
+      }
+    });
     exec(
       `UPDATE goals SET parent_id=?, title=?, type=?, metric=?, start_value=?, target_value=?, current_value=?, unit=?, deadline=?, status=?, color=?, cover=?, updated_at=? WHERE id=?`,
       [next.parent_id, next.title, next.type, next.metric, next.start_value, next.target_value, next.current_value, next.unit, next.deadline, next.status, next.color, next.cover, next.updated_at, id],
@@ -116,19 +133,22 @@ export const useStore = create<State>((set, get) => ({
     const task: Task = {
       id: nanoid(10),
       goal_id: t.goal_id ?? null,
+      parent_id: t.parent_id ?? null,
       title: t.title,
       notes: t.notes ?? null,
       date: t.date ?? todayISO(),
       time_block: t.time_block ?? null,
       priority: t.priority ?? 2,
       status: t.status ?? 'active',
+      tags: t.tags ?? null,
+      estimate_min: t.estimate_min ?? null,
       completed_at: null,
       created_at: now(),
       updated_at: now(),
     };
     exec(
-      `INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [task.id, task.goal_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.completed_at, task.created_at, task.updated_at],
+      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.tags, task.estimate_min, task.completed_at, task.created_at, task.updated_at],
     );
     get().reload();
     return task;
@@ -139,8 +159,8 @@ export const useStore = create<State>((set, get) => ({
     if (!cur) return;
     const next = { ...cur, ...p, updated_at: now() };
     exec(
-      `UPDATE tasks SET goal_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, completed_at=?, updated_at=? WHERE id=?`,
-      [next.goal_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.completed_at, next.updated_at, id],
+      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, tags=?, estimate_min=?, completed_at=?, updated_at=? WHERE id=?`,
+      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.tags, next.estimate_min, next.completed_at, next.updated_at, id],
     );
     get().reload();
   },
@@ -207,9 +227,41 @@ export const useStore = create<State>((set, get) => ({
   },
 
   addProgress: (r) => {
+    const prev = query<Goal>('SELECT * FROM goals WHERE id = ?', [r.goal_id])[0];
     exec('INSERT INTO progress_records VALUES (?,?,?,?,?)', [nanoid(10), r.goal_id, r.date, r.value, r.note]);
     exec('UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?', [r.value, now(), r.goal_id]);
+    if (prev) get().logChange('progress', r.goal_id, 'current_value', prev.current_value, r.value);
     get().reload();
+  },
+
+  startTimeEntry: (task_id, type = 'pomodoro') => {
+    const e: TimeEntry = {
+      id: nanoid(10),
+      task_id,
+      goal_id: task_id ? (query<Task>('SELECT goal_id FROM tasks WHERE id=?', [task_id])[0]?.goal_id ?? null) : null,
+      type,
+      started_at: now(),
+      ended_at: null,
+      duration: 0,
+      note: null,
+    };
+    exec('INSERT INTO time_entries VALUES (?,?,?,?,?,?,?,?)', [e.id, e.task_id, e.goal_id, e.type, e.started_at, e.ended_at, e.duration, e.note]);
+    get().reload();
+    return e;
+  },
+
+  finishTimeEntry: (id, duration) => {
+    exec('UPDATE time_entries SET ended_at=?, duration=? WHERE id=?', [now(), Math.max(0, Math.round(duration)), id]);
+    get().reload();
+  },
+
+  logChange: (entity, entity_id, field, oldV, newV) => {
+    exec('INSERT INTO change_log VALUES (?,?,?,?,?,?,?)', [
+      nanoid(10), entity, entity_id, field,
+      oldV == null ? null : String(oldV),
+      newV == null ? null : String(newV),
+      now(),
+    ]);
   },
 
   upsertReflection: (r) => {
@@ -289,8 +341,8 @@ function seed() {
     ['Подготовка ко сну', 'night', 3, 'active'],
   ] as const;
   tasks.forEach(([title, block, prio, status]) => {
-    exec('INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [nanoid(10), ids.g1, title, null, today, block, prio, status, status === 'done' ? t : null, t, t]);
+    exec('INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [nanoid(10), ids.g1, null, title, null, today, block, prio, status, null, null, status === 'done' ? t : null, t, t]);
   });
 
   // habits

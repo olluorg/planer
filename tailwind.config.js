@@ -13,7 +13,7 @@ export default {
         },
         border: { DEFAULT: 'var(--border)', soft: 'var(--border-soft)' },
         text: { DEFAULT: 'var(--text)', muted: 'var(--text-muted)', dim: 'var(--text-dim)' },
-        accent: { DEFAULT: '#22c55e', soft: '#16a34a' },
+        accent: { DEFAULT: 'var(--accent, #22c55e)', soft: 'var(--accent-soft, #16a34a)' },
         warn: '#eab308',
         danger: '#ef4444',
         info: '#3b82f6',
