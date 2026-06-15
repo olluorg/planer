@@ -11,6 +11,7 @@ import { useStore } from '@/lib/store';
 import { fmtNum, colorByPct } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
 import { ECharts } from '@/components/charts/ECharts';
+import { GoalPath } from '@/components/GoalPath';
 import { useTheme } from '@/lib/theme';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 import type { Goal, GoalType } from '@/lib/types';
@@ -20,7 +21,7 @@ export const GoalsPage = () => {
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: '', type: 'mid' as GoalType, start_value: '0', target_value: '100', unit: '', deadline: '' });
+  const [form, setForm] = useState({ title: '', type: 'mid' as GoalType, start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none' });
 
   const submit = () => {
     if (!form.title.trim()) return;
@@ -32,9 +33,10 @@ export const GoalsPage = () => {
       current_value: Number(form.start_value) || 0,
       unit: form.unit || null,
       deadline: form.deadline || null,
+      parent_id: form.parent_id === '__none' ? null : form.parent_id,
     });
     setOpen(false);
-    setForm({ title: '', type: 'mid', start_value: '0', target_value: '100', unit: '', deadline: '' });
+    setForm({ title: '', type: 'mid', start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none' });
   };
 
   return (
@@ -45,7 +47,7 @@ export const GoalsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {goals.map((g) => {
+        {goals.filter((g) => !g.parent_id).map((g) => {
           const recs = progress.filter((p) => p.goal_id === g.id);
           const f = forecastGoal(g, recs, 30);
           const denom = g.target_value - g.start_value || 1;
@@ -87,6 +89,36 @@ export const GoalsPage = () => {
                 <ECharts height={140} option={forecastChart(g, recs, f, cc)} />
               </div>
 
+              <div className="mt-3 overflow-x-auto">
+                <GoalPath goal={g} />
+              </div>
+
+              {(() => {
+                const children = goals.filter((x) => x.parent_id === g.id);
+                if (children.length === 0) return null;
+                return (
+                  <div className="mt-3 border-t border-border-soft pt-3">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted mb-2">
+                      Подцели · {children.length}
+                    </div>
+                    <ul className="space-y-2">
+                      {children.map((c) => {
+                        const cd = c.target_value - c.start_value || 1;
+                        const cr = Math.round(Math.max(0, Math.min(1, (c.current_value - c.start_value) / cd)) * 100);
+                        return (
+                          <li key={c.id} className="flex items-center gap-3 text-sm">
+                            <span className="text-text-dim">↳</span>
+                            <span className="flex-1 truncate">{c.title}</span>
+                            <div className="w-24"><Progress value={cr} barColor={colorByPct(cr)} /></div>
+                            <span className="text-[11px] text-text-muted tabular-nums w-8 text-right">{cr}%</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })()}
+
               <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
               </div>
             </Card>
@@ -113,6 +145,15 @@ export const GoalsPage = () => {
               <Input placeholder="Ед." value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
             </div>
             <Input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
+            <Select value={form.parent_id} onValueChange={(v) => setForm({ ...form, parent_id: v })}>
+              <SelectTrigger><SelectValue placeholder="Родительская цель" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Без родителя</SelectItem>
+                {goals.filter((g) => !g.parent_id).map((g) => (
+                  <SelectItem key={g.id} value={g.id}>↳ {g.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>

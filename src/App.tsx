@@ -7,9 +7,10 @@ import { Dashboard } from './pages/Dashboard';
 import { QuickAddDialog } from './components/QuickAddDialog';
 import { CommandPalette } from './components/CommandPalette';
 import { PomodoroTimer } from './components/PomodoroTimer';
+import { Confetti } from './components/Confetti';
 import { applyAccent, getAccent } from './lib/theme';
 import { useNavigate } from 'react-router-dom';
-import { loadReminders } from './lib/notifications';
+import { loadReminders, scheduleHeartbeat } from './lib/notifications';
 
 const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
 const TasksPage = lazy(() => import('./pages/Tasks').then((m) => ({ default: m.TasksPage })));
@@ -19,6 +20,7 @@ const AnalyticsPage = lazy(() => import('./pages/Analytics').then((m) => ({ defa
 const ReflectionPage = lazy(() => import('./pages/Reflection').then((m) => ({ default: m.ReflectionPage })));
 const HistoryPage = lazy(() => import('./pages/History').then((m) => ({ default: m.HistoryPage })));
 const SettingsPage = lazy(() => import('./pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const AwardsPage = lazy(() => import('./pages/Awards').then((m) => ({ default: m.AwardsPage })));
 
 const Loader = () => (
   <div className="h-full flex items-center justify-center text-text-muted text-sm">Загрузка...</div>
@@ -34,8 +36,38 @@ export default function App() {
   const [timerOpen, setTimerOpen] = useState(false);
   const nav = useNavigate();
   const bellCount = loadReminders().filter((r) => r.enabled).length;
+  const recentUnlocks = useStore((s) => s.recentUnlocks);
+  const [confettiTrigger, setConfettiTrigger] = useState(0);
+  useEffect(() => {
+    if (recentUnlocks.length > 0) setConfettiTrigger((v) => v + 1);
+  }, [recentUnlocks.length]);
 
   useEffect(() => { void init(); applyAccent(getAccent()); }, [init]);
+
+  useEffect(() => {
+    if (!ready) return;
+    scheduleHeartbeat({
+      morningBody: () => {
+        const st = useStore.getState();
+        const today = new Date().toISOString().slice(0, 10);
+        const top = st.tasks
+          .filter((t) => t.date === today && t.status === 'active' && !t.parent_id)
+          .sort((a, b) => a.priority - b.priority)
+          .slice(0, 3)
+          .map((t) => `• ${t.title}`).join('\n');
+        return top ? `Главное на сегодня:\n${top}` : 'Утро. Что главное сегодня?';
+      },
+      eveningBody: () => {
+        const st = useStore.getState();
+        const today = new Date().toISOString().slice(0, 10);
+        const has = st.reflections.some((r) => r.date === today && r.mood !== null);
+        if (has) return 'Хороший день. Завтра тоже получится.';
+        const dt = st.tasks.filter((t) => t.date === today);
+        const done = dt.filter((t) => t.status === 'done').length;
+        return `Закрой день: ${done}/${dt.length} задач. Запиши рефлексию.`;
+      },
+    });
+  }, [ready]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -79,6 +111,7 @@ export default function App() {
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/reflection" element={<ReflectionPage date={date} />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/awards" element={<AwardsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </Suspense>
@@ -99,6 +132,7 @@ export default function App() {
         onAddProgress={() => setQuickTab('progress')}
       />
       <PomodoroTimer task={null} open={timerOpen} onClose={() => setTimerOpen(false)} />
+      <Confetti trigger={confettiTrigger} />
     </div>
   );
 }

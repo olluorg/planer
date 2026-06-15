@@ -10,6 +10,8 @@ import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
 import { isExtension, getExtSetting, setExtSetting } from "@/lib/extension";
 import { parseCsv, readFileText } from "@/lib/importCsv";
+import { isHeartbeatEnabled, setHeartbeatEnabled } from "@/lib/notifications";
+import { isSoundEnabled, setSoundEnabled, playSuccess } from "@/lib/sound";
 import { ACCENTS } from "@/lib/theme";
 import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
@@ -28,6 +30,21 @@ export const SettingsPage = () => {
   const reload = useStore((s) => s.reload);
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [notifEnabled, setNotifEnabled] = useState(true);
+  const [heartbeat, setHeartbeat] = useState(isHeartbeatEnabled());
+  const [sound, setSound] = useState(isSoundEnabled());
+  const toggleSound = (v: boolean) => {
+    setSoundEnabled(v); setSound(v);
+    if (v) setTimeout(() => playSuccess(), 50);
+  };
+  const toggleHeartbeat = async (v: boolean) => {
+    if (v) {
+      const p = await requestPermission();
+      if (p !== 'granted') { alert('Разрешите уведомления в браузере'); return; }
+    }
+    setHeartbeatEnabled(v);
+    setHeartbeat(v);
+    location.reload();
+  };
 
   useEffect(() => {
     if (!isExtension) return;
@@ -328,6 +345,37 @@ export const SettingsPage = () => {
             </div>
           ))}
         </div>
+
+        <CardTitle className="mt-6">Heartbeat-уведомления</CardTitle>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={heartbeat}
+            onClick={() => toggleHeartbeat(!heartbeat)}
+            className={`relative w-10 h-6 transition-colors ${heartbeat ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white transition-transform ${heartbeat ? 'translate-x-5' : 'translate-x-1'}`} />
+          </button>
+          <span className="text-sm">
+            Утро (08:00) и вечер (21:00) — пуш с фокусом дня и напоминанием о рефлексии.
+          </span>
+        </label>
+        <div className="text-[11px] text-text-muted mt-2">Работает только пока вкладка открыта (без сервера VAPID).</div>
+
+        <CardTitle className="mt-6">Звук при действии</CardTitle>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={sound}
+            onClick={() => toggleSound(!sound)}
+            className={`relative w-10 h-6 transition-colors ${sound ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white transition-transform ${sound ? 'translate-x-5' : 'translate-x-1'}`} />
+          </button>
+          <span className="text-sm">Короткий beep при выполнении задачи и unlock-ачивке.</span>
+        </label>
 
         <CardTitle className="mt-6">Расширение Chrome (опционально)</CardTitle>
         {isExtension ? (

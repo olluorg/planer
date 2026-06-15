@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { exec, getDB, query } from './db';
-import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task, TimeEntry, ChangeLog } from './types';
+import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task, TimeEntry, ChangeLog, XpEntry, Achievement } from './types';
+import { ACHIEVEMENTS, checkNewAchievements, computeStreak, levelFromXp, xpTotal, XP_REWARDS, type XpSource } from './gamification';
+import { useCombo } from './combo';
+import { playSuccess, playUnlock } from './sound';
 import { todayISO } from './utils';
 import { syncTasksToExtension } from './extension';
 
@@ -15,6 +18,10 @@ interface State {
   reflections: Reflection[];
   timeEntries: TimeEntry[];
   changeLog: ChangeLog[];
+  xpLog: XpEntry[];
+  achievements: Achievement[];
+  recentXp: { id: string; amount: number; ts: number }[];
+  recentUnlocks: { key: string; ts: number }[];
   init: () => Promise<void>;
   reload: () => void;
   // time entries
@@ -22,6 +29,11 @@ interface State {
   finishTimeEntry: (id: string, duration: number) => void;
   // change log
   logChange: (entity: string, entity_id: string, field: string, oldV: any, newV: any) => void;
+  // gamification
+  awardXp: (source: XpSource, sourceId?: string | null) => void;
+  runAchievementCheck: () => void;
+  dismissRecentXp: () => void;
+  dismissRecentUnlock: (key: string) => void;
   // goals
   addGoal: (g: Partial<Goal> & { title: string }) => Goal;
   updateGoal: (id: string, p: Partial<Goal>) => void;
@@ -54,6 +66,10 @@ export const useStore = create<State>((set, get) => ({
   reflections: [],
   timeEntries: [],
   changeLog: [],
+  xpLog: [],
+  achievements: [],
+  recentXp: [],
+  recentUnlocks: [],
 
   init: async () => {
     await getDB();
@@ -74,6 +90,8 @@ export const useStore = create<State>((set, get) => ({
       reflections: query<Reflection>('SELECT * FROM reflections ORDER BY date DESC'),
       timeEntries: query<TimeEntry>('SELECT * FROM time_entries ORDER BY started_at DESC'),
       changeLog: query<ChangeLog>('SELECT * FROM change_log ORDER BY ts DESC LIMIT 500'),
+      xpLog: query<XpEntry>('SELECT * FROM xp_log ORDER BY ts DESC'),
+      achievements: query<Achievement>('SELECT * FROM achievements ORDER BY unlocked_at DESC'),
     });
     syncTasksToExtension(tasks);
   },
@@ -174,6 +192,10 @@ export const useStore = create<State>((set, get) => ({
       status: isDone ? 'active' : 'done',
       completed_at: isDone ? null : now(),
     });
+    if (!isDone) {
+      useCombo.getState().recordCompletion();
+      get().awardXp(cur.parent_id ? 'subtask' : 'task', id);
+    }
   },
 
   removeTask: (id) => {
@@ -223,6 +245,7 @@ export const useStore = create<State>((set, get) => ({
       exec('DELETE FROM habit_logs WHERE id = ?', [ex.id]);
     } else {
       exec('INSERT INTO habit_logs VALUES (?,?,?,1)', [nanoid(10), habit_id, date]);
+      get().awardXp('habit', habit_id);
     }
     get().reload();
   },
@@ -233,6 +256,7 @@ export const useStore = create<State>((set, get) => ({
     exec('UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?', [r.value, now(), r.goal_id]);
     if (prev) get().logChange('progress', r.goal_id, 'current_value', prev.current_value, r.value);
     get().reload();
+    get().awardXp('progress', r.goal_id);
   },
 
   startTimeEntry: (task_id, type = 'pomodoro') => {
@@ -252,7 +276,11 @@ export const useStore = create<State>((set, get) => ({
   },
 
   finishTimeEntry: (id, duration) => {
-    exec('UPDATE time_entries SET ended_at=?, duration=? WHERE id=?', [now(), Math.max(0, Math.round(duration)), id]);
+    const d = Math.max(0, Math.round(duration));
+    exec('UPDATE time_entries SET ended_at=?, duration=? WHERE id=?', [now(), d, id]);
+    if (d >= 50 * 60) { useCombo.getState().recordCompletion(); get().awardXp('pomodoro_50', id); }
+    else if (d >= 25 * 60) { useCombo.getState().recordCompletion(); get().awardXp('pomodoro_25', id); }
+    else if (d >= 15 * 60) get().awardXp('pomodoro_15', id);
     get().reload();
   },
 
@@ -265,7 +293,93 @@ export const useStore = create<State>((set, get) => ({
     ]);
   },
 
+  awardXp: (source, sourceId = null) => {
+    const base = XP_REWARDS[source];
+    if (!base) return;
+    useCombo.getState().refresh();
+    const mult = useCombo.getState().multiplier;
+    const amount = Math.round(base * mult);
+    const id = nanoid(10);
+    const ts = now();
+    const date = todayISO();
+    exec('INSERT INTO xp_log VALUES (?,?,?,?,?,?)', [id, ts, date, source, sourceId, amount]);
+    set((st) => ({ recentXp: [...st.recentXp, { id, amount, ts: Date.now() }].slice(-5) }));
+    playSuccess();
+    get().reload();
+    get().runAchievementCheck();
+  },
+
+  runAchievementCheck: () => {
+    const st = get();
+    // combo lifetime count (count distinct boost activations from localStorage history)
+    let comboCount = 0;
+    try {
+      const raw = localStorage.getItem('combo.lifetime.count.v1');
+      comboCount = raw ? Number(raw) || 0 : 0;
+    } catch {}
+    // freezes used
+    let freezesUsed = 0;
+    try {
+      const raw = localStorage.getItem('streak.freezes.used.v1');
+      freezesUsed = raw ? (JSON.parse(raw) as string[]).length : 0;
+    } catch {}
+    // weekly wins
+    let weeklyWins = 0;
+    try {
+      const raw = localStorage.getItem('weekly.wins.v1');
+      weeklyWins = raw ? Number(raw) || 0 : 0;
+    } catch {}
+    // daily quest all-day
+    let dailyQuestsAllDayCount = 0;
+    try {
+      const raw = localStorage.getItem('quests.all_day_count.v1');
+      dailyQuestsAllDayCount = raw ? Number(raw) || 0 : 0;
+    } catch {}
+    // league
+    let highestLeagueIndex = 0;
+    try {
+      const raw = localStorage.getItem('leagues.peak.v1');
+      highestLeagueIndex = raw ? Number(raw) || 0 : 0;
+    } catch {}
+    const weekXp = (() => {
+      const ws = new Date(); ws.setHours(0, 0, 0, 0);
+      const day = ws.getDay() === 0 ? 6 : ws.getDay() - 1; // Monday-start
+      ws.setDate(ws.getDate() - day);
+      const dates = Array.from({ length: 7 }, (_, i) => { const d = new Date(ws); d.setDate(d.getDate() + i); return d.toISOString().slice(0, 10); });
+      return st.xpLog.filter((e) => dates.includes(e.date)).reduce((s, e) => s + e.amount, 0);
+    })();
+    const ctx = {
+      tasks: st.tasks,
+      habitLogs: st.habitLogs,
+      reflections: st.reflections,
+      xp: xpTotal(st.xpLog),
+      level: levelFromXp(xpTotal(st.xpLog)).level,
+      streak: computeStreak(new Date(), st.tasks, st.habitLogs, st.reflections),
+      pomodoroCount: st.timeEntries.filter((e) => e.type === 'pomodoro' && e.ended_at !== null).length,
+      comboCount,
+      freezesUsed,
+      weeklyWins,
+      dailyQuestsAllDayCount,
+      highestLeagueIndex,
+      weekXp,
+    };
+    const fresh = checkNewAchievements(ctx, st.achievements);
+    if (fresh.length === 0) return;
+    fresh.forEach((a) => {
+      exec('INSERT INTO achievements VALUES (?,?,?)', [nanoid(10), a.key, now()]);
+    });
+    set((s) => ({
+      recentUnlocks: [...s.recentUnlocks, ...fresh.map((a) => ({ key: a.key, ts: Date.now() }))],
+    }));
+    playUnlock();
+    get().reload();
+  },
+
+  dismissRecentXp: () => set({ recentXp: [] }),
+  dismissRecentUnlock: (key) => set((s) => ({ recentUnlocks: s.recentUnlocks.filter((u) => u.key !== key) })),
+
   upsertReflection: (r) => {
+    const isNew = !query<Reflection>('SELECT id FROM reflections WHERE date = ?', [r.date])[0];
     const ex = query<Reflection>('SELECT * FROM reflections WHERE date = ?', [r.date])[0];
     if (ex) {
       exec(
@@ -279,6 +393,7 @@ export const useStore = create<State>((set, get) => ({
       );
     }
     get().reload();
+    if (isNew) get().awardXp('reflection', null);
   },
 }));
 

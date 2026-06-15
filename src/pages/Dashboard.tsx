@@ -23,6 +23,13 @@ import { useTheme } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { QuickAddDialog } from '@/components/QuickAddDialog';
+import { forecastGoal } from '@/lib/predict';
+import { QUEST_POOL, loadOrGenerate as loadQuests, save as saveQuests, effectiveTarget } from '@/lib/quests';
+import { WEEKLY_POOL, loadOrGenerate as loadWeekly, save as saveWeekly, buildContext as buildWeeklyCtx } from '@/lib/weekly';
+import { xpInWeek, leagueFor, nextLeague, buildHistory } from '@/lib/leagues';
+import { pickLetter, lastShownDate, markShown } from '@/lib/letters';
+import { computeStreak, levelFromXp, xpToday, xpTotal } from '@/lib/gamification';
+import { Mascot } from '@/components/Mascot';
 import { PRESETS } from '@/lib/dashboardPresets';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -42,9 +49,13 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: 'notes',         x: 8,  y: 6,  w: 4,  h: 7 },
   { i: 'plan-future',   x: 0,  y: 13, w: 12, h: 9 },
   { i: 'focus',         x: 0,  y: 22, w: 4,  h: 4 },
-  { i: 'quick-add',     x: 4,  y: 22, w: 4,  h: 4 },
-  { i: 'reflection',    x: 8,  y: 22, w: 4,  h: 4 },
-  { i: 'kpi-grid',      x: 0,  y: 26, w: 12, h: 5 },
+  { i: 'quests',        x: 4,  y: 22, w: 4,  h: 4 },
+  { i: 'weekly-challenge', x: 8, y: 22, w: 4, h: 4 },
+  { i: 'letter',        x: 0,  y: 34, w: 8,  h: 4 },
+  { i: 'quick-add',     x: 0,  y: 26, w: 4,  h: 4 },
+  { i: 'reflection',    x: 4,  y: 26, w: 4,  h: 4 },
+  { i: 'kpi-grid',      x: 8,  y: 26, w: 4,  h: 4 },
+  { i: 'leagues',       x: 0,  y: 30, w: 12, h: 4 },
 ];
 
 // Mobile layout: single-column (4 cols), stacked vertically
@@ -66,13 +77,26 @@ const ROW_HEIGHT = 48;
 
 export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   const nav = useNavigate();
-  const { goals, tasks, habits, habitLogs, toggleTask, addProgress, upsertReflection } = useStore();
+  const { goals, tasks, habits, habitLogs, progress, reflections, timeEntries, xpLog, toggleTask, addProgress, upsertReflection, awardXp } = useStore();
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
   const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v5', DEFAULT_LAYOUT);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditingRaw] = useState(false);
+  const [backup, setBackup] = useState<Layout[] | null>(null);
+  const enterEditor = () => { setBackup(JSON.parse(JSON.stringify(layout))); setEditingRaw(true); };
+  const exitEditor = () => {
+    if (backup) {
+      const changed = JSON.stringify(backup) !== JSON.stringify(layout);
+      if (changed && !window.confirm('Сохранить изменения раскладки?')) {
+        setLayout(backup);
+      }
+    }
+    setBackup(null);
+    setEditingRaw(false);
+  };
+  const revertToBackup = () => { if (backup) { setLayout(backup); } };
   const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v3', []);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
   const [reminders, setReminders] = useLocalStorage<{ id: string; text: string; done: boolean }[]>(
@@ -251,9 +275,19 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
             <Row label="Лучший" value={dayName(weekStats.bestI)} valueClass="text-accent" />
             <Row label="Худший" value={dayName(weekStats.worstI)} valueClass="text-danger" />
           </div>
-          {/* Bar chart — hidden on mobile */}
-          <div className="hidden sm:flex sm:col-span-3 min-w-0 items-center">
-            <ECharts option={weekChartOpt} height={140} />
+          {/* Большое число выполненных задач — заменяет слабый бар */}
+          <div className="hidden sm:flex sm:col-span-3 flex-col justify-center items-end pr-2">
+            <div className="text-[10px] uppercase tracking-wider text-text-muted">Сделано за неделю</div>
+            <div className="text-5xl font-bold tabular-nums leading-none" style={{ color: colorByPct(weekDoneRatio) }}>
+              {weekStats.done}<span className="text-text-dim text-2xl">/{weekStats.total || 0}</span>
+            </div>
+            {velocityHint !== null && (
+              <div className="text-xs mt-1">
+                {velocityHint > 0 && <span className="text-accent">↗ +{velocityHint}% к прошлой неделе</span>}
+                {velocityHint === 0 && <span className="text-text-muted">→ темп прежний</span>}
+                {velocityHint < 0 && <span className="text-danger">↘ {velocityHint}% к прошлой неделе</span>}
+              </div>
+            )}
           </div>
         </div>
       </WidgetCard>
@@ -413,6 +447,17 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
             const r = Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom)) * 100);
             const monthLabel = g.deadline ? format(new Date(g.deadline), 'LLLL yyyy', { locale: ru }) : '';
             const colorHex = r >= 80 ? '#84CC16' : r >= 50 ? '#F59E0B' : r >= 20 ? '#F97316' : '#6B7280';
+            const recs = progress.filter((p) => p.goal_id === g.id);
+            const fc = forecastGoal(g, recs, 30);
+            let etaHint: { text: string; tone: 'good' | 'bad' | 'neutral' } | null = null;
+            if (g.deadline && fc.etaDate) {
+              const days = Math.round((Date.parse(fc.etaDate) - Date.parse(g.deadline)) / 86400000);
+              if (days < -2) etaHint = { text: `опережаешь на ${-days} дн.`, tone: 'good' };
+              else if (days > 2) etaHint = { text: `отстаёшь на ${days} дн.`, tone: 'bad' };
+              else etaHint = { text: 'идёшь по графику', tone: 'neutral' };
+            } else if (g.deadline && !fc.etaDate && recs.length < 2) {
+              etaHint = { text: 'мало данных для прогноза', tone: 'neutral' };
+            }
             return (
               <button
                 key={g.id}
@@ -483,6 +528,16 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                     </div>
                     <span className="text-xs font-bold tabular-nums" style={{ color: colorHex }}>{r}%</span>
                   </div>
+                  {etaHint && (
+                    <div
+                      className="text-[10px] mt-2 tabular-nums"
+                      style={{
+                        color: etaHint.tone === 'good' ? '#84CC16' : etaHint.tone === 'bad' ? '#ef4444' : 'rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      {etaHint.tone === 'good' ? '↗ ' : etaHint.tone === 'bad' ? '↘ ' : '→ '}{etaHint.text}
+                    </div>
+                  )}
                 </div>
               </button>
             );
@@ -521,18 +576,262 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     ),
 
     'focus': () => {
-      const top = [...dayTasks].filter(t => t.status === 'active')
-        .sort((a, b) => a.priority - b.priority).slice(0, 1);
-      const focusText = top.length > 0 ? top[0].title : 'Сделай сегодня немного больше, чем вчера.';
+      const top = [...dayTasks]
+        .filter((t) => t.status === 'active' && !t.parent_id)
+        .sort((a, b) => (a.priority - b.priority) || (a.start_time ?? '').localeCompare(b.start_time ?? ''))
+        .slice(0, 3);
+      const subtasksOf = (parentId: string) =>
+        tasks.filter((t) => t.parent_id === parentId);
       return (
         <WidgetCard editing={editing} onHide={() => hideWidget('focus')}>
           <div className="flex flex-col h-full">
             <div className="text-[10px] uppercase tracking-widest text-text-muted font-medium mb-3">Фокус дня</div>
-            <div className="flex-1 flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-accent/10 flex items-center justify-center">
-                <Target className="h-5 w-5 text-accent" />
+            {top.length === 0 ? (
+              <div className="flex-1 flex items-center gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-accent/10 flex items-center justify-center">
+                  <Target className="h-5 w-5 text-accent" />
+                </div>
+                <p className="text-base font-semibold leading-snug text-text">
+                  Сегодня нет активных задач. Добавь главное.
+                </p>
               </div>
-              <p className="text-base font-semibold leading-snug text-text">{focusText}</p>
+            ) : (
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {top.map((t, i) => {
+                  const subs = subtasksOf(t.id);
+                  const subsDone = subs.filter((s) => s.status === 'done').length;
+                  return (
+                    <div key={t.id} className="border border-border-soft p-3 flex flex-col gap-2 min-w-0">
+                      <div className="flex items-start gap-2">
+                        <span className="text-2xl font-bold text-text-dim leading-none w-6 tabular-nums">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-base font-semibold leading-snug truncate">{t.title}</div>
+                          <div className="text-[11px] text-text-muted flex gap-2 mt-0.5">
+                            {t.start_time && <span className="tabular-nums">{t.start_time}</span>}
+                            {subs.length > 0 && <span>{subsDone}/{subs.length} подзадач</span>}
+                          </div>
+                        </div>
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={false} onCheckedChange={() => toggleTask(t.id)} />
+                        </span>
+                      </div>
+                      {subs.length > 0 && (
+                        <ul className="ml-8 space-y-1">
+                          {subs.slice(0, 3).map((s) => (
+                            <li key={s.id} className="flex items-center gap-2 text-xs">
+                              <span onClick={(e) => e.stopPropagation()}>
+                                <Checkbox checked={s.status === 'done'} onCheckedChange={() => toggleTask(s.id)} />
+                              </span>
+                              <span className={s.status === 'done' ? 'line-through text-text-muted' : 'text-text-muted'}>{s.title}</span>
+                            </li>
+                          ))}
+                          {subs.length > 3 && (
+                            <li className="text-[11px] text-text-dim">+ ещё {subs.length - 3}</li>
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </WidgetCard>
+      );
+    },
+
+    'quests': () => {
+      const state = loadQuests(habits.map((h) => ({ id: h.id })));
+      const ctx = { today, tasks, habits: habits.map((h) => ({ id: h.id, title: h.title })), habitLogs, reflections, timeEntries };
+      const items = state.keys.map((k) => QUEST_POOL.find((q) => q.key === k)).filter(Boolean) as typeof QUEST_POOL;
+      // award on completion
+      items.forEach((q) => {
+        if (state.rewardedKeys.includes(q.key)) return;
+        const tgt = effectiveTarget(q, ctx);
+        if (q.measure(ctx) >= tgt) {
+          state.rewardedKeys.push(q.key);
+          saveQuests(state);
+          queueMicrotask(() => awardXp('task', q.key));
+        }
+      });
+      // all-day bonus tracker
+      if (state.rewardedKeys.length === items.length && items.length > 0) {
+        const flagKey = `quests.all_day_done.${state.date}`;
+        if (localStorage.getItem(flagKey) !== '1') {
+          localStorage.setItem(flagKey, '1');
+          const prev = Number(localStorage.getItem('quests.all_day_count.v1') || 0);
+          localStorage.setItem('quests.all_day_count.v1', String(prev + 1));
+        }
+      }
+      return (
+        <WidgetCard editing={editing} onHide={() => hideWidget('quests')}>
+          <div className="flex items-center justify-between mb-3">
+            <CardTitle className="mb-0">Задания дня</CardTitle>
+            <span className="text-[11px] text-text-muted tabular-nums">
+              {state.rewardedKeys.length}/{items.length}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {items.map((q) => {
+              const tgt = effectiveTarget(q, ctx);
+              const cur = Math.min(tgt, q.measure(ctx));
+              const done = cur >= tgt;
+              const pct = Math.round((cur / tgt) * 100);
+              return (
+                <div key={q.key}>
+                  <div className="flex justify-between text-sm">
+                    <span className={done ? 'text-accent' : 'text-text'}>{done ? '✓ ' : ''}{q.title}</span>
+                    <span className="text-text-muted tabular-nums text-xs">{cur}/{tgt} · +{q.reward}XP</span>
+                  </div>
+                  <Progress value={pct} className="mt-1.5" barColor={done ? '#22c55e' : undefined} />
+                </div>
+              );
+            })}
+          </div>
+        </WidgetCard>
+      );
+    },
+
+    'letter': () => {
+      const streak = computeStreak(new Date(), tasks, habitLogs, reflections);
+      const dailyGoal = Number(localStorage.getItem('gamification.dailyGoal')) || 100;
+      const lvl = levelFromXp(xpTotal(xpLog)).level;
+      const xt = xpToday(today, xpLog);
+      const ctx = {
+        today, streak, level: lvl, xpToday: xt, dailyGoal,
+        tasks, habitLogs, reflections, timeEntries, xpLog,
+      };
+      // Choose once per day; persist key in localStorage so it stays stable
+      const cacheKey = `thedad.letter.key.${today}`;
+      let letter = pickLetter(ctx);
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const match = letter && letter.key === cached ? letter : null;
+        letter = match ?? letter;
+      }
+      if (letter && lastShownDate() !== today) {
+        localStorage.setItem(cacheKey, letter.key);
+        markShown();
+      }
+      if (!letter) {
+        return (
+          <WidgetCard editing={editing} onHide={() => hideWidget('letter')}>
+            <CardTitle>Письмо от маскота</CardTitle>
+            <div className="flex items-center gap-3">
+              <Mascot streak={streak} size={48} />
+              <p className="text-sm text-text-muted">Сегодня всё идёт ровно. Продолжай в том же духе.</p>
+            </div>
+          </WidgetCard>
+        );
+      }
+      const out = letter.render(ctx);
+      const toneClass = out.tone === 'urgent' ? 'border-l-4 border-l-danger pl-3'
+                     : out.tone === 'celebrate' ? 'border-l-4 border-l-accent pl-3'
+                     : out.tone === 'warm' ? 'border-l-4 border-l-info pl-3'
+                     : 'border-l-4 border-l-border pl-3';
+      return (
+        <WidgetCard editing={editing} onHide={() => hideWidget('letter')}>
+          <CardTitle>Письмо от маскота</CardTitle>
+          <div className={`flex gap-3 ${toneClass}`}>
+            <div className="shrink-0"><Mascot streak={streak} size={56} /></div>
+            <div>
+              <div className="text-sm font-semibold">{out.title}</div>
+              <p className="text-xs text-text-muted leading-relaxed mt-1">{out.body}</p>
+            </div>
+          </div>
+        </WidgetCard>
+      );
+    },
+
+    'leagues': () => {
+      const weekXp = xpInWeek(xpLog, new Date());
+      const cur = leagueFor(weekXp);
+      // record league peak
+      try {
+        const peakRaw = localStorage.getItem('leagues.peak.v1');
+        const peak = peakRaw ? Number(peakRaw) : 0;
+        const idx = ['bronze', 'silver', 'gold', 'sapphire', 'ruby', 'diamond'].indexOf(cur.key);
+        if (idx > peak) localStorage.setItem('leagues.peak.v1', String(idx));
+      } catch {}
+      const next = nextLeague(weekXp);
+      const span = next ? next.minXp - cur.minXp : 1;
+      const within = next ? weekXp - cur.minXp : 1;
+      const pct = next ? Math.round((within / span) * 100) : 100;
+      const history = buildHistory(xpLog, 8);
+      return (
+        <WidgetCard editing={editing} onHide={() => hideWidget('leagues')}>
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between mb-2">
+              <CardTitle className="mb-0">Лига недели</CardTitle>
+              <span className="text-[11px] text-text-muted">XP за неделю определяет лигу</span>
+            </div>
+            <div className="flex items-center gap-4 mb-3">
+              <div
+                className="px-3 py-2 text-sm font-bold border"
+                style={{ borderColor: cur.color, color: cur.color }}
+              >
+                {cur.label}
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-text-muted">{weekXp} XP за неделю</span>
+                  {next ? <span className="text-text-muted">до {next.label}: {next.minXp - weekXp} XP</span>
+                        : <span className="text-accent">высшая лига</span>}
+                </div>
+                <Progress value={pct} barColor={cur.color} />
+              </div>
+            </div>
+            <div className="flex gap-1 mt-auto">
+              {history.map((h, i) => (
+                <div key={i} className="flex-1 text-center" title={`${h.weekStart} · ${h.xp} XP`}>
+                  <div
+                    className="h-8 mx-0.5"
+                    style={{
+                      background: h.league.color,
+                      opacity: 0.2 + Math.min(1, h.xp / 2000) * 0.8,
+                    }}
+                  />
+                  <div className="text-[9px] text-text-dim mt-1">{h.weekStart.slice(5)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </WidgetCard>
+      );
+    },
+
+    'weekly-challenge': () => {
+      const state = loadWeekly();
+      const def = WEEKLY_POOL.find((w) => w.key === state.key);
+      if (!def) return <WidgetCard editing={editing} onHide={() => hideWidget('weekly-challenge')}>—</WidgetCard>;
+      const ctx = buildWeeklyCtx(new Date(), tasks, habitLogs, reflections, timeEntries);
+      const cur = Math.min(def.target, def.measure(ctx));
+      const pct = Math.round((cur / def.target) * 100);
+      const done = cur >= def.target;
+      if (done && !state.rewarded) {
+        state.rewarded = true;
+        saveWeekly(state);
+        try {
+          const prev = Number(localStorage.getItem('weekly.wins.v1') || 0);
+          localStorage.setItem('weekly.wins.v1', String(prev + 1));
+        } catch {}
+        queueMicrotask(() => awardXp('progress', def.key));
+      }
+      return (
+        <WidgetCard editing={editing} onHide={() => hideWidget('weekly-challenge')}>
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between mb-2">
+              <CardTitle className="mb-0">Челлендж недели</CardTitle>
+              <span className="text-[11px] text-accent">+{def.reward} XP</span>
+            </div>
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="text-xl font-bold leading-tight">{def.title}</div>
+              <div className="text-xs text-text-muted">{def.description}</div>
+              <div className="mt-3 flex items-center gap-3">
+                <Progress value={pct} className="flex-1 h-2" barColor={done ? '#22c55e' : undefined} />
+                <span className="text-sm font-semibold tabular-nums">{cur}/{def.target}</span>
+              </div>
+              {done && <div className="mt-2 text-xs text-accent">✓ Челлендж пройден!</div>}
             </div>
           </div>
         </WidgetCard>
@@ -678,12 +977,17 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
                   <Button variant="ghost" size="sm" onClick={resetLayout}>
                     <RotateCcw className="h-3.5 w-3.5" /> Сбросить
                   </Button>
+                  {backup && (
+                    <Button variant="ghost" size="sm" onClick={revertToBackup} title="Откатить к моменту входа в редактор">
+                      <RotateCcw className="h-3.5 w-3.5" /> Отменить правки
+                    </Button>
+                  )}
                 </>
               )}
               <Button
                 variant={editing ? 'default' : 'soft'}
                 size="sm"
-                onClick={() => setEditing((v) => !v)}
+                onClick={() => editing ? exitEditor() : enterEditor()}
               >
                 {editing ? <><Unlock className="h-3.5 w-3.5" /> Готово</> : <><Lock className="h-3.5 w-3.5" /> Редактор</>}
               </Button>

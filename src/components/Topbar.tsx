@@ -1,9 +1,11 @@
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Bell, Timer, Sun, Moon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Bell, Timer, Sun, Moon, Pause, Play, Square } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { useTheme } from '@/lib/theme';
+import { GamificationBar } from './GamificationBar';
+import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 
 interface Props {
   date: Date;
@@ -20,6 +22,7 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, o
   const labelFull = format(date, 'd MMMM, EEEE', { locale: ru });
   const labelShort = format(date, 'd MMM', { locale: ru });
   const { theme, toggle } = useTheme();
+  const pomo = usePomodoroState();
   return (
     <header className="shrink-0 border-b border-border">
       {/* Desktop */}
@@ -41,8 +44,30 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, o
           <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, 1))}><ChevronRight /></Button>
         </div>
         <div className="flex items-center gap-2">
+          <GamificationBar />
           <Button variant="ghost" size="icon" onClick={onAdd} title="Добавить (Ctrl+K)"><Plus /></Button>
-          <Button variant="ghost" size="icon" onClick={onTimer} title="Таймер Pomodoro"><Timer /></Button>
+          {pomo.secondsLeft > 0 ? (
+            <div className="flex items-center gap-1 border border-border px-2 py-1">
+              <Timer className="h-3.5 w-3.5 text-text-muted" />
+              <button onClick={onTimer} className="tabular-nums text-xs hover:text-accent" title={pomo.taskTitle ?? 'Свободный таймер'}>
+                {fmtSec(pomo.secondsLeft)}
+              </button>
+              {pomo.running ? (
+                <button onClick={() => pomo.pauseAction?.()} className="text-text-muted hover:text-text" title="Пауза">
+                  <Pause className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <button onClick={() => pomo.resumeAction?.()} className="text-accent hover:text-accent-soft" title="Старт">
+                  <Play className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button onClick={() => pomo.stopAction?.()} className="text-text-muted hover:text-danger" title="Стоп">
+                <Square className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={onTimer} title="Таймер Pomodoro"><Timer /></Button>
+          )}
           <Button variant="ghost" size="icon" onClick={onBell} title="Напоминания" className="relative">
             <Bell />
             {bellCount > 0 && (

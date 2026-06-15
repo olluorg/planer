@@ -60,6 +60,21 @@ export interface ChangeLog {
   ts: string;
 }
 
+export interface XpEntry {
+  id: string;
+  ts: string;
+  date: string;
+  source: string;
+  source_id: string | null;
+  amount: number;
+}
+
+export interface Achievement {
+  id: string;
+  key: string;
+  unlocked_at: string;
+}
+
 export interface Habit {
   id: string;
   goal_id: string | null;

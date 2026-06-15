@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Pause, Play, Square, RotateCcw } from 'lucide-react';
 import { Ring } from './ui/ring';
 import { useStore } from '@/lib/store';
+import { usePomodoroState } from '@/lib/pomodoroState';
 import type { Task } from '@/lib/types';
 
 const PRESETS = [
@@ -20,11 +21,49 @@ export const PomodoroTimer: React.FC<{
   const open = openProp ?? task !== null;
   const startTimeEntry = useStore((s) => s.startTimeEntry);
   const finishTimeEntry = useStore((s) => s.finishTimeEntry);
+  const setGlobal = usePomodoroState((s) => s.set);
 
   const [preset, setPreset] = useState(PRESETS[0]);
   const [phase, setPhase] = useState<'work' | 'rest'>('work');
   const [secondsLeft, setSecondsLeft] = useState(preset.work * 60);
   const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    setGlobal({
+      running,
+      phase,
+      secondsLeft,
+      taskTitle: task?.title ?? null,
+    });
+  }, [running, phase, secondsLeft, task?.title, setGlobal]);
+
+  useEffect(() => () => {
+    setGlobal({ running: false, secondsLeft: 0, taskTitle: null, pauseAction: null, resumeAction: null, stopAction: null });
+  }, [setGlobal]);
+
+  // expose pause/resume/stop actions to global state for Topbar inline control
+  useEffect(() => {
+    setGlobal({
+      pauseAction: () => setRunning(false),
+      resumeAction: () => {
+        if (!entryIdRef.current && phase === 'work') {
+          const e = startTimeEntry(task?.id ?? null, 'pomodoro');
+          entryIdRef.current = e.id;
+          elapsedRef.current = 0;
+        }
+        setRunning(true);
+      },
+      stopAction: () => {
+        setRunning(false);
+        if (entryIdRef.current) {
+          finishTimeEntry(entryIdRef.current, elapsedRef.current);
+          entryIdRef.current = null;
+        }
+        elapsedRef.current = 0;
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, task?.id]);
   const tickRef = useRef<number | null>(null);
   const entryIdRef = useRef<string | null>(null);
   const elapsedRef = useRef(0);

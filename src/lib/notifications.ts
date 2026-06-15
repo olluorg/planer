@@ -43,10 +43,48 @@ export function scheduleAll() {
     const delay = target.getTime() - now.getTime();
     const id = window.setTimeout(() => {
       try {
-        new Notification('THEDAD', { body: r.text, icon: '/icon-192.png', tag: r.id });
+        new Notification('THEDAD', { body: r.text, tag: r.id });
       } catch {}
-      scheduleAll(); // reschedule for tomorrow
+      scheduleAll();
     }, delay);
     timers.push(id);
   });
+}
+
+const HEARTBEAT_KEY = 'thedad.heartbeat.enabled.v1';
+
+export function isHeartbeatEnabled(): boolean {
+  return localStorage.getItem(HEARTBEAT_KEY) === '1';
+}
+export function setHeartbeatEnabled(enabled: boolean) {
+  localStorage.setItem(HEARTBEAT_KEY, enabled ? '1' : '0');
+}
+
+let heartbeatTimers: number[] = [];
+
+function scheduleHeartbeatAt(hh: number, mm: number, body: () => string) {
+  const now = new Date();
+  const target = new Date();
+  target.setHours(hh, mm, 0, 0);
+  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
+  const delay = target.getTime() - now.getTime();
+  const id = window.setTimeout(() => {
+    try { new Notification('THEDAD', { body: body(), tag: `heartbeat-${hh}` }); } catch {}
+    scheduleHeartbeatAt(hh, mm, body);
+  }, delay);
+  heartbeatTimers.push(id);
+}
+
+interface HeartbeatProviders {
+  morningBody: () => string; // top-3 focus
+  eveningBody: () => string; // remind reflection / progress
+}
+
+export function scheduleHeartbeat(providers: HeartbeatProviders) {
+  heartbeatTimers.forEach((t) => window.clearTimeout(t));
+  heartbeatTimers = [];
+  if (!isHeartbeatEnabled()) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  scheduleHeartbeatAt(8, 0, providers.morningBody);
+  scheduleHeartbeatAt(21, 0, providers.eveningBody);
 }

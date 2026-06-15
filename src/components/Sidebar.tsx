@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings, History, Flame, ChevronRight } from 'lucide-react';
+import { LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings, History, Flame, ChevronRight, Trophy } from 'lucide-react';
 import { cn, isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useMemo } from 'react';
@@ -13,6 +13,7 @@ const items = [
   { to: '/habits', label: 'Привычки', icon: Repeat },
   { to: '/analytics', label: 'Аналитика', icon: BarChart3 },
   { to: '/reflection', label: 'Рефлексия', icon: NotebookPen },
+  { to: '/awards', label: 'Награды', icon: Trophy },
 ];
 
 const XP_PER_TASK = 50;

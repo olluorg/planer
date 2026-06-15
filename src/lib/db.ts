@@ -102,12 +102,26 @@ CREATE TABLE IF NOT EXISTS change_log (
   new_value TEXT,
   ts TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS xp_log (
+  id TEXT PRIMARY KEY,
+  ts TEXT NOT NULL,
+  date TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_id TEXT,
+  amount INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS achievements (
+  id TEXT PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  unlocked_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date);
 CREATE INDEX IF NOT EXISTS idx_tasks_goal ON tasks(goal_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(date);
 CREATE INDEX IF NOT EXISTS idx_progress_goal ON progress_records(goal_id);
 CREATE INDEX IF NOT EXISTS idx_time_entries_task ON time_entries(task_id);
 CREATE INDEX IF NOT EXISTS idx_change_log_entity ON change_log(entity, entity_id);
+CREATE INDEX IF NOT EXISTS idx_xp_log_date ON xp_log(date);
 `;
 
 const POST_MIGRATE_INDEXES = `

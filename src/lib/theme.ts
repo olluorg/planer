@@ -31,10 +31,10 @@ export function applyAccent(id: AccentId) {
 }
 
 export function getTheme(): Theme {
-  return (localStorage.getItem('theme') as Theme) || 'dark';
+  return (localStorage.getItem('theme') as Theme) || 'light';
 }
 export function getAccent(): AccentId {
-  return ((localStorage.getItem('accent') as AccentId) || 'green');
+  return ((localStorage.getItem('accent') as AccentId) || 'purple');
 }
 
 export function useTheme() {

@@ -4,15 +4,29 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play } from 'lucide-react';
+import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import type { Task } from '@/lib/types';
 import { PomodoroTimer } from '@/components/PomodoroTimer';
+import {
+  DndContext, DragOverlay, PointerSensor, useDroppable, useDraggable, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+
+const PRIORITY_COLUMNS = [
+  { id: 1, label: 'Высокий', color: '#ef4444' },
+  { id: 2, label: 'Средний', color: '#eab308' },
+  { id: 3, label: 'Низкий',  color: '#737373' },
+] as const;
 
 export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
-  const { tasks, goals, addTask, toggleTask, removeTask } = useStore();
+  const { tasks, goals, addTask, updateTask, toggleTask, removeTask } = useStore();
+  const [view, setView] = useState<'list' | 'kanban'>('list');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [filter, setFilter] = useState<'today' | 'all' | 'open' | 'done'>('today');
   const [tagFilter, setTagFilter] = useState<string>('__all');
   const [title, setTitle] = useState('');
@@ -130,6 +144,12 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-semibold">Задачи</h1>
         <div className="flex gap-2">
+          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+            <TabsList>
+              <TabsTrigger value="list">Список</TabsTrigger>
+              <TabsTrigger value="kanban">Приоритет</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Select value={tagFilter} onValueChange={setTagFilter}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Тег" /></SelectTrigger>
             <SelectContent>
@@ -174,14 +194,118 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
         </div>
       </Card>
 
-      <Card className="p-0">
-        <div className="row-divide">
-          {roots.length === 0 && <div className="p-6 text-text-muted text-sm">Нет задач</div>}
-          {roots.map((t) => <TaskRow key={t.id} task={t} depth={0} />)}
-        </div>
-      </Card>
+      {view === 'list' ? (
+        <Card className="p-0">
+          <div className="row-divide">
+            {roots.length === 0 && <div className="p-6 text-text-muted text-sm">Нет задач</div>}
+            {roots.map((t) => <TaskRow key={t.id} task={t} depth={0} />)}
+          </div>
+        </Card>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          onDragStart={(e) => setDraggingId(String(e.active.id))}
+          onDragCancel={() => setDraggingId(null)}
+          onDragEnd={(e: DragEndEvent) => {
+            setDraggingId(null);
+            if (!e.over) return;
+            const taskId = String(e.active.id);
+            const priority = Number(String(e.over.id).replace('priority-', ''));
+            if ([1, 2, 3].includes(priority)) updateTask(taskId, { priority });
+          }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {PRIORITY_COLUMNS.map((col) => {
+              const items = filtered.filter((t) => !t.parent_id && t.priority === col.id);
+              return (
+                <PriorityColumn key={col.id} id={`priority-${col.id}`} label={col.label} color={col.color} count={items.length}>
+                  {items.length === 0 && <div className="text-xs text-text-dim p-3">Пусто</div>}
+                  {items.map((t) => {
+                    const goal = goals.find((g) => g.id === t.goal_id);
+                    return (
+                      <DraggableCard key={t.id} task={t} title={t.title}>
+                        <div className="flex items-start gap-2">
+                          <span onClick={(ev) => ev.stopPropagation()}>
+                            <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium leading-snug ${t.status === 'done' ? 'line-through text-text-muted' : ''}`}>
+                              {t.title}
+                            </div>
+                            <div className="text-[11px] text-text-muted mt-0.5 flex flex-wrap gap-2">
+                              {t.start_time && <span className="tabular-nums">{t.start_time}</span>}
+                              {t.time_block && !t.start_time && <span>{t.time_block}</span>}
+                              {goal && <Badge tone="accent">{goal.title}</Badge>}
+                            </div>
+                          </div>
+                        </div>
+                      </DraggableCard>
+                    );
+                  })}
+                </PriorityColumn>
+              );
+            })}
+          </div>
+          <DragOverlay>
+            {draggingId ? (() => {
+              const t = tasks.find((x) => x.id === draggingId);
+              return t ? (
+                <div className="border border-border bg-bg-card p-2 text-sm shadow-2xl max-w-[260px]">
+                  {t.title}
+                </div>
+              ) : null;
+            })() : null}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       <PomodoroTimer task={pomodoroFor} onClose={() => setPomodoroFor(null)} />
+    </div>
+  );
+};
+
+const PriorityColumn: React.FC<{
+  id: string;
+  label: string;
+  color: string;
+  count: number;
+  children: React.ReactNode;
+}> = ({ id, label, color, count, children }) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`border transition-all ${isOver ? 'border-text bg-bg-hover' : 'border-border'}`}
+    >
+      <div className="flex items-center justify-between p-3 border-b border-border" style={{ borderTopColor: color, borderTopWidth: 3 }}>
+        <div className="text-sm font-semibold" style={{ color }}>{label}</div>
+        <span className="text-[11px] text-text-muted tabular-nums">{count}</span>
+      </div>
+      <div className="p-2 space-y-2 min-h-[200px]">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const DraggableCard: React.FC<{ task: Task; title: string; children: React.ReactNode }> = ({ task, children }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`border border-border bg-bg-card p-2 group ${isDragging ? 'opacity-30' : ''} hover:border-text transition-colors`}
+    >
+      <div className="flex items-start gap-1">
+        <button
+          {...listeners}
+          {...attributes}
+          className="cursor-grab active:cursor-grabbing text-text-dim hover:text-text shrink-0 pt-0.5"
+          aria-label="Перетащить"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
     </div>
   );
 };
