@@ -15,6 +15,7 @@ import { isOnboardingDone } from './lib/onboarding';
 import { InboxPopover } from './components/InboxPopover';
 import { InsightsPanel } from './components/InsightsPanel';
 import { Toaster } from './components/Toaster';
+import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { useInbox } from './lib/inbox';
 import { ACHIEVEMENTS } from './lib/gamification';
 import { applyAccent, getAccent } from './lib/theme';
@@ -57,6 +58,7 @@ export default function App() {
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
 
   const nav = useNavigate();
@@ -115,6 +117,15 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
         e.preventDefault();
         setInsightsOpen((v) => !v);
+      }
+      // "?" без модификаторов и не в поле ввода
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const el = document.activeElement;
+        const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
+        if (!typing) {
+          e.preventDefault();
+          setShortcutsOpen((v) => !v);
+        }
       }
     };
     const onQuick = () => setQuickTab('task');
@@ -220,6 +231,7 @@ export default function App() {
         onAddGoal={() => setQuickTab('goal')}
         onAddProgress={() => setQuickTab('progress')}
         onFocusMode={() => setFocusOpen(true)}
+        onShortcuts={() => setShortcutsOpen(true)}
       />
       <PomodoroTimer task={null} open={timerOpen} onClose={() => setTimerOpen(false)} />
       <FocusMode open={focusOpen} onClose={() => setFocusOpen(false)} />
@@ -227,6 +239,7 @@ export default function App() {
       <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} />
       <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
       <Confetti trigger={confettiTrigger} />
+      <ShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <Toaster />
     </div>
   );

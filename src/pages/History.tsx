@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export const HistoryPage = () => {
   const { changeLog, goals, tasks, habits } = useStore();
@@ -37,12 +38,15 @@ export const HistoryPage = () => {
         </Select>
       </div>
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 ? (
         <Card>
-          <div className="text-text-muted text-sm">Пока нет записей. История наполняется автоматически при изменении целей и значений.</div>
+          <EmptyState
+            emoji="📜"
+            title="История пуста"
+            description="Записи появляются автоматически при изменении целей и значений прогресса."
+          />
         </Card>
-      )}
-
+      ) : (
       <Card className="p-0">
         <div className="row-divide">
           {filtered.map((c) => (
@@ -60,6 +64,7 @@ export const HistoryPage = () => {
           ))}
         </div>
       </Card>
+      )}
     </div>
   );
 };
