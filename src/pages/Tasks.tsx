@@ -195,12 +195,38 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
       </Card>
 
       {view === 'list' ? (
-        <Card className="p-0">
-          <div className="row-divide">
-            {roots.length === 0 && <div className="p-6 text-text-muted text-sm">Нет задач</div>}
-            {roots.map((t) => <TaskRow key={t.id} task={t} depth={0} />)}
-          </div>
-        </Card>
+        <div className="space-y-3">
+          {roots.length === 0 && (
+            <Card className="p-8 text-center text-sm text-text-muted">Нет задач — добавь первую выше</Card>
+          )}
+          {PRIORITY_COLUMNS.map((col) => {
+            const items = roots.filter((t) => t.priority === col.id);
+            if (items.length === 0) return null;
+            const done = items.filter((t) => t.status === 'done').length;
+            const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+            return (
+              <Card key={col.id} className="p-0 overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-soft" style={{ borderLeft: `3px solid ${col.color}` }}>
+                  <span className="text-sm font-semibold" style={{ color: col.color }}>{col.label} приоритет</span>
+                  <span className="text-[11px] text-text-muted tabular-nums">{done}/{items.length}</span>
+                  <div className="flex-1" />
+                  <div className="w-20 h-1.5 rounded-full bg-bg-soft overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: col.color }} />
+                  </div>
+                </div>
+                <div className="row-divide">
+                  {items.map((t) => <TaskRow key={t.id} task={t} depth={0} />)}
+                </div>
+              </Card>
+            );
+          })}
+          {roots.length > 0 && (
+            <div className="text-xs text-text-muted px-1">
+              Всего: <b className="text-text">{roots.filter((t) => t.status === 'done').length}</b> из {roots.length} выполнено
+              {' · '}{roots.length ? Math.round((roots.filter((t) => t.status === 'done').length / roots.length) * 100) : 0}%
+            </div>
+          )}
+        </div>
       ) : (
         <DndContext
           sensors={sensors}

@@ -74,18 +74,27 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
           ))}
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
-            <div className="text-sm text-text-muted mb-1">Что выполнено</div>
+            <div className="flex items-center gap-2 text-sm font-medium mb-1.5">
+              <span className="h-5 w-5 rounded-md bg-success/15 text-success flex items-center justify-center text-xs">✓</span>
+              Что прошло хорошо
+            </div>
             <Textarea value={done} onChange={(e) => setDone(e.target.value)} placeholder="3 главные победы дня..." />
           </div>
           <div>
-            <div className="text-sm text-text-muted mb-1">Что не выполнено</div>
-            <Textarea value={notDone} onChange={(e) => setNotDone(e.target.value)} placeholder="Что осталось..." />
+            <div className="flex items-center gap-2 text-sm font-medium mb-1.5">
+              <span className="h-5 w-5 rounded-md bg-warning/15 text-warning flex items-center justify-center text-xs">↑</span>
+              Что можно улучшить
+            </div>
+            <Textarea value={notDone} onChange={(e) => setNotDone(e.target.value)} placeholder="Что осталось / над чем поработать..." />
           </div>
           <div>
-            <div className="text-sm text-text-muted mb-1">Причина</div>
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Почему так получилось..." />
+            <div className="flex items-center gap-2 text-sm font-medium mb-1.5">
+              <span className="h-5 w-5 rounded-md bg-info/15 text-info flex items-center justify-center text-xs">→</span>
+              Планы на завтра
+            </div>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Завтра я..." />
           </div>
         </div>
 

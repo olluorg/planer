@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Camera, Plus, Trash2, TrendingUp, X } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { fmtNum, colorByPct } from '@/lib/utils';
@@ -21,6 +22,7 @@ export const GoalsPage = () => {
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const [open, setOpen] = useState(false);
+  const [statusTab, setStatusTab] = useState<'active' | 'done' | 'archived'>('active');
   const [form, setForm] = useState({ title: '', type: 'mid' as GoalType, start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none' });
 
   const submit = () => {
@@ -39,15 +41,46 @@ export const GoalsPage = () => {
     setForm({ title: '', type: 'mid', start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none' });
   };
 
+  const isAchieved = (g: typeof goals[number]) => {
+    const denom = g.target_value - g.start_value || 1;
+    return (g.current_value - g.start_value) / denom >= 1;
+  };
+  const roots = goals.filter((g) => !g.parent_id);
+  const visible = roots.filter((g) => {
+    if (statusTab === 'active') return g.status === 'active' && !isAchieved(g);
+    if (statusTab === 'done') return isAchieved(g) || g.status === 'done';
+    return g.status === 'archived';
+  });
+  const counts = {
+    active: roots.filter((g) => g.status === 'active' && !isAchieved(g)).length,
+    done: roots.filter((g) => isAchieved(g) || g.status === 'done').length,
+    archived: roots.filter((g) => g.status === 'archived').length,
+  };
+
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-h1">Цели</h1>
-        <Button onClick={() => setOpen(true)}><Plus /> Новая цель</Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as any)}>
+            <TabsList>
+              <TabsTrigger value="active">Активные · {counts.active}</TabsTrigger>
+              <TabsTrigger value="done">Достигнутые · {counts.done}</TabsTrigger>
+              <TabsTrigger value="archived">Архив · {counts.archived}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button onClick={() => setOpen(true)}><Plus /> Новая цель</Button>
+        </div>
       </div>
 
+      {visible.length === 0 && (
+        <Card className="p-8 text-center text-sm text-text-muted">
+          {statusTab === 'active' ? 'Нет активных целей — создай первую' : statusTab === 'done' ? 'Пока нет достигнутых целей' : 'Архив пуст'}
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {goals.filter((g) => !g.parent_id).map((g) => {
+        {visible.map((g) => {
           const recs = progress.filter((p) => p.goal_id === g.id);
           const f = forecastGoal(g, recs, 30);
           const denom = g.target_value - g.start_value || 1;
