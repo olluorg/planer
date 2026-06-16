@@ -42,7 +42,7 @@ export const GoalsPage = () => {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Цели</h1>
+        <h1 className="text-h1">Цели</h1>
         <Button onClick={() => setOpen(true)}><Plus /> Новая цель</Button>
       </div>
 

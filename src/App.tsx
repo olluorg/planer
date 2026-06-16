@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { useStore } from './lib/store';
@@ -14,6 +14,7 @@ import { Onboarding } from './components/Onboarding';
 import { isOnboardingDone } from './lib/onboarding';
 import { InboxPopover } from './components/InboxPopover';
 import { InsightsPanel } from './components/InsightsPanel';
+import { Toaster } from './components/Toaster';
 import { useInbox } from './lib/inbox';
 import { ACHIEVEMENTS } from './lib/gamification';
 import { applyAccent, getAccent } from './lib/theme';
@@ -33,7 +34,15 @@ const TemplatesPage = lazy(() => import('./pages/Templates').then((m) => ({ defa
 const CalendarPage = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.CalendarPage })));
 
 const Loader = () => (
-  <div className="h-full flex items-center justify-center text-text-muted text-sm">Загрузка...</div>
+  <div className="p-6 space-y-6">
+    <div className="skeleton h-8 w-48" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="skeleton h-40 rounded-2xl" />
+      <div className="skeleton h-40 rounded-2xl" />
+      <div className="skeleton h-40 rounded-2xl" />
+    </div>
+    <div className="skeleton h-64 w-full rounded-2xl" />
+  </div>
 );
 
 export default function App() {
@@ -51,6 +60,7 @@ export default function App() {
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
 
   const nav = useNavigate();
+  const location = useLocation();
   const bellCount = loadReminders().filter((r) => r.enabled).length;
   const recentUnlocks = useStore((s) => s.recentUnlocks);
   const inboxUnread = useInbox((s) => s.items.filter((x) => !x.read).length);
@@ -118,8 +128,44 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        Загрузка SQLite...
+      <div className="h-full flex bg-bg">
+        {/* Sidebar skeleton */}
+        <div className="hidden sm:flex w-[210px] shrink-0 border-r border-border flex-col p-5 gap-3">
+          <div className="flex items-center gap-3">
+            <div className="skeleton h-10 w-10 rounded-xl" />
+            <div className="flex-1 space-y-1.5">
+              <div className="skeleton h-3 w-20" />
+              <div className="skeleton h-2 w-16" />
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton h-8 w-full rounded-lg" />)}
+          </div>
+        </div>
+        {/* Main skeleton */}
+        <div className="flex-1 flex flex-col">
+          <div className="h-20 border-b border-border px-8 flex items-center">
+            <div className="space-y-2">
+              <div className="skeleton h-6 w-64" />
+              <div className="skeleton h-3 w-40" />
+            </div>
+          </div>
+          <div className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+            <div className="space-y-6">
+              <div className="skeleton h-44 w-full rounded-2xl" />
+              <div className="skeleton h-72 w-full rounded-2xl" />
+              <div className="grid grid-cols-3 gap-6">
+                <div className="skeleton h-40 rounded-2xl" />
+                <div className="skeleton h-40 rounded-2xl" />
+                <div className="skeleton h-40 rounded-2xl" />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="skeleton h-64 rounded-2xl" />
+              <div className="skeleton h-48 rounded-2xl" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -138,24 +184,26 @@ export default function App() {
           bellCount={inboxUnread || bellCount}
         />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
-          <Suspense fallback={<Loader />}>
-            <Routes>
-              <Route path="/index.html" element={<Navigate to="/" replace />} />
-              <Route path="/" element={<DashboardLavender date={date} onDateChange={setDate} />} />
-              <Route path="/dashboard-bento" element={<Dashboard date={date} />} />
-              <Route path="/goals" element={<GoalsPage />} />
-              <Route path="/tasks" element={<TasksPage date={date} />} />
-              <Route path="/habits" element={<HabitsPage />} />
-              <Route path="/plan" element={<PlanPage date={date} />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/reflection" element={<ReflectionPage date={date} />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/awards" element={<AwardsPage />} />
-              <Route path="/templates" element={<TemplatesPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
-          </Suspense>
+          <div key={location.pathname} className="animate-fade-in h-full">
+            <Suspense fallback={<Loader />}>
+              <Routes location={location}>
+                <Route path="/index.html" element={<Navigate to="/" replace />} />
+                <Route path="/" element={<DashboardLavender date={date} onDateChange={setDate} />} />
+                <Route path="/dashboard-bento" element={<Dashboard date={date} />} />
+                <Route path="/goals" element={<GoalsPage />} />
+                <Route path="/tasks" element={<TasksPage date={date} />} />
+                <Route path="/habits" element={<HabitsPage />} />
+                <Route path="/plan" element={<PlanPage date={date} />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/reflection" element={<ReflectionPage date={date} />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/awards" element={<AwardsPage />} />
+                <Route path="/templates" element={<TemplatesPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </Suspense>
+          </div>
         </main>
       </div>
       <QuickAddDialog
@@ -179,6 +227,7 @@ export default function App() {
       <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} />
       <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
       <Confetti trigger={confettiTrigger} />
+      <Toaster />
     </div>
   );
 }

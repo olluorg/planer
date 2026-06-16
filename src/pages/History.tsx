@@ -24,7 +24,7 @@ export const HistoryPage = () => {
   return (
     <div className="p-4 space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">История изменений</h1>
+        <h1 className="text-h1">История изменений</h1>
         <Select value={entityFilter} onValueChange={setEntityFilter}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>

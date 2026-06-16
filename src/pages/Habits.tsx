@@ -26,7 +26,7 @@ export const HabitsPage = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-xl font-semibold">Привычки</h1>
+      <h1 className="text-h1">Привычки</h1>
 
       <Card>
         <div className="flex gap-2">

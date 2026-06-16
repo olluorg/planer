@@ -255,6 +255,18 @@ export const useStore = create<State>((set, get) => ({
     exec('INSERT INTO progress_records VALUES (?,?,?,?,?)', [nanoid(10), r.goal_id, r.date, r.value, r.note]);
     exec('UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?', [r.value, now(), r.goal_id]);
     if (prev) get().logChange('progress', r.goal_id, 'current_value', prev.current_value, r.value);
+    // Цель впервые достигнута?
+    if (prev) {
+      const denom = prev.target_value - prev.start_value || 1;
+      const wasDone = (prev.current_value - prev.start_value) / denom >= 1;
+      const nowDone = (r.value - prev.start_value) / denom >= 1;
+      if (!wasDone && nowDone) {
+        import('./toast').then((m) => m.toast.success(`Цель достигнута: ${prev.title} 🎉`, 'Поздравляем!'));
+        import('./inbox').then((m) => m.useInbox.getState().add({
+          kind: 'system', title: `Цель достигнута: ${prev.title}`, icon: '🎯', link: '/goals',
+        }));
+      }
+    }
     get().reload();
     get().awardXp('progress', r.goal_id);
   },

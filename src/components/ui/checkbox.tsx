@@ -22,7 +22,7 @@ export const Checkbox = React.forwardRef<
     style={{ borderRadius: '4px' }}
     {...props}
   >
-    <RC.Indicator className="flex items-center justify-center">
+    <RC.Indicator className="flex items-center justify-center animate-scale-in">
       <Check className="h-3 w-3 text-black" strokeWidth={3} />
     </RC.Indicator>
   </RC.Root>

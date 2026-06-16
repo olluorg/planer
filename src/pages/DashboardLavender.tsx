@@ -8,6 +8,7 @@ import { WeekProgressChart } from '@/components/dashboard/WeekProgressChart';
 import { FocusTimeCard } from '@/components/dashboard/FocusTimeCard';
 import { MiniCalendar } from '@/components/dashboard/MiniCalendar';
 import { ReflectionMini } from '@/components/dashboard/ReflectionMini';
+import { MetricsRow } from '@/components/dashboard/MetricsRow';
 import { QuickAddDialog } from '@/components/QuickAddDialog';
 
 interface Props { date: Date; onDateChange?: (d: Date) => void }
@@ -19,6 +20,7 @@ export const DashboardLavender: React.FC<Props> = ({ date, onDateChange }) => {
     <div className="p-4 sm:p-6 grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4 sm:gap-6">
       {/* Главная колонка */}
       <div className="space-y-4 sm:space-y-6 min-w-0">
+        <MetricsRow date={date} />
         <AiInsightCard date={date} />
         <TodayPlan date={date} />
 

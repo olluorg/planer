@@ -12,6 +12,7 @@ import { isExtension, getExtSetting, setExtSetting } from "@/lib/extension";
 import { parseCsv, readFileText } from "@/lib/importCsv";
 import { isHeartbeatEnabled, setHeartbeatEnabled } from "@/lib/notifications";
 import { isSoundEnabled, setSoundEnabled, playSuccess } from "@/lib/sound";
+import { toast } from "@/lib/toast";
 import { ACCENTS } from "@/lib/theme";
 import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
@@ -87,7 +88,6 @@ export const SettingsPage = () => {
     location.reload();
   };
 
-  const [importMsg, setImportMsg] = useState<string>("");
   const [reminders, setReminders] = useState<Reminder[]>(() => loadReminders());
   const [reminderText, setReminderText] = useState("");
   const [reminderTime, setReminderTime] = useState("18:00");
@@ -140,11 +140,10 @@ export const SettingsPage = () => {
           imported++;
         }
       }
-      setImportMsg(`✓ Импортировано: ${imported}`);
+      toast.success(`Импортировано: ${imported}`, `Из CSV (${kind})`);
     } catch (e: any) {
-      setImportMsg(`✗ Ошибка: ${e?.message ?? e}`);
+      toast.error('Ошибка импорта', String(e?.message ?? e));
     }
-    setTimeout(() => setImportMsg(""), 3000);
   };
 
   const exportWeeklyReport = () => {
@@ -192,16 +191,15 @@ export const SettingsPage = () => {
       if (Array.isArray(data?.goals)) data.goals.forEach((g: any) => g.title && (addGoal(g), imported++));
       if (Array.isArray(data?.habits)) data.habits.forEach((h: any) => h.title && (addHabit(h), imported++));
       if (Array.isArray(data?.tasks)) data.tasks.forEach((t: any) => t.title && (addTask(t), imported++));
-      setImportMsg(`✓ Импортировано из JSON: ${imported}`);
+      toast.success(`Импортировано из JSON: ${imported}`);
     } catch (e: any) {
-      setImportMsg(`✗ Ошибка: ${e?.message ?? e}`);
+      toast.error('Ошибка импорта JSON', String(e?.message ?? e));
     }
-    setTimeout(() => setImportMsg(""), 3000);
   };
 
   return (
     <div className="p-4 max-w-2xl space-y-4">
-      <h1 className="text-xl font-semibold">Настройки</h1>
+      <h1 className="text-h1">Настройки</h1>
 
       <Card>
         <CardTitle>Внешний вид</CardTitle>
@@ -314,7 +312,6 @@ export const SettingsPage = () => {
             </Button>
           </label>
         </div>
-        {importMsg && <div className="text-xs text-text-muted mt-3">{importMsg}</div>}
       </Card>
 
       <Card>

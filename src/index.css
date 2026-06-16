@@ -27,6 +27,23 @@
     --pastel-day:     #e0f0ff;
     --pastel-evening: #ffeadd;
     --pastel-night:   #ece4ff;
+
+    /* motion tokens */
+    --motion-fast: 100ms;
+    --motion-base: 150ms;
+    --motion-slow: 300ms;
+    --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
   }
 
   .dark {
@@ -96,6 +113,36 @@
 }
 
 @layer components {
+  /* === Typography scale === */
+  .text-display { font-size: 56px; line-height: 64px; font-weight: 700; letter-spacing: -0.02em; }
+  .text-h1 { font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.01em; }
+  .text-h2 { font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -0.01em; }
+  .text-h3 { font-size: 20px; line-height: 28px; font-weight: 500; }
+  .text-body { font-size: 16px; line-height: 24px; font-weight: 400; }
+  .text-small { font-size: 14px; line-height: 20px; font-weight: 400; }
+  .text-caption { font-size: 12px; line-height: 16px; font-weight: 500; }
+  .text-label {
+    font-size: 11px; line-height: 16px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  /* === Skeleton === */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-soft);
+    border-radius: 8px;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(148,163,184,0.12), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+
   /* === Section label === */
   .section-label {
     font-size: 10px;

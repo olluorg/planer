@@ -65,7 +65,7 @@ export const AwardsPage = () => {
   return (
     <div className="p-4 space-y-4 max-w-5xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Награды</h1>
+        <h1 className="text-h1">Награды</h1>
         <Button variant="soft" onClick={handleShare}><Share2 /> Карточка PNG</Button>
       </div>
 

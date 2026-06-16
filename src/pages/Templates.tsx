@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { CATEGORY_LABEL, TEMPLATES, type TemplatePack } from '@/lib/templates';
 import { useStore } from '@/lib/store';
 import { todayISO } from '@/lib/utils';
+import { toast } from '@/lib/toast';
 import { Check, ChevronRight } from 'lucide-react';
 
 export const TemplatesPage = () => {
@@ -51,6 +52,8 @@ export const TemplatesPage = () => {
       });
     });
     setApplied((s) => new Set([...s, tpl.id]));
+    const total = (tpl.goals?.length ?? 0) + (tpl.habits?.length ?? 0) + (tpl.tasks?.length ?? 0);
+    toast.success(`Шаблон «${tpl.title}» применён`, `Добавлено ${total} элементов`);
   };
 
   const cats = ['all', ...Object.keys(CATEGORY_LABEL)] as const;

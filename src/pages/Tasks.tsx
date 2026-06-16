@@ -142,7 +142,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-xl font-semibold">Задачи</h1>
+        <h1 className="text-h1">Задачи</h1>
         <div className="flex gap-2">
           <Tabs value={view} onValueChange={(v) => setView(v as any)}>
             <TabsList>

@@ -35,7 +35,7 @@ export const PlanPage: React.FC<{ date: Date }> = ({ date }) => {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Планирование</h1>
+        <h1 className="text-h1">Планирование</h1>
         <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
           <TabsList>
             <TabsTrigger value="day">День</TabsTrigger>
