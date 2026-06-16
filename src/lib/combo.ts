@@ -62,6 +62,14 @@ export const useCombo = create<ComboState>((set, get) => ({
       try {
         new Notification('THEDAD', { body: 'Поток! ×1.5 XP на 30 минут. Не теряй темп.' });
       } catch {}
+      try {
+        // import dynamically to avoid circular module init
+        import('./inbox').then((m) => m.useInbox.getState().add({
+          kind: 'combo',
+          title: 'Combo ×1.5 активен!',
+          body: 'Следующие 30 минут вся выработка XP с множителем 1.5×',
+        }));
+      } catch {}
     }
   },
 

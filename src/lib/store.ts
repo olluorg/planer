@@ -302,10 +302,22 @@ export const useStore = create<State>((set, get) => ({
     const id = nanoid(10);
     const ts = now();
     const date = todayISO();
+    const prevLevel = levelFromXp(xpTotal(get().xpLog)).level;
     exec('INSERT INTO xp_log VALUES (?,?,?,?,?,?)', [id, ts, date, source, sourceId, amount]);
     set((st) => ({ recentXp: [...st.recentXp, { id, amount, ts: Date.now() }].slice(-5) }));
     playSuccess();
     get().reload();
+    const newLevel = levelFromXp(xpTotal(get().xpLog)).level;
+    if (newLevel > prevLevel) {
+      try {
+        import('./inbox').then((m) => m.useInbox.getState().add({
+          kind: 'level_up',
+          title: `Новый уровень: L${newLevel}!`,
+          body: `Ты вырос. Так держать.`,
+          link: '/awards',
+        }));
+      } catch {}
+    }
     get().runAchievementCheck();
   },
 

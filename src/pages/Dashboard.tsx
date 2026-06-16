@@ -661,6 +661,14 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
           localStorage.setItem(flagKey, '1');
           const prev = Number(localStorage.getItem('quests.all_day_count.v1') || 0);
           localStorage.setItem('quests.all_day_count.v1', String(prev + 1));
+          try {
+            import('@/lib/inbox').then((m) => m.useInbox.getState().add({
+              kind: 'daily_quest_full',
+              title: 'Полный сбор!',
+              body: 'Все 3 daily quests закрыты сегодня',
+              link: '/awards',
+            }));
+          } catch {}
         }
       }
       return (
@@ -814,6 +822,14 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         try {
           const prev = Number(localStorage.getItem('weekly.wins.v1') || 0);
           localStorage.setItem('weekly.wins.v1', String(prev + 1));
+        } catch {}
+        try {
+          import('@/lib/inbox').then((m) => m.useInbox.getState().add({
+            kind: 'weekly_win',
+            title: `Челлендж недели: ${def.title}`,
+            body: `Награда: +${def.reward} XP`,
+            link: '/awards',
+          }));
         } catch {}
         queueMicrotask(() => awardXp('progress', def.key));
       }
@@ -1176,17 +1192,18 @@ const WidgetCard: React.FC<{
   children: React.ReactNode;
 }> = ({ title, editing, primary, onHide, onClick, children }) => (
   <div
-    className={`relative h-full flex flex-col overflow-hidden transition-all duration-200 ${onClick ? 'cursor-pointer' : ''}`}
+    className={`relative h-full flex flex-col overflow-hidden rounded-xl transition-all duration-200 ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
     style={editing ? {
-      border: '1px dashed rgba(255,255,255,0.08)',
-      background: 'rgba(255,255,255,0.02)',
+      border: '1px dashed var(--accent)',
+      background: 'var(--accent-glow)',
       padding: '16px',
     } : {
-      background: primary ? 'var(--bg-elevated, #111927)' : 'var(--bg-card)',
-      border: '1px solid var(--border)',
+      background: primary ? 'var(--accent)' : 'var(--bg-card)',
+      color: primary ? '#fff' : undefined,
+      border: '1px solid var(--border-soft)',
       boxShadow: primary
-        ? '0 12px 36px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)'
-        : '0 6px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03)',
+        ? '0 12px 28px rgba(99,102,241,0.28)'
+        : '0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.05)',
       padding: '16px',
     }}
     onClick={onClick}

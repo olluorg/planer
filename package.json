@@ -3,6 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Local-first планер целей с прогнозированием результата. SQLite WASM, без сервера.",
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/your-org/planer#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/planer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/planer/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

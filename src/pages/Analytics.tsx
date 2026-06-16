@@ -13,7 +13,7 @@ import { useTheme } from '@/lib/theme';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 
 export const AnalyticsPage = () => {
-  const { goals, progress, tasks, habits, habitLogs, reflections } = useStore();
+  const { goals, progress, tasks, habits, habitLogs, reflections, timeEntries } = useStore();
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const [goalId, setGoalId] = useState<string>(goals[0]?.id ?? '');
@@ -82,6 +82,59 @@ export const AnalyticsPage = () => {
       target: 7,
     }));
   }, [habits, habitLogs]);
+
+  // Radar — баланс жизни по 6 осям (0..100)
+  const radar = useMemo(() => {
+    const last30 = Array.from({ length: 30 }, (_, i) => isoDate(addDays(new Date(), -i)));
+    // Продуктивность: доля выполненных задач
+    const dt = tasks.filter((t) => last30.includes(t.date));
+    const productivity = dt.length ? Math.round((dt.filter((t) => t.status === 'done').length / dt.length) * 100) : 0;
+    // Постоянство: средняя доля привычек
+    const habitRatio = habits.length
+      ? Math.round((habits.reduce((s, h) => {
+          const cnt = last30.filter((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d)).length;
+          return s + cnt / 30;
+        }, 0) / habits.length) * 100)
+      : 0;
+    // Настроение
+    const moods = reflections.filter((r) => last30.includes(r.date) && r.mood !== null).map((r) => r.mood as number);
+    const mood = moods.length ? Math.round((moods.reduce((a, b) => a + b, 0) / moods.length / 4) * 100) : 0;
+    // Фокус: pomodoro дни
+    const focusDays = new Set(timeEntries.filter((e) => e.type === 'pomodoro' && e.duration >= 25 * 60).map((e) => isoDate(new Date(e.started_at)))).size;
+    const focus = Math.min(100, Math.round((focusDays / 30) * 100 * 2));
+    // Цели: средний прогресс
+    const goalsAvg = goals.length
+      ? Math.round((goals.reduce((s, g) => {
+          const denom = g.target_value - g.start_value || 1;
+          return s + Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom));
+        }, 0) / goals.length) * 100)
+      : 0;
+    // Рефлексия: дней с рефлексией
+    const reflDays = reflections.filter((r) => last30.includes(r.date) && r.mood !== null).length;
+    const reflection = Math.min(100, Math.round((reflDays / 30) * 100));
+    return [
+      { axis: 'Продуктивность', value: productivity },
+      { axis: 'Постоянство', value: habitRatio },
+      { axis: 'Настроение', value: mood },
+      { axis: 'Фокус', value: focus },
+      { axis: 'Цели', value: goalsAvg },
+      { axis: 'Рефлексия', value: reflection },
+    ];
+  }, [tasks, habits, habitLogs, reflections, timeEntries, goals]);
+
+  // Distribution — гистограмма дневной доли выполнения задач за 60 дней (бины 0-20-40-60-80-100)
+  const distribution = useMemo(() => {
+    const days = Array.from({ length: 60 }, (_, i) => isoDate(addDays(new Date(), -i)));
+    const bins = [0, 0, 0, 0, 0];
+    days.forEach((d) => {
+      const dt = tasks.filter((t) => t.date === d);
+      if (dt.length === 0) return;
+      const r = dt.filter((t) => t.status === 'done').length / dt.length;
+      const idx = Math.min(4, Math.floor(r * 5));
+      bins[idx]++;
+    });
+    return bins;
+  }, [tasks]);
 
   return (
     <div className="p-4 space-y-4">
@@ -190,6 +243,91 @@ export const AnalyticsPage = () => {
             series: [{ type: 'heatmap', data: heat.data, progressive: 0 }],
           }} />
         </Card>
+
+        {/* Radar — баланс жизни */}
+        <Card className="sm:col-span-2 lg:col-span-5">
+          <CardTitle>Баланс по сферам</CardTitle>
+          <div className="text-[11px] text-text-muted mb-2">За последние 30 дней</div>
+          <ECharts height={300} option={{
+            tooltip: {},
+            radar: {
+              indicator: radar.map((r) => ({ name: r.axis, max: 100 })),
+              radius: '65%',
+              axisName: { color: cc.axis, fontSize: 11 },
+              splitLine: { lineStyle: { color: cc.splitLine } },
+              splitArea: { areaStyle: { color: ['transparent', 'rgba(99,102,241,0.04)'] } },
+              axisLine: { lineStyle: { color: cc.splitLine } },
+            },
+            series: [{
+              type: 'radar',
+              data: [{
+                value: radar.map((r) => r.value),
+                name: 'Текущий баланс',
+                areaStyle: { color: 'rgba(99,102,241,0.25)' },
+                lineStyle: { color: '#6366f1', width: 2 },
+                itemStyle: { color: '#6366f1' },
+              }],
+            }],
+          }} />
+        </Card>
+
+        {/* Distribution — гистограмма дней по выполнению */}
+        <Card className="sm:col-span-2 lg:col-span-4">
+          <CardTitle>Распределение дней</CardTitle>
+          <div className="text-[11px] text-text-muted mb-2">Сколько дней попадали в диапазон выполнения (60 дней)</div>
+          <ECharts height={280} option={{
+            tooltip: { trigger: 'axis', backgroundColor: cc.tooltipBg, borderColor: cc.tooltipBorder, textStyle: { color: cc.tooltipText } },
+            grid: { left: 30, right: 10, top: 10, bottom: 30 },
+            xAxis: {
+              type: 'category',
+              data: ['0–20%', '20–40%', '40–60%', '60–80%', '80–100%'],
+              axisLabel: { color: cc.axis, fontSize: 10 },
+              axisLine: { lineStyle: { color: cc.axisLine } },
+            },
+            yAxis: {
+              type: 'value', axisLabel: { color: cc.axis },
+              splitLine: { lineStyle: { color: cc.splitLine } },
+              axisLine: { show: false }, axisTick: { show: false },
+            },
+            series: [{
+              type: 'bar', barWidth: '55%',
+              data: distribution.map((v, i) => ({
+                value: v,
+                itemStyle: { color: `hsl(${Math.round((i / 4) * 130)} 70% 55%)`, borderRadius: [6, 6, 0, 0] },
+              })),
+            }],
+          }} />
+        </Card>
+
+        {/* Confidence — прогноз с диапазоном ETA */}
+        {goal && f && (
+          <Card className="sm:col-span-2 lg:col-span-3 flex flex-col justify-center">
+            <CardTitle>Диапазон достижения</CardTitle>
+            <div className="text-[11px] text-text-muted mb-3">95% доверительный интервал</div>
+            {f.etaDate ? (
+              <div className="space-y-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-text">{f.etaDate}</div>
+                  <div className="text-[11px] text-text-muted">ожидаемая дата</div>
+                </div>
+                <div className="relative h-2 rounded-full bg-bg-soft overflow-hidden">
+                  <div className="absolute inset-y-0 left-[15%] right-[15%] bg-accent/30" />
+                  <div className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-accent" />
+                </div>
+                <div className="flex justify-between text-[10px] text-text-muted">
+                  <span>оптимистично</span>
+                  <span>вероятно</span>
+                  <span>пессимистично</span>
+                </div>
+                <div className="text-center text-xs text-text-muted">
+                  точность модели: <b className="text-text">{Math.round(f.etaConfidence * 100)}%</b>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-text-dim text-center py-4">Недостаточно данных для прогноза. Записывайте прогресс цели.</div>
+            )}
+          </Card>
+        )}
       </div>
     </div>
   );

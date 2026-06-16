@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Bell, Timer, Sun, Moon, Pause, Play, Square } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Bell, Timer, Sun, Moon, Pause, Play, Square, Crosshair, Lightbulb } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Button } from './ui/button';
@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { useTheme } from '@/lib/theme';
 import { GamificationBar } from './GamificationBar';
 import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
+import { getUserName } from '@/lib/onboarding';
 
 interface Props {
   date: Date;
@@ -15,10 +16,20 @@ interface Props {
   onAdd?: () => void;
   onTimer?: () => void;
   onBell?: () => void;
+  onFocusMode?: () => void;
+  onInsights?: () => void;
   bellCount?: number;
 }
 
-export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, onTimer, onBell, bellCount = 0 }) => {
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'Доброй ночи';
+  if (h < 12) return 'Доброе утро';
+  if (h < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
+export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, onTimer, onBell, onFocusMode, onInsights, bellCount = 0 }) => {
   const labelFull = format(date, 'd MMMM, EEEE', { locale: ru });
   const labelShort = format(date, 'd MMM', { locale: ru });
   const { theme, toggle } = useTheme();
@@ -26,8 +37,20 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, o
   return (
     <header className="shrink-0 border-b border-border">
       {/* Desktop */}
-      <div className="hidden sm:flex items-center h-16 px-6 gap-4">
-        <Tabs value={range} onValueChange={(v) => onRange(v as any)}>
+      <div className="hidden sm:flex items-center h-20 px-8 gap-4">
+        <div className="flex-1 leading-tight">
+          <div className="text-2xl font-bold text-text">{greeting()}, {getUserName()} <span className="ml-1">👋</span></div>
+          <div className="text-sm text-text-muted mt-0.5">{labelFull}</div>
+        </div>
+        <div className="flex items-center gap-1 rounded-xl bg-bg-card border border-border-soft px-2 py-1 shadow-soft">
+          <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, -1))}><ChevronLeft /></Button>
+          <div className="flex items-center gap-2 text-sm font-medium px-2">
+            <CalendarIcon className="h-4 w-4 text-text-muted" />
+            <span>{labelFull}</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, 1))}><ChevronRight /></Button>
+        </div>
+        <Tabs value={range} onValueChange={(v) => onRange(v as any)} className="hidden lg:block">
           <TabsList>
             <TabsTrigger value="day">Сегодня</TabsTrigger>
             <TabsTrigger value="week">Неделя</TabsTrigger>
@@ -35,14 +58,6 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, o
             <TabsTrigger value="year">Год</TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex-1 flex items-center justify-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, -1))}><ChevronLeft /></Button>
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <span>{labelFull}</span>
-            <CalendarIcon className="h-4 w-4 text-text-muted" />
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => onDate(addDays(date, 1))}><ChevronRight /></Button>
-        </div>
         <div className="flex items-center gap-2">
           <GamificationBar />
           <Button variant="ghost" size="icon" onClick={onAdd} title="Добавить (Ctrl+K)"><Plus /></Button>
@@ -68,6 +83,8 @@ export const Topbar: React.FC<Props> = ({ date, onDate, range, onRange, onAdd, o
           ) : (
             <Button variant="ghost" size="icon" onClick={onTimer} title="Таймер Pomodoro"><Timer /></Button>
           )}
+          <Button variant="ghost" size="icon" onClick={onFocusMode} title="Focus Mode (Ctrl+Shift+F)"><Crosshair /></Button>
+          <Button variant="ghost" size="icon" onClick={onInsights} title="Инсайты (Ctrl+I)"><Lightbulb /></Button>
           <Button variant="ghost" size="icon" onClick={onBell} title="Напоминания" className="relative">
             <Bell />
             {bellCount > 0 && (

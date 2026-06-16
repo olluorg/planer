@@ -3,7 +3,7 @@ import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings,
-  Plus, Search, Moon, Sun, Download,
+  Plus, Search, Moon, Sun, Download, Crosshair,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
@@ -15,7 +15,8 @@ export const CommandPalette: React.FC<{
   onAddHabit: () => void;
   onAddGoal: () => void;
   onAddProgress: () => void;
-}> = ({ open, onOpenChange, onAddTask, onAddHabit, onAddGoal, onAddProgress }) => {
+  onFocusMode?: () => void;
+}> = ({ open, onOpenChange, onAddTask, onAddHabit, onAddGoal, onAddProgress, onFocusMode }) => {
   const nav = useNavigate();
   const { goals, tasks, habits } = useStore();
   const { theme, toggle } = useTheme();
@@ -54,6 +55,7 @@ export const CommandPalette: React.FC<{
           <Item icon={Plus} label="Новая привычка" shortcut="H" onSelect={() => { close(); onAddHabit(); }} />
           <Item icon={Plus} label="Новая цель" shortcut="G" onSelect={() => { close(); onAddGoal(); }} />
           <Item icon={Plus} label="Записать показатель" shortcut="P" onSelect={() => { close(); onAddProgress(); }} />
+          {onFocusMode && <Item icon={Crosshair} label="Focus Mode (Deep Work)" shortcut="⇧F" onSelect={() => { close(); onFocusMode(); }} />}
           <Item icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'} onSelect={() => { toggle(); close(); }} />
         </Command.Group>
 

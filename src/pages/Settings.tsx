@@ -4,7 +4,7 @@ import { resetDB, persist, DB_KEY } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import {
-  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson,
+  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles,
 } from "lucide-react";
 import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
@@ -272,6 +272,12 @@ export const SettingsPage = () => {
           </label>
           <Button variant="soft" onClick={exportWeeklyReport}>
             <FileText /> Отчёт за неделю (.md)
+          </Button>
+          <Button
+            variant="soft"
+            onClick={() => { localStorage.removeItem('onboarding.done.v1'); location.reload(); }}
+          >
+            <Sparkles /> Пройти onboarding снова
           </Button>
           <Button variant="danger" onClick={reset}>
             <RefreshCw /> Сбросить

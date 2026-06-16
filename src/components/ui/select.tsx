@@ -13,7 +13,7 @@ export const SelectTrigger = React.forwardRef<
   <RS.Trigger
     ref={ref}
     className={cn(
-      'flex h-9 w-full items-center justify-between rounded-md border border-border bg-bg-soft px-3 py-2 text-sm',
+      'flex h-9 w-full items-center justify-between rounded-lg border border-border bg-bg-soft px-3 py-2 text-sm',
       'focus:outline-none focus:ring-1 focus:ring-accent data-[placeholder]:text-text-dim',
       className,
     )}
@@ -37,7 +37,7 @@ export const SelectContent = React.forwardRef<
       position="popper"
       sideOffset={4}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-md border border-border bg-bg-card text-text shadow-md animate-fade-in',
+        'z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-bg-card text-text shadow-md animate-fade-in',
         className,
       )}
       {...props}

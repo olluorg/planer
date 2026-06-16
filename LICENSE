@@ -1,0 +1,46 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+ THEDAD — Goal Planner
+ Copyright (C) 2025  THEDAD contributors
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Affero General Public License as published
+ by the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU Affero General Public License for more details.
+
+ You should have received a copy of the GNU Affero General Public License
+ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+================================================================================
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+The full text of the GNU Affero General Public License v3.0 must accompany
+this file. If the full text below this line is missing, fetch it once with:
+
+    curl -L https://www.gnu.org/licenses/agpl-3.0.txt -o LICENSE.AGPL
+    # then append it, or replace this file's body with the canonical text.
+
+A canonical copy is always available at:
+    https://www.gnu.org/licenses/agpl-3.0.txt
+
+--------------------------------------------------------------------------------
+DUAL LICENSING / COMMERCIAL USE
+
+THEDAD is offered under a dual-licensing model:
+
+  • The open-source core is licensed under AGPL-3.0-or-later (this file).
+  • Team / collaboration ("Pro") features and any deployment that wishes to
+    avoid the AGPL network-copyleft obligations require a separate commercial
+    license. See COMMERCIAL-LICENSE.md.
+
+If you only run THEDAD locally for personal use, AGPL imposes no obligation
+on you. The AGPL's source-disclosure requirement applies when you operate a
+modified version as a network service available to others.
+--------------------------------------------------------------------------------
