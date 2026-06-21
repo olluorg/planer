@@ -61,7 +61,7 @@ export const WeekProgressChart: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <h3 className="text-base font-semibold text-text mb-2">Прогресс на этой неделе</h3>
       <ECharts option={option} height={200} />
     </div>

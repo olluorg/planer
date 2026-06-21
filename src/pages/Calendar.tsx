@@ -39,7 +39,7 @@ export const CalendarPage = () => {
   const openQuick = (d: Date) => { setQuickDate(d); setQuickOpen(true); };
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
+    <div className="page py-4 space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text">Календарь</h1>
@@ -96,7 +96,7 @@ const MonthView: React.FC<{
   const today = new Date();
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft overflow-hidden">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card overflow-hidden">
       <div className="grid grid-cols-7 border-b border-border-soft">
         {WEEKDAYS.map((d) => (
           <div key={d} className="px-3 py-2 text-[11px] uppercase tracking-wider text-text-muted font-medium">{d}</div>
@@ -169,7 +169,7 @@ const WeekView: React.FC<{
   const today = new Date();
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft overflow-hidden">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card overflow-hidden">
       {/* Day headers */}
       <div className="grid grid-cols-[60px_repeat(7,minmax(0,1fr))] border-b border-border-soft">
         <div />

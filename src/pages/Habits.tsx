@@ -47,7 +47,7 @@ export const HabitsPage = () => {
   const todayIso = isoDate(new Date());
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="page py-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-h1">Привычки</h1>
         <Tabs value={view} onValueChange={(v) => setView(v as any)}>

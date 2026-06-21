@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical } from 'lucide-react';
+import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical, Search } from 'lucide-react';
+import { PageContainer } from '@/components/ui/page-container';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import type { Task } from '@/lib/types';
@@ -15,6 +16,8 @@ import {
   DndContext, DragOverlay, PointerSensor, useDroppable, useDraggable, useSensor, useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
+
+const BLOCK_LABELS: Record<string, string> = { morning: 'Утро', day: 'День', evening: 'Вечер', night: 'Ночь' };
 
 const PRIORITY_COLUMNS = [
   { id: 1, label: 'Высокий', color: '#ef4444' },
@@ -36,7 +39,11 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
   const [startTime, setStartTime] = useState<string>('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [pomodoroFor, setPomodoroFor] = useState<Task | null>(null);
+  const [search, setSearch] = useState('');
+  const [showAllSections, setShowAllSections] = useState<Record<number, boolean>>({});
+  const SECTION_LIMIT = 6;
   const today = isoDate(date);
+  const tomorrowIso = isoDate(new Date(date.getTime() + 86400000));
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -53,9 +60,10 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
         const tags = (t.tags ?? '').split(',').map((x) => x.trim()).filter(Boolean);
         if (!tags.includes(tagFilter)) return false;
       }
+      if (search.trim() && !t.title.toLowerCase().includes(search.trim().toLowerCase())) return false;
       return true;
     });
-  }, [tasks, filter, today, tagFilter]);
+  }, [tasks, filter, today, tagFilter, search]);
 
   // build tree (only roots filtered; children attached even if filtered out)
   const byParent = useMemo(() => {
@@ -97,42 +105,48 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
     const children = byParent[task.id] ?? [];
     const tags = (task.tags ?? '').split(',').map((x) => x.trim()).filter(Boolean);
     const expanded = !collapsed[task.id];
+    const dueLabel = task.date === today ? 'Сегодня' : task.date === tomorrowIso ? 'Завтра' : task.date.slice(5);
     return (
       <>
-        <div className="flex items-center gap-3 p-3" style={{ paddingLeft: 12 + depth * 24 }}>
+        <div className="group flex items-center gap-3 px-3 py-2.5" style={{ paddingLeft: 12 + depth * 24 }}>
           {children.length > 0 ? (
-            <button onClick={() => setCollapsed((c) => ({ ...c, [task.id]: !c[task.id] }))} className="text-text-muted">
+            <button onClick={() => setCollapsed((c) => ({ ...c, [task.id]: !c[task.id] }))} className="text-text-muted shrink-0">
               {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
           ) : depth > 0 ? (
-            <CornerDownRight className="h-3.5 w-3.5 text-text-dim" />
+            <CornerDownRight className="h-3.5 w-3.5 text-text-dim shrink-0" />
           ) : (
-            <div className="w-3.5" />
+            <div className="w-3.5 shrink-0" />
           )}
           <Checkbox checked={task.status === 'done'} onCheckedChange={() => toggleTask(task.id)} />
           <div className="flex-1 min-w-0">
-            <div className={task.status === 'done' ? 'line-through text-text-muted' : ''}>{task.title}</div>
-            <div className="text-[11px] text-text-muted flex flex-wrap items-center gap-2 mt-0.5">
-              <span>{task.date}</span>
-              {task.start_time && <span className="text-text">· {task.start_time}</span>}
-              {!task.start_time && task.time_block && <span>· {task.time_block}</span>}
-              {task.estimate_min && <span>· ~{task.estimate_min} мин</span>}
-              {goal && <Badge tone="accent">{goal.title}</Badge>}
-              {tags.map((tg) => <Badge key={tg} tone="info">#{tg}</Badge>)}
-            </div>
+            <div className={`text-sm truncate ${task.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>{task.title}</div>
+            {(task.start_time || task.time_block || task.estimate_min) && (
+              <div className="text-caption text-text-muted flex items-center gap-2 mt-0.5">
+                {task.start_time ? <span className="tabular-nums">{task.start_time}</span> : task.time_block && <span>{BLOCK_LABELS[task.time_block] ?? task.time_block}</span>}
+                {task.estimate_min && <span>~{task.estimate_min} мин</span>}
+              </div>
+            )}
           </div>
-          <Button variant="ghost" size="icon" title="Pomodoro" onClick={() => setPomodoroFor(task)}>
-            <Play className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" title="Подзадача" onClick={() => {
-            const sub = window.prompt('Название подзадачи:');
-            if (sub?.trim()) addTask({ title: sub.trim(), date: task.date, parent_id: task.id, goal_id: task.goal_id });
-          }}>
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => removeTask(task.id)}>
-            <Trash2 className="h-4 w-4 text-text-muted" />
-          </Button>
+          <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+            {goal && <Badge tone="accent">{goal.title}</Badge>}
+            {tags.map((tg) => <Badge key={tg} tone="info">#{tg}</Badge>)}
+          </div>
+          <div className="text-caption text-text-muted tabular-nums w-16 text-right shrink-0">{dueLabel}</div>
+          <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+            <Button variant="ghost" size="icon" title="Pomodoro" onClick={() => setPomodoroFor(task)}>
+              <Play className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" title="Подзадача" onClick={() => {
+              const sub = window.prompt('Название подзадачи:');
+              if (sub?.trim()) addTask({ title: sub.trim(), date: task.date, parent_id: task.id, goal_id: task.goal_id });
+            }}>
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => removeTask(task.id)}>
+              <Trash2 className="h-4 w-4 text-text-muted" />
+            </Button>
+          </div>
         </div>
         {expanded && children.map((c) => <TaskRow key={c.id} task={c} depth={depth + 1} />)}
       </>
@@ -140,10 +154,14 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <PageContainer className="py-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-h1">Задачи</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim pointer-events-none" />
+            <Input placeholder="Поиск задач…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-48" />
+          </div>
           <Tabs value={view} onValueChange={(v) => setView(v as any)}>
             <TabsList>
               <TabsTrigger value="list">Список</TabsTrigger>
@@ -204,6 +222,8 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             if (items.length === 0) return null;
             const done = items.filter((t) => t.status === 'done').length;
             const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+            const showAll = showAllSections[col.id];
+            const visibleItems = showAll ? items : items.slice(0, SECTION_LIMIT);
             return (
               <Card key={col.id} className="p-0 overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border-soft" style={{ borderLeft: `3px solid ${col.color}` }}>
@@ -215,17 +235,32 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
                   </div>
                 </div>
                 <div className="row-divide">
-                  {items.map((t) => <TaskRow key={t.id} task={t} depth={0} />)}
+                  {visibleItems.map((t) => <TaskRow key={t.id} task={t} depth={0} />)}
                 </div>
+                {items.length > SECTION_LIMIT && (
+                  <button
+                    onClick={() => setShowAllSections((s) => ({ ...s, [col.id]: !showAll }))}
+                    className="w-full py-2 text-caption text-accent hover:bg-bg-soft transition-colors border-t border-border-soft"
+                  >
+                    {showAll ? 'Свернуть' : `Показать ещё ${items.length - SECTION_LIMIT}`}
+                  </button>
+                )}
               </Card>
             );
           })}
-          {roots.length > 0 && (
-            <div className="text-xs text-text-muted px-1">
-              Всего: <b className="text-text">{roots.filter((t) => t.status === 'done').length}</b> из {roots.length} выполнено
-              {' · '}{roots.length ? Math.round((roots.filter((t) => t.status === 'done').length / roots.length) * 100) : 0}%
-            </div>
-          )}
+          {roots.length > 0 && (() => {
+            const totalDone = roots.filter((t) => t.status === 'done').length;
+            const totalPct = roots.length ? Math.round((totalDone / roots.length) * 100) : 0;
+            return (
+              <div className="flex items-center gap-3 px-1 pt-1">
+                <span className="text-small text-text-muted">Выполнено <b className="text-text">{totalDone}</b> из {roots.length}</span>
+                <div className="flex-1 max-w-xs h-1.5 rounded-full bg-bg-soft overflow-hidden">
+                  <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${totalPct}%` }} />
+                </div>
+                <span className="text-small font-semibold tabular-nums">{totalPct}%</span>
+              </div>
+            );
+          })()}
         </div>
       ) : (
         <DndContext
@@ -286,7 +321,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
       )}
 
       <PomodoroTimer task={pomodoroFor} onClose={() => setPomodoroFor(null)} />
-    </div>
+    </PageContainer>
   );
 };
 

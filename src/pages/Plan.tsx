@@ -33,7 +33,7 @@ export const PlanPage: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="page py-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-h1">Планирование</h1>
         <Tabs value={mode} onValueChange={(v) => setMode(v as any)}>
@@ -61,7 +61,7 @@ const DayView: React.FC<{ date: Date; tasks: any[]; onToggle: (id: string) => vo
   const d = isoDate(date);
   const today = tasks.filter((t) => t.date === d);
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="bento-grid-kpi">
       {BLOCKS.map((b) => (
         <Column key={b.key} id={`${d}|${b.key}`} title={b.label}>
           {today.filter((t) => t.time_block === b.key).map((t) => (

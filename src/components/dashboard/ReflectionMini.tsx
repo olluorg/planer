@@ -17,7 +17,7 @@ export const ReflectionMini: React.FC<{ date: Date }> = ({ date }) => {
   const filled = mood !== null;
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold text-text">Рефлексия дня</h3>
         <Button variant="ghost" size="sm" onClick={() => upsertReflection({ date: today, mood, note })}>

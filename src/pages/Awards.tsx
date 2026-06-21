@@ -63,7 +63,7 @@ export const AwardsPage = () => {
   };
 
   return (
-    <div className="p-4 space-y-4 max-w-5xl">
+    <div className="page py-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-h1">Награды</h1>
         <Button variant="soft" onClick={handleShare}><Share2 /> Карточка PNG</Button>
@@ -186,7 +186,7 @@ export const AwardsPage = () => {
       <Card>
         <CardTitle>Достижения</CardTitle>
         <div className="text-[11px] text-text-muted mb-3">{unlockedSet.size} / {ACHIEVEMENTS.length} разблокировано</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="bento-grid-kpi">
           {ACHIEVEMENTS.map((a) => {
             const unlocked = unlockedSet.has(a.key);
             const at = unlockedMap.get(a.key);

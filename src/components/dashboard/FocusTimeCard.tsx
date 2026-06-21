@@ -34,7 +34,7 @@ export const FocusTimeCard: React.FC<{ date: Date }> = ({ date }) => {
   const pct = Math.min(100, Math.round((totalSec / goalSec) * 100));
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <h3 className="text-base font-semibold text-text mb-3">Фокус времени</h3>
       <div className="flex items-center gap-5">
         <Ring value={pct} size={120} stroke={12} color="#6366f1" trackColor="rgba(15,23,42,0.06)" glow={false}>

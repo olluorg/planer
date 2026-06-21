@@ -7,13 +7,14 @@
     color-scheme: light;
     --accent:        #6366f1;
     --accent-soft:   #818cf8;
-    --accent-glow:   rgba(99, 102, 241, 0.18);
+    --accent-glow:   rgba(99, 102, 241, 0.16);
+    --accent-glow-sm:rgba(99, 102, 241, 0.08);
 
-    --bg:            #f4f4f8;
+    --bg:            #f1f5f9;
     --bg-card:       #ffffff;
     --bg-elevated:   #ffffff;
-    --bg-soft:       #f1f1f6;
-    --bg-hover:      #ececf2;
+    --bg-soft:       #f8fafc;
+    --bg-hover:      #eef2f7;
 
     --border:        rgba(15, 23, 42, 0.08);
     --border-soft:   rgba(15, 23, 42, 0.04);
@@ -48,11 +49,11 @@
 
   .dark {
     color-scheme: dark;
-    /* Accent */
-    --accent:        #84CC16;
-    --accent-soft:   #A3E635;
-    --accent-glow:   rgba(132, 204, 22, 0.28);
-    --accent-glow-sm:rgba(132, 204, 22, 0.12);
+    /* Accent — единый indigo, чуть светлее для читаемости на тёмном */
+    --accent:        #818cf8;
+    --accent-soft:   #a5b4fc;
+    --accent-glow:   rgba(99, 102, 241, 0.22);
+    --accent-glow-sm:rgba(99, 102, 241, 0.10);
 
     /* 3-уровневый background */
     --bg:            #06080B;
@@ -84,12 +85,9 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Subtle ambient background for glassmorphism depth */
+  /* Плоский нейтральный фон — без ambient glow */
   .dark body {
-    background:
-      radial-gradient(ellipse 80% 40% at 15% 10%,  rgba(132,204,22,0.04)  0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 85% 85%,  rgba(59,130,246,0.04)  0%, transparent 60%),
-      #06080B;
+    background: #06080B;
   }
 
   *::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -155,18 +153,14 @@
 
   /* === Premium card === */
 .premium-card {
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.02) 0%,
-    rgba(255,255,255,0.00) 100%
-  ), var(--bg-card);
-
+  background: var(--bg-card);
   border: 1px solid var(--border);
-
   box-shadow:
-    0 20px 60px rgba(0,0,0,0.65),
-    0 1px 0 rgba(255,255,255,0.06) inset,
-    0 0 0 1px rgba(255,255,255,0.02) inset;
+    0 1px 3px rgba(15, 23, 42, 0.04),
+    0 4px 16px rgba(15, 23, 42, 0.06);
+}
+.dark .premium-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
   /* === Task row === */
@@ -212,17 +206,13 @@
   }
   /* === Accent glow utilities === */
  .glow-accent {
-  box-shadow:
-    0 0 25px var(--accent-glow),
-    0 0 60px rgba(132,204,22,0.18);
+    box-shadow: 0 8px 28px rgba(99, 102, 241, 0.16);
   }
   .glow-accent-strong {
-    box-shadow:
-      0 0 40px rgba(132,204,22,0.35),
-      0 0 80px rgba(132,204,22,0.25);
+    box-shadow: 0 10px 32px rgba(99, 102, 241, 0.22);
   }
   .glow-accent-sm {
-    box-shadow: 0 0 10px var(--accent-glow-sm);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.10);
   }
 
   /* === Hover lift === */
@@ -230,8 +220,8 @@
     transition: transform 200ms ease, box-shadow 200ms ease;
   }
   .hover-lift:hover {
-  transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 18px 50px rgba(0,0,0,0.7);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.16);
 }
 
   /* Legacy compat */
@@ -252,8 +242,8 @@
 
   background: linear-gradient(
     180deg,
-    transparent 20%,
-    rgba(0,0,0,0.7) 100%
+    transparent 30%,
+    rgba(6,8,11,0.35) 100%
   );
 }
 /* === Big stat === */
@@ -276,7 +266,7 @@
 
   background: linear-gradient(
     120deg,
-    rgba(132,204,22,0.4),
+    rgba(99,102,241,0.4),
     transparent 40%
   );
 
@@ -292,7 +282,7 @@
 @keyframes check-pop { 0%{transform:scale(0.7)} 55%{transform:scale(1.2)} 100%{transform:scale(1)} }
 @keyframes pulse-ok  {
   0%   { background:transparent }
-  40%  { background:rgba(132,204,22,0.14) }
+  40%  { background:rgba(99,102,241,0.14) }
   100% { background:transparent }
 }
 @keyframes glow-pulse {
@@ -302,8 +292,8 @@
 
 /* === react-grid-layout === */
 .react-grid-item.react-grid-placeholder {
-  background: rgba(132,204,22,0.06) !important;
-  border: 1px dashed rgba(132,204,22,0.25) !important;
+  background: rgba(99,102,241,0.06) !important;
+  border: 1px dashed rgba(99,102,241,0.25) !important;
   border-radius: 0 !important;
   opacity: 1;
 }
@@ -314,9 +304,47 @@
 }
 .editing .bento-item { user-select: none; }
 .bento-item { transition: filter 120ms; }
-.editing .bento-item:hover { outline: 1.5px solid rgba(132,204,22,0.4); }
+.editing .bento-item:hover { outline: 1.5px solid rgba(99,102,241,0.4); }
 
 /* === Progress bar smooth === */
 .progress-bar {
   transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* === Consistency heatmap: прячем легенду/ссылку на узком виджете === */
+@container (max-width: 300px) {
+  .hm-legend,
+  .hm-more { display: none; }
+}
+
+/* === Goals: 2 колонки когда колонка списка достаточно широкая === */
+.goals-col { container-type: inline-size; }
+.goals-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@container (min-width: 680px) {
+  .goals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* === Контейнер страницы по дизайн-системе (max-width + поля по брейкпоинтам) === */
+.page {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 1200px;
+  padding-inline: 1rem;
+}
+@media (min-width: 768px)  { .page { padding-inline: 1.5rem; } }
+@media (min-width: 1024px) { .page { padding-inline: 2rem; } }
+@media (min-width: 1281px) { .page { max-width: 1280px; } }
+@media (min-width: 1537px) { .page { max-width: 1440px; padding-inline: 2.5rem; } }
+
+/* === Bento auto-flow: модули раскладываются относительно друг друга === */
+/* Колонок столько, сколько влезает; карточки растягиваются на остаток. */
+.bento-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+.bento-grid-kpi {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
 }

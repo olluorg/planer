@@ -59,7 +59,7 @@ export const TemplatesPage = () => {
   const cats = ['all', ...Object.keys(CATEGORY_LABEL)] as const;
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
+    <div className="page py-4 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text">Шаблоны</h1>
@@ -85,7 +85,7 @@ export const TemplatesPage = () => {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="bento-grid">
         {filtered.map((tpl) => {
           const total = (tpl.goals?.length ?? 0) + (tpl.habits?.length ?? 0) + (tpl.tasks?.length ?? 0);
           const isApplied = applied.has(tpl.id);

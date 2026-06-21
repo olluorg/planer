@@ -50,7 +50,6 @@ export default function App() {
   const ready = useStore((s) => s.ready);
   const init = useStore((s) => s.init);
   const [date, setDate] = useState(new Date());
-  const [range, setRange] = useState<'day' | 'week' | 'month' | 'year'>('day');
   const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
@@ -129,11 +128,14 @@ export default function App() {
       }
     };
     const onQuick = () => setQuickTab('task');
+    const onFocus = () => setFocusOpen(true);
     window.addEventListener('keydown', onKey);
     window.addEventListener('thedad:quick-capture', onQuick);
+    window.addEventListener('thedad:focus-mode', onFocus);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('thedad:quick-capture', onQuick);
+      window.removeEventListener('thedad:focus-mode', onFocus);
     };
   }, []);
 
@@ -186,12 +188,14 @@ export default function App() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar
-          date={date} onDate={setDate} range={range} onRange={setRange}
           onAdd={() => setQuickTab('task')}
+          onAddNote={() => setQuickTab('task')}
+          onAddGoal={() => setQuickTab('goal')}
           onTimer={() => setTimerOpen(true)}
           onFocusMode={() => setFocusOpen(true)}
           onInsights={() => setInsightsOpen((v) => !v)}
           onBell={() => setInboxOpen((v) => !v)}
+          onPalette={() => setPaletteOpen(true)}
           bellCount={inboxUnread || bellCount}
         />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
@@ -199,7 +203,7 @@ export default function App() {
             <Suspense fallback={<Loader />}>
               <Routes location={location}>
                 <Route path="/index.html" element={<Navigate to="/" replace />} />
-                <Route path="/" element={<DashboardLavender date={date} onDateChange={setDate} />} />
+                <Route path="/" element={<DashboardLavender date={date} onDateChange={setDate} onStartFocus={() => setFocusOpen(true)} />} />
                 <Route path="/dashboard-bento" element={<Dashboard date={date} />} />
                 <Route path="/goals" element={<GoalsPage />} />
                 <Route path="/tasks" element={<TasksPage date={date} />} />

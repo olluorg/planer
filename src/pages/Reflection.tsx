@@ -59,7 +59,7 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   const moodAvg = week.filter((d) => d.mood !== null).reduce((s, d, _, a) => s + (d.mood as number) / (a.length || 1), 0);
 
   return (
-    <div className="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <div className="page py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
       <Card className="lg:col-span-7">
         <CardTitle>Рефлексия · {format(date, 'd MMMM yyyy', { locale: ru })}</CardTitle>
 

@@ -15,7 +15,7 @@ export const QuickActions: React.FC<Props> = ({ onAddTask, onScheduleEvent, onAd
     { l: 'Записать рефлексию', icon: BarChart3, onClick: onAddProgress },
   ];
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <h3 className="text-base font-semibold text-text mb-3">Быстрые действия</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {items.map((q) => (

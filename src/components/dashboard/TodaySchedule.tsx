@@ -21,7 +21,7 @@ export const TodaySchedule: React.FC<Props> = ({ date }) => {
   }, [tasks, today]);
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-text">Расписание на сегодня</h3>
         <Button variant="ghost" size="sm" onClick={() => nav('/plan')}>Все события</Button>

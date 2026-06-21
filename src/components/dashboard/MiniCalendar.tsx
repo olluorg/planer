@@ -29,7 +29,7 @@ export const MiniCalendar: React.FC<Props> = ({ date, onDateChange }) => {
   }, [date]);
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold text-text">Календарь</h3>
         <div className="flex items-center gap-1">

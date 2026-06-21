@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutGrid, Target, CheckSquare, Repeat, Calendar, CalendarDays, BarChart3, NotebookPen, Settings, History, ChevronRight, Trophy, Sparkles, LayoutTemplate, Plus } from 'lucide-react';
+import { LayoutGrid, Target, CheckSquare, Repeat, Calendar, CalendarDays, BarChart3, NotebookPen, Settings, History, ChevronRight, Trophy, Sparkles, LayoutTemplate, Plus, Crosshair, Play } from 'lucide-react';
 import { cn, isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useMemo } from 'react';
@@ -115,16 +115,29 @@ export const Sidebar = () => {
               )}
             </div>
           )}
-          <div className="rounded-xl bg-bg-soft p-3">
-            <div className="text-[10px] uppercase tracking-wider text-text-muted">Мотивация дня</div>
-            <p className="text-[12px] text-text leading-snug mt-1">Маленькие шаги приводят к большим результатам.</p>
-          </div>
+          {/* Focus Mode */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('thedad:focus-mode'))}
+            className="w-full flex items-center gap-3 rounded-xl bg-bg-soft hover:bg-bg-hover p-3 transition-colors group"
+          >
+            <div className="h-9 w-9 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+              <Crosshair className="h-4 w-4 text-accent" />
+            </div>
+            <div className="flex-1 min-w-0 text-left leading-tight">
+              <div className="text-[13px] font-semibold text-text">Focus Mode</div>
+              <div className="text-[10px] text-text-muted">Deep Work · 45 мин</div>
+            </div>
+            <div className="h-7 w-7 rounded-full bg-accent text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+              <Play className="h-3.5 w-3.5" fill="white" />
+            </div>
+          </button>
+          {/* User */}
           <NavLink
             to="/settings"
             className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-bg-soft transition-colors"
           >
-            <div className="h-9 w-9 rounded-full bg-accent/15 text-accent flex items-center justify-center text-sm font-bold shrink-0">
-              A
+            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-accent to-accent-soft text-white flex items-center justify-center text-sm font-bold shrink-0 shadow-sm">
+              {getUserName().slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0 leading-tight">
               <div className="text-[13px] font-semibold text-text truncate">{getUserName()}</div>

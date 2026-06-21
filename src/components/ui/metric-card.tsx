@@ -31,7 +31,7 @@ export const MetricCard: React.FC<Props> = ({
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className="text-left rounded-2xl bg-bg-card border border-border-soft shadow-soft p-4 transition-all hover:shadow-card disabled:cursor-default w-full"
+      className="text-left rounded-xl bg-bg-card border border-border shadow-card p-5 transition-all hover:shadow-lift hover:-translate-y-0.5 disabled:cursor-default w-full"
     >
       <div className="flex items-start justify-between mb-2">
         <div className="text-label text-text-muted">{label}</div>

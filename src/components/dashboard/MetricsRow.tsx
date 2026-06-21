@@ -72,7 +72,7 @@ export const MetricsRow: React.FC<{ date: Date }> = ({ date }) => {
         value={m.tasksProgress}
         suffix="%"
         data={m.tasksSeries}
-        color="#8b5cf6"
+        color="#3b82f6"
         icon={<CheckSquare className="h-4 w-4" />}
         onClick={() => nav('/tasks')}
       />

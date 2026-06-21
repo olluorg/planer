@@ -8,7 +8,7 @@ export const GoalsProgress: React.FC = () => {
   const rootGoals = goals.filter((g) => !g.parent_id).slice(0, 5);
 
   return (
-    <div className="rounded-2xl bg-bg-card border border-border-soft shadow-soft p-5">
+    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-text">Прогресс целей</h3>
         <Button variant="ghost" size="sm" onClick={() => nav('/goals')}>Все цели</Button>
