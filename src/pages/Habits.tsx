@@ -4,13 +4,24 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Plus, Trash2, Check, Flame } from 'lucide-react';
+import { Plus, Trash2, Check, Flame, Droplet, Dumbbell, BookOpen, Brain, Moon, Sparkles } from 'lucide-react';
 import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const HABIT_PALETTE = ['#6366f1', '#8b5cf6', '#3b82f6', '#ec4899', '#06b6d4', '#f59e0b'];
+
+function habitIcon(title: string): React.ElementType {
+  const t = title.toLowerCase();
+  if (/(вод|пить|water)/.test(t)) return Droplet;
+  if (/(трен|спорт|зал|отжим|workout|зарядк|бег|фитнес)/.test(t)) return Dumbbell;
+  if (/(чита|книг|read|страниц)/.test(t)) return BookOpen;
+  if (/(медит|осознан|meditat)/.test(t)) return Brain;
+  if (/(сон|спать|sleep|экран|подъём|подъем)/.test(t)) return Moon;
+  return Sparkles;
+}
 
 export const HabitsPage = () => {
   const { habits, habitLogs, goals, addHabit, removeHabit, toggleHabitLog } = useStore();
@@ -79,24 +90,38 @@ export const HabitsPage = () => {
       {view === 'week' ? (
         <Card className="p-0 overflow-hidden">
           {/* header */}
-          <div className="grid grid-cols-[1fr_repeat(7,40px)_56px] items-center px-4 py-2 border-b border-border-soft text-[11px] text-text-muted">
+          <div className="grid grid-cols-[1fr_56px_repeat(7,36px)_32px] items-center px-4 py-2 border-b border-border-soft text-caption text-text-muted">
             <div>Привычка</div>
+            <div className="text-center">Серия</div>
             {weekDates.map((d, i) => (
               <div key={d} className={`text-center font-medium ${d === todayIso ? 'text-accent' : ''}`}>{WEEKDAYS[i]}</div>
             ))}
-            <div className="text-center">Серия</div>
+            <div />
           </div>
           <div className="divide-y divide-border-soft">
-            {habits.map((h) => {
-              const color = h.color ?? '#6366f1';
+            {habits.map((h, idx) => {
+              const sq = HABIT_PALETTE[idx % HABIT_PALETTE.length];
+              const Icon = habitIcon(h.title);
               const streak = habitStreak(h.id);
               const doneWeek = weekDates.filter((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d)).length;
               return (
-                <div key={h.id} className="grid grid-cols-[1fr_repeat(7,40px)_56px] items-center px-4 py-2.5 hover:bg-bg-soft group">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: color }} />
-                    <span className="truncate text-sm">{h.title}</span>
-                    <span className="text-[11px] text-text-dim tabular-nums">{doneWeek}/7</span>
+                <div key={h.id} className="grid grid-cols-[1fr_56px_repeat(7,36px)_32px] items-center px-4 py-3 hover:bg-bg-soft group">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${sq}1f` }}>
+                      <Icon className="h-5 w-5" style={{ color: sq }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-text truncate">{h.title}</div>
+                      <div className="text-caption text-text-muted tabular-nums">{doneWeek}/7 на неделе</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-1">
+                    {streak > 0 ? (
+                      <>
+                        <Flame className="h-3.5 w-3.5 text-warning" />
+                        <span className="text-sm font-semibold tabular-nums">{streak}</span>
+                      </>
+                    ) : <span className="text-text-dim text-caption">—</span>}
                   </div>
                   {weekDates.map((d) => {
                     const done = habitLogs.some((l) => l.habit_id === h.id && l.date === d);
@@ -106,10 +131,10 @@ export const HabitsPage = () => {
                         <button
                           onClick={() => !future && toggleHabitLog(h.id, d)}
                           disabled={future}
-                          className="h-7 w-7 rounded-full border-2 flex items-center justify-center transition-all disabled:opacity-30 hover:scale-110"
+                          className="h-7 w-7 rounded-full border flex items-center justify-center transition-all disabled:opacity-40 hover:scale-110"
                           style={{
-                            background: done ? color : 'transparent',
-                            borderColor: done ? color : 'var(--border)',
+                            background: done ? 'var(--accent)' : 'var(--bg-soft)',
+                            borderColor: done ? 'var(--accent)' : 'var(--border)',
                           }}
                         >
                           {done && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
@@ -117,13 +142,7 @@ export const HabitsPage = () => {
                       </div>
                     );
                   })}
-                  <div className="flex items-center justify-center gap-1">
-                    {streak > 0 ? (
-                      <>
-                        <Flame className="h-3.5 w-3.5 text-warning" />
-                        <span className="text-sm font-semibold tabular-nums">{streak}</span>
-                      </>
-                    ) : <span className="text-text-dim text-xs">—</span>}
+                  <div className="flex justify-center">
                     <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={() => removeHabit(h.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-text-muted" />
                     </Button>
@@ -146,23 +165,22 @@ export const HabitsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {habits.map((h) => (
+              {habits.map((h, idx) => (
                 <tr key={h.id} className="border-t border-border-soft hover:bg-bg-soft">
                   <td className="p-3 sticky left-0 bg-bg-card">
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ background: h.color ?? '#6366f1' }} />
+                      <span className="h-2 w-2 rounded-full" style={{ background: HABIT_PALETTE[idx % HABIT_PALETTE.length] }} />
                       <span>{h.title}</span>
                     </div>
                   </td>
                   {monthDays.map((d) => {
                     const done = habitLogs.some((l) => l.habit_id === h.id && l.date === d);
-                    const color = h.color ?? '#6366f1';
                     return (
                       <td key={d} className="p-1 text-center">
                         <button
                           onClick={() => toggleHabitLog(h.id, d)}
                           className="h-6 w-6 rounded-md border border-border bg-bg-soft flex items-center justify-center hover:border-accent transition-colors"
-                          style={{ background: done ? color : undefined, borderColor: done ? color : undefined }}
+                          style={{ background: done ? 'var(--accent)' : undefined, borderColor: done ? 'var(--accent)' : undefined }}
                         >
                           {done && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
                         </button>
