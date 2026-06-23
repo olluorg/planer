@@ -4,6 +4,7 @@ import { cn, isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useMemo } from 'react';
 import { getUserName } from '@/lib/onboarding';
+import { quoteOfDay } from '@/lib/quotes';
 
 const items = [
   { to: '/', label: 'Главная', icon: LayoutGrid, end: true },
@@ -33,6 +34,8 @@ export const Sidebar = () => {
     const dt = tasks.filter((t) => t.date === today && !t.parent_id);
     return { done: dt.filter((t) => t.status === 'done').length, total: dt.length };
   }, [tasks]);
+
+  const quote = quoteOfDay();
 
   return (
     <>
@@ -115,6 +118,11 @@ export const Sidebar = () => {
               )}
             </div>
           )}
+          {/* Мотивация дня */}
+          <div className="rounded-xl bg-bg-soft p-3">
+            <div className="text-[10px] uppercase tracking-wider text-text-muted mb-1">Мотивация дня</div>
+            <div className="text-[12px] text-text leading-snug">«{quote.text}»</div>
+          </div>
           {/* Focus Mode */}
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('thedad:focus-mode'))}

@@ -9,6 +9,7 @@ import { isoDate } from '@/lib/utils';
 import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ECharts } from '@/components/charts/ECharts';
+import { Sparkline } from '@/components/ui/sparkline';
 import { useTheme } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 
@@ -58,6 +59,23 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
 
   const moodAvg = week.filter((d) => d.mood !== null).reduce((s, d, _, a) => s + (d.mood as number) / (a.length || 1), 0);
 
+  const streak = useMemo(() => {
+    let s = 0;
+    for (let i = 0; ; i++) {
+      const d = isoDate(addDays(date, -i));
+      const r = reflections.find((x) => x.date === d);
+      if (r && r.mood !== null) s++; else break;
+    }
+    return s;
+  }, [date, reflections]);
+
+  const moodSeries = useMemo(() =>
+    Array.from({ length: 14 }, (_, i) => {
+      const d = isoDate(addDays(date, -13 + i));
+      const r = reflections.find((x) => x.date === d);
+      return r?.mood != null ? r.mood : 0;
+    }), [date, reflections]);
+
   return (
     <div className="page py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
       <Card className="lg:col-span-7">
@@ -69,7 +87,7 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
             <button
               key={i}
               onClick={() => setMood(i)}
-              className={`h-12 w-12 rounded-full text-xl transition-all ${mood === i ? 'bg-accent text-black ring-2 ring-accent' : 'bg-bg-soft hover:bg-bg-hover'}`}
+              className={`h-12 w-12 rounded-full text-xl transition-all ${mood === i ? 'bg-accent text-white ring-2 ring-accent' : 'bg-bg-soft hover:bg-bg-hover'}`}
             >{e}</button>
           ))}
         </div>
@@ -102,6 +120,20 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
       </Card>
 
       <div className="lg:col-span-5 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="flex flex-col items-center justify-center text-center">
+            <CardTitle>Настроение</CardTitle>
+            <div className="text-4xl leading-none">{mood != null ? MOODS[mood] : '—'}</div>
+            <div className="text-small text-text-muted mt-2">{mood != null ? `${mood + 1}/5` : 'не отмечено'}</div>
+          </Card>
+          <Card>
+            <CardTitle>Серия рефлексий</CardTitle>
+            <div className="text-h1 tabular-nums leading-none">{streak}</div>
+            <div className="text-caption text-text-muted mt-1 mb-2">дней подряд</div>
+            <Sparkline data={moodSeries} color="#6366f1" width={130} height={40} />
+          </Card>
+        </div>
+
         <Card>
           <CardTitle>Недельный обзор</CardTitle>
           <ECharts height={200} option={{
@@ -114,13 +146,12 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
             ],
             series: [
               { name: 'Выполнено', type: 'bar', barWidth: 16,
-                data: week.map((w) => {
-                  const v = w.total ? Math.round((w.done / w.total) * 100) : 0;
-                  const hue = Math.round((Math.max(0, Math.min(100, v)) / 100) * 130);
-                  return { value: v, itemStyle: { color: `hsl(${hue} 70% 50%)` } };
-                }),
+                data: week.map((w) => ({
+                  value: w.total ? Math.round((w.done / w.total) * 100) : 0,
+                  itemStyle: { color: '#6366f1', borderRadius: [4, 4, 0, 0] },
+                })),
               },
-              { name: 'Настроение', type: 'line', yAxisIndex: 1, smooth: true, data: week.map((w) => w.mood), lineStyle: { color: '#eab308' }, itemStyle: { color: '#eab308' } },
+              { name: 'Настроение', type: 'line', yAxisIndex: 1, smooth: true, data: week.map((w) => w.mood), lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' } },
             ],
           }} />
         </Card>

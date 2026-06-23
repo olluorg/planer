@@ -49,8 +49,8 @@ export const HabitDots: React.FC<{ date: Date }> = ({ date }) => {
               <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}1f` }}>
                 <Icon className="h-3.5 w-3.5" style={{ color }} />
               </div>
-              <div className="flex-1 text-sm text-text truncate">{h.title}</div>
-              <div className="flex gap-1">
+              <div className="flex-1 min-w-0 text-sm text-text truncate">{h.title}</div>
+              <div className="flex gap-[3px] shrink-0">
                 {marks.map((m, j) => {
                   const future = weekDates[j] > todayIso;
                   return (
@@ -58,19 +58,19 @@ export const HabitDots: React.FC<{ date: Date }> = ({ date }) => {
                       key={j}
                       onClick={() => !future && toggleHabitLog(h.id, weekDates[j])}
                       disabled={future}
-                      className="h-5 w-5 rounded-full border flex items-center justify-center transition-all hover:scale-110 disabled:opacity-40"
+                      className="h-4 w-4 rounded-full border flex items-center justify-center transition-all hover:scale-110 disabled:opacity-40"
                       style={{
                         background: m ? color : 'var(--bg-soft)',
                         borderColor: m ? color : 'var(--border)',
                       }}
                       title={weekDates[j]}
                     >
-                      {m && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
+                      {m && <Check className="h-2 w-2 text-white" strokeWidth={3} />}
                     </button>
                   );
                 })}
               </div>
-              <div className="text-[11px] font-medium tabular-nums w-8 text-right" style={{ color: done >= 5 ? color : 'var(--text-muted)' }}>
+              <div className="text-[11px] font-medium tabular-nums w-7 text-right shrink-0" style={{ color: done >= 5 ? color : 'var(--text-muted)' }}>
                 {done}/7
               </div>
             </div>

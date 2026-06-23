@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { fmtNum, colorByPct } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
-import { computeInsights } from '@/lib/insights';
 import { ECharts } from '@/components/charts/ECharts';
 import { Ring } from '@/components/ui/ring';
 import { PageContainer } from '@/components/ui/page-container';
@@ -82,8 +81,35 @@ export const GoalsPage = () => {
   const sphereMap = new Map<string, { label: string; color: string; count: number }>();
   activeRoots.forEach((g) => { const s = goalSphere(g.title); const e = sphereMap.get(s.label) ?? { ...s, count: 0 }; e.count++; sphereMap.set(s.label, e); });
   const spheres = [...sphereMap.values()];
-  const insights = computeInsights({ today: new Date(), tasks, habits, habitLogs, reflections, timeEntries, goals, progress }).slice(0, 3);
   const recent = [...progress].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((p) => ({ p, goal: goals.find((g) => g.id === p.goal_id) }));
+
+  // --- Goals V2: hero-цель, отставание от графика, AI-coach (эвристики на реальных данных) ---
+  const heroGoal = statusTab === 'active' && !query.trim() && activeRoots.length
+    ? [...activeRoots].sort((a, b) => pctOf(b) - pctOf(a) || (a.deadline ?? '9999-99-99').localeCompare(b.deadline ?? '9999-99-99'))[0]
+    : undefined;
+
+  const scheduleGap = (g: Goal): number | null => {
+    const created = new Date(g.created_at).getTime();
+    const dl = g.deadline ? new Date(g.deadline).getTime() : null;
+    if (!dl || dl <= created) return null;
+    const timeP = Math.max(0, Math.min(1, (Date.now() - created) / (dl - created)));
+    return Math.round((timeP - pctOf(g)) * 100); // >0 отстаёт, <0 опережает
+  };
+
+  const risks = activeRoots
+    .map((g) => ({ g, gap: scheduleGap(g) }))
+    .filter((x): x is { g: Goal; gap: number } => x.gap !== null)
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, 3);
+
+  const coachPush = activeRoots
+    .map((g) => ({ g, m: nextMilestone(g) }))
+    .filter((x) => x.m !== null)
+    .sort((a, b) => a.m!.remainFrac - b.m!.remainFrac)
+    .slice(0, 3)
+    .map((x) => x.g);
+
+  const gridGoals = visible.filter((g) => g.id !== heroGoal?.id);
 
   return (
     <PageContainer className="py-4 space-y-4">
@@ -100,6 +126,8 @@ export const GoalsPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim pointer-events-none" />
             <Input placeholder="Поиск целей…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9 w-56" />
           </div>
+          <Button variant="ghost" onClick={() => nav('/settings')}><Download /> Импорт</Button>
+          <Button variant="ghost" onClick={() => nav('/templates')}><FileText /> Шаблоны</Button>
           <Button onClick={() => setOpen(true)}><Plus /> Новая цель</Button>
         </div>
       </div>
@@ -133,8 +161,110 @@ export const GoalsPage = () => {
         </Card>
       )}
 
+      {heroGoal && (() => {
+        const g = heroGoal;
+        const recs = progress.filter((p) => p.goal_id === g.id);
+        const f = forecastGoal(g, recs, 30);
+        const r = Math.round(pctOf(g) * 100);
+        const successPct = f.etaDate ? Math.round(f.etaConfidence * 100) : null;
+        const chance = successPct == null ? null : successPct >= 70 ? 'Высокий' : successPct >= 40 ? 'Средний' : 'Низкий';
+        const daysLeft = g.deadline ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000) : null;
+        const gap = scheduleGap(g);
+        const Icon = goalIcon(g.title);
+        const accent = g.color || GOAL_PALETTE[0];
+        const ms = deriveMilestones(g);
+        const nextIdx = ms.findIndex((m) => !m.done);
+        const typeLabel = { long: 'Долгосрочная', mid: 'Среднесрочная', short: 'Краткосрочная' }[g.type];
+        const aiText = gap == null
+          ? 'Добавь дедлайн и записывай прогресс — оценю темп и шанс достижения.'
+          : gap <= -5 ? 'Ты идёшь с опережением графика. Продолжай в том же темпе.'
+          : gap >= 5 ? `Отставание от графика ~${gap}%. Стоит увеличить частоту действий.`
+          : 'Ты держишь темп графика. Так держать.';
+        return (
+          <Card className="relative overflow-hidden border-accent/15">
+            <span className="absolute inset-x-0 top-0 h-1" style={{ background: accent }} />
+            <div className="flex flex-col gap-5">
+              <div className="flex items-start gap-4">
+                <div className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${accent}1f` }}>
+                  <Icon className="h-7 w-7" style={{ color: accent }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-h2">{g.title}</h2>
+                    <Badge tone="soft">основная цель</Badge>
+                  </div>
+                  <p className="text-small text-text-muted mt-1">
+                    {g.metric || `${fmtNum(g.current_value, 1)} → ${fmtNum(g.target_value, 0)}${g.unit ? ` ${g.unit}` : ''}`}
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap mt-2 text-caption text-text-muted">
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: accent }} />{typeLabel}</span>
+                    {successPct != null && <><span className="text-text-dim">·</span><span>{successPct}% уверенность</span></>}
+                    {daysLeft != null && <><span className="text-text-dim">·</span><span>{daysLeft < 0 ? 'просрочено' : `осталось ${daysLeft} дн`}</span></>}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-caption text-text-muted uppercase tracking-wider">Прогноз достижения</div>
+                  <div className="text-4xl font-bold tabular-nums leading-none mt-1" style={{ color: successPct == null ? 'var(--text-dim)' : successPct >= 70 ? '#22c55e' : successPct >= 40 ? '#f59e0b' : '#ef4444' }}>
+                    {successPct == null ? '—' : `${successPct}%`}
+                  </div>
+                  {chance && <div className="text-caption text-text-muted mt-1">Шанс: {chance}</div>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-4 items-center">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <Progress value={r} className="flex-1" barColor={accent} />
+                    <span className="text-h3 font-bold tabular-nums">{r}%</span>
+                  </div>
+                  <div className="text-caption text-text-muted mt-1.5">
+                    {g.deadline ? `Дедлайн ${fmtDate(g.deadline)} · прогноз ${f.etaDate ?? '—'}` : 'Без дедлайна'}
+                  </div>
+                </div>
+                <ECharts height={90} option={forecastChart(g, recs, f, cc, accent)} />
+              </div>
+
+              <div>
+                <div className="section-label !mb-2">Ближайшие вехи</div>
+                <div className="flex flex-wrap gap-2">
+                  {ms.map((m, k) => {
+                    const isNext = k === nextIdx;
+                    return (
+                      <div key={k} className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: m.done ? accent : isNext ? `${accent}80` : 'var(--border)' }}>
+                        <span className="h-4 w-4 rounded-full flex items-center justify-center shrink-0" style={{ background: m.done ? accent : 'transparent', border: m.done ? 'none' : `1.5px solid ${isNext ? accent : 'var(--border)'}` }}>
+                          {m.done && <CheckCircle2 className="h-3 w-3 text-white" />}
+                        </span>
+                        <div className="leading-tight">
+                          <div className="text-small font-medium tabular-nums">{fmtNum(m.value, 1)}{g.unit ? ` ${g.unit}` : ''}</div>
+                          <div className="text-caption text-text-muted">{m.done ? 'достигнута' : isNext ? 'следующая' : k === ms.length - 1 ? 'финиш' : 'впереди'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-xl border border-accent/15 bg-accent/[0.06] p-3">
+                <Sparkles className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-caption font-semibold text-accent">AI Coach</div>
+                  <div className="text-small text-text mt-0.5">{aiText}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={() => nav('/plan')}><Rocket className="h-4 w-4" /> Перейти в фокус</Button>
+                <div className="flex-1 min-w-[200px]">
+                  <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
+                </div>
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
+
       <div className="goals-grid">
-        {visible.map((g, i) => {
+        {gridGoals.map((g, i) => {
           const recs = progress.filter((p) => p.goal_id === g.id);
           const f = forecastGoal(g, recs, 30);
           const denom = g.target_value - g.start_value || 1;
@@ -284,43 +414,71 @@ export const GoalsPage = () => {
       </div>
 
       <aside className="w-full xl:w-[320px] shrink-0 space-y-4 xl:sticky xl:top-4 self-start">
-        <Card>
+        <Card className="border-accent/20 bg-gradient-to-br from-accent/[0.08] to-transparent">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="h-4 w-4 text-accent" />
-            <h3 className="text-base font-semibold text-text">AI-инсайты</h3>
+            <h3 className="text-base font-semibold text-text">AI Coach</h3>
+            <span className="ml-auto inline-flex items-center gap-1 text-caption text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" />онлайн</span>
           </div>
-          {insights.length === 0 ? (
-            <p className="text-small text-text-muted">Пока недостаточно данных для рекомендаций — добавь прогресс по целям.</p>
+          {coachPush.length === 0 ? (
+            <p className="text-small text-text-muted">Все цели идут по графику. Выбери любую и действуй сегодня.</p>
           ) : (
-            <div className="space-y-3">
-              {insights.map((i) => (
-                <div key={i.id} className="flex gap-2.5">
-                  <span className="text-base leading-none">{i.icon}</span>
-                  <div className="min-w-0">
-                    <div className="text-small font-medium text-text">{i.title}</div>
-                    <div className="text-caption text-text-muted mt-0.5">{i.body}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              <p className="text-small text-text-muted mb-2">Сегодня выгоднее всего продвинуть:</p>
+              <ul className="space-y-1.5">
+                {coachPush.map((g) => (
+                  <li key={g.id} className="flex items-center gap-2 text-small text-text">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-accent shrink-0" />
+                    <span className="truncate">{g.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
-          <button onClick={() => nav('/analytics')} className="mt-3 w-full flex items-center justify-center gap-1 text-caption text-accent hover:underline">
-            Все рекомендации <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+          <Button className="w-full mt-3" onClick={() => nav('/plan')}>Оптимизировать план <ChevronRight className="h-4 w-4" /></Button>
         </Card>
 
         <Card>
-          <CardTitle>Общая статистика</CardTitle>
+          <CardTitle>Прогноз на неделю</CardTitle>
           <div className="flex items-center gap-4">
-            <Ring value={overall} size={84} stroke={9} color="#6366f1" glow={false} trackColor="var(--border)">
-              <div className="text-base font-bold tabular-nums leading-none">{overall}%</div>
+            <Ring value={avgSuccess ?? 0} size={84} stroke={9} color="#6366f1" glow={false} trackColor="var(--border)">
+              <div className="text-base font-bold tabular-nums leading-none">{avgSuccess == null ? '—' : `${avgSuccess}%`}</div>
             </Ring>
             <div className="flex-1 space-y-2">
+              <RailStat label="Средний прогресс" value={`${overall}%`} />
               <RailStat label="Активные цели" value={counts.active} />
-              <RailStat label="Завершённые" value={counts.done} />
-              <RailStat label="Средний прогноз" value={avgSuccess == null ? '—' : `${avgSuccess}%`} />
+              <RailStat label="Достигнутые" value={counts.done} />
             </div>
           </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Риски и возможности</CardTitle>
+          {risks.length === 0 ? (
+            <p className="text-small text-text-muted">Добавь дедлайны целям — оценю отставание от графика.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {risks.map(({ g, gap }) => {
+                const danger = gap > 5;
+                const ahead = gap < -5;
+                const Icon = goalIcon(g.title);
+                const tone = danger ? '#ef4444' : ahead ? '#22c55e' : '#94a3b8';
+                return (
+                  <li key={g.id} className="flex items-center gap-2.5">
+                    <span className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${tone}1f` }}>
+                      <Icon className="h-3.5 w-3.5" style={{ color: tone }} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-small text-text truncate">{g.title}</div>
+                      <div className="text-caption" style={{ color: tone }}>
+                        {danger ? `Отстаёт на ${gap}%` : ahead ? 'Опережает график' : 'В графике'}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
 
         <Card>
@@ -452,6 +610,31 @@ const QuickProgress: React.FC<{ goal: any; onAdd: (v: number) => void }> = ({ go
 };
 
 const GOAL_PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'];
+
+// Вехи выводятся из start→target как 4 контрольные точки (без изменения схемы БД).
+function deriveMilestones(g: Goal) {
+  const span = g.target_value - g.start_value;
+  const dir = Math.sign(span) || 1;
+  const steps = 4;
+  return Array.from({ length: steps }, (_, k) => {
+    const frac = (k + 1) / steps;
+    const value = g.start_value + span * frac;
+    const done = dir > 0 ? g.current_value >= value - 1e-9 : g.current_value <= value + 1e-9;
+    return { value, frac, done };
+  });
+}
+
+function nextMilestone(g: Goal): { value: number; frac: number; done: boolean; remainFrac: number } | null {
+  const ms = deriveMilestones(g);
+  const idx = ms.findIndex((m) => !m.done);
+  if (idx === -1) return null;
+  const next = ms[idx];
+  const span = g.target_value - g.start_value || 1;
+  const prevVal = g.start_value + span * (next.frac - 1 / ms.length);
+  const seg = next.value - prevVal || 1;
+  const remainFrac = Math.max(0, Math.min(1, (next.value - g.current_value) / seg));
+  return { ...next, remainFrac };
+}
 
 function goalSphere(title: string): { label: string; color: string } {
   const t = title.toLowerCase();
