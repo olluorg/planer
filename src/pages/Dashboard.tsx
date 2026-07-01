@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Responsive, WidthProvider, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/button';
 import {
   Plus, ChevronRight, Sun, Moon, Lock, Unlock, RotateCcw, Trash2,
   CheckSquare, Repeat, NotebookPen, Dumbbell, Timer, Target,
+  Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from 'lucide-react';
+import { getWeather, type Weather } from '@/lib/weather';
 import { useStore } from '@/lib/store';
 import { isoDate, fmtNum, colorByPct } from '@/lib/utils';
 import { addDays, format, startOfWeek } from 'date-fns';
@@ -57,8 +59,7 @@ const BLOCKS = [
 const DEFAULT_LAYOUT: Layout[] = [
   // Ряд 1: фокус дня + сводка + коуч
   { i: 'today-focus',    x: 0, y: 0,  w: 6, h: 5, minW: 4, minH: 4, maxH: 7 },
-  { i: 'day-brief',      x: 6, y: 0,  w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'coach',          x: 9, y: 0,  w: 3, h: 5, minW: 3, minH: 3, maxH: 7 },
+  { i: 'day-brief',      x: 6, y: 0,  w: 6, h: 5, minW: 3, minH: 4, maxH: 7 },
   // Ряд 2: план · привычки · постоянство · ближайшее
   { i: 'today-plan',     x: 0, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
   { i: 'habit-dots',     x: 3, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
@@ -85,6 +86,7 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: 'reflection',    x: 9,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
   { i: 'kpi-grid',      x: 0,  y: 47, w: 6,  h: 4, minW: 4, minH: 4 },
   { i: 'reminders',     x: 6,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'coach',         x: 9,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
   { i: 'leagues',       x: 0,  y: 51, w: 12, h: 4, minW: 6, minH: 4 },
 ];
 
@@ -92,7 +94,7 @@ const DEFAULT_LAYOUT: Layout[] = [
 const DEFAULT_HIDDEN = [
   'goals-week', 'block-morning', 'block-day', 'block-evening', 'block-night',
   'notes', 'plan-future', 'focus', 'quests', 'weekly-challenge', 'letter',
-  'quick-add', 'reflection', 'kpi-grid', 'reminders', 'leagues',
+  'quick-add', 'reflection', 'kpi-grid', 'reminders', 'leagues', 'coach',
 ];
 
 // Mobile layout: single-column (4 cols), stacked vertically
@@ -107,7 +109,6 @@ const MOBILE_LAYOUT: Layout[] = [
   { i: 'week-progress',  x: 0, y: 39, w: 4, h: 5 },
   { i: 'goals-progress', x: 0, y: 44, w: 4, h: 5 },
   { i: 'quick-capture',  x: 0, y: 49, w: 4, h: 5 },
-  { i: 'coach',          x: 0, y: 54, w: 4, h: 4 },
 ];
 
 const ROW_HEIGHT = 48;
@@ -120,6 +121,29 @@ function greeting(): string {
   return 'Добрый вечер';
 }
 
+const WEATHER_ICON: Record<Weather['kind'], React.ElementType> = {
+  clear: Sun, cloudy: Cloud, fog: CloudFog, drizzle: CloudDrizzle,
+  rain: CloudRain, snow: CloudSnow, storm: CloudLightning,
+};
+
+const WeatherChip: React.FC = () => {
+  const [w, setW] = useState<Weather | null>(null);
+  useEffect(() => {
+    let on = true;
+    void getWeather().then((x) => { if (on) setW(x); });
+    return () => { on = false; };
+  }, []);
+  const hour = new Date().getHours();
+  const Icon = w ? WEATHER_ICON[w.kind] : hour >= 6 && hour < 21 ? Sun : Moon;
+  const clear = !w || w.kind === 'clear';
+  return (
+    <span className="inline-flex items-center gap-1.5 align-middle shrink-0">
+      <Icon className={`h-6 w-6 ${clear ? 'text-warning' : 'text-text-muted'}`} />
+      {w && <span className="text-lg font-medium tabular-nums text-text-muted">{w.temp}°</span>}
+    </span>
+  );
+};
+
 export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({ date, onStartFocus }) => {
   const nav = useNavigate();
   const { goals, tasks, habits, habitLogs, progress, reflections, timeEntries, xpLog, toggleTask, addProgress, upsertReflection, awardXp } = useStore();
@@ -127,7 +151,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v6', DEFAULT_LAYOUT);
+  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v7', DEFAULT_LAYOUT);
   const [editing, setEditingRaw] = useState(false);
   const [backup, setBackup] = useState<Layout[] | null>(null);
   const enterEditor = () => { setBackup(JSON.parse(JSON.stringify(layout))); setEditingRaw(true); };
@@ -142,7 +166,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     setEditingRaw(false);
   };
   const revertToBackup = () => { if (backup) { setLayout(backup); } };
-  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v4', DEFAULT_HIDDEN);
+  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v5', DEFAULT_HIDDEN);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
   const [reminders, setReminders] = useLocalStorage<{ id: string; text: string; done: boolean }[]>(
     'dashboard.reminders',
@@ -1085,18 +1109,36 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       {/* Main area */}
       <div className="min-w-0">
         <div>
-          {/* Приветствие */}
-          <div className="mb-4 px-1">
-            <h1 className="text-h1 text-text flex items-center gap-2">
-              {greeting()}, {getUserName()} <span className="text-2xl">👋</span>
-            </h1>
-            <div className="text-sm text-text-muted mt-1">
-              Ты на <span className="text-accent font-semibold">{weekDoneRatio}%</span> ближе к своим целям на этой неделе.
+          {/* Шапка: приветствие + дата · цитата дня вписана в фон + редактор */}
+          <div className="mb-6 px-1 flex items-start justify-between gap-8">
+            <div className="min-w-0">
+              <h1 className="text-h1 text-text flex items-center gap-3">
+                <span className="truncate">{greeting()}, {getUserName()}.</span> <WeatherChip />
+              </h1>
+              <div className="text-sm text-text-muted mt-1">
+                <span className="capitalize">{format(date, 'EEEE, d MMMM', { locale: ru })}</span>
+                <span className="text-text-dim"> · ты на <span className="text-accent font-medium">{weekDoneRatio}%</span> ближе к целям недели</span>
+              </div>
+            </div>
+            <div className="hidden lg:flex items-start gap-2 pt-2 shrink min-w-0 max-w-md">
+              <div className="text-[13px] text-text-dim leading-snug text-right italic min-w-0">
+                «{quote.text}» <span className="not-italic whitespace-nowrap">— {quote.author}</span>
+              </div>
+              <Button
+                variant={editing ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => (editing ? exitEditor() : enterEditor())}
+                title={editing ? 'Готово' : 'Редактор раскладки'}
+                className="shrink-0 -mt-1.5 text-text-dim"
+              >
+                {editing ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              </Button>
             </div>
           </div>
+          {editing && (
           <div className="flex items-center justify-between mb-3 px-1">
             <div className="text-sm text-text-muted">
-              {editing ? 'Перетаскивай и меняй размер. Нажми «Готово» чтобы сохранить.' : ''}
+              Перетаскивай и меняй размер. Нажми «Готово» чтобы сохранить.
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {editing && (
@@ -1120,15 +1162,12 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                   )}
                 </>
               )}
-              <Button
-                variant={editing ? 'default' : 'soft'}
-                size="sm"
-                onClick={() => editing ? exitEditor() : enterEditor()}
-              >
-                {editing ? <><Unlock className="h-3.5 w-3.5" /> Готово</> : <><Lock className="h-3.5 w-3.5" /> Редактор</>}
+              <Button variant="default" size="sm" onClick={exitEditor}>
+                <Unlock className="h-3.5 w-3.5" /> Готово
               </Button>
             </div>
           </div>
+          )}
 
           <RGL
             className={editing ? 'editing' : ''}

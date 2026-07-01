@@ -10,14 +10,14 @@
     --accent-glow:   rgba(99, 102, 241, 0.16);
     --accent-glow-sm:rgba(99, 102, 241, 0.08);
 
-    --bg:            #f1f5f9;
+    --bg:            #ffffff;
     --bg-card:       #ffffff;
     --bg-elevated:   #ffffff;
-    --bg-soft:       #f8fafc;
-    --bg-hover:      #eef2f7;
+    --bg-soft:       #f6f7f9;
+    --bg-hover:      #eef0f4;
 
-    --border:        rgba(15, 23, 42, 0.08);
-    --border-soft:   rgba(15, 23, 42, 0.04);
+    --border:        rgba(15, 23, 42, 0.10);
+    --border-soft:   rgba(15, 23, 42, 0.05);
 
     --text:          #0f172a;
     --text-muted:    #64748b;

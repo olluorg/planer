@@ -116,13 +116,18 @@ export default function App() {
         e.preventDefault();
         setInsightsOpen((v) => !v);
       }
-      // "?" без модификаторов и не в поле ввода
-      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // Одиночные клавиши без модификаторов и не в поле ввода
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         const el = document.activeElement;
         const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
         if (!typing) {
-          e.preventDefault();
-          setShortcutsOpen((v) => !v);
+          // e.code — независимо от раскладки (T работает и на «е»)
+          if (e.key === '?') { e.preventDefault(); setShortcutsOpen((v) => !v); }
+          else if (e.code === 'KeyT') { e.preventDefault(); setQuickTab('task'); }
+          else if (e.code === 'KeyN') { e.preventDefault(); setQuickTab('task'); }
+          else if (e.code === 'KeyF') { e.preventDefault(); setFocusOpen(true); }
+          else if (e.code === 'KeyG') { e.preventDefault(); setQuickTab('goal'); }
+          else if (e.code === 'KeyQ') { e.preventDefault(); setQuickTab('task'); }
         }
       }
     };

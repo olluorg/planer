@@ -33,7 +33,7 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, 
         {/* Search / command */}
         <button
           onClick={onPalette}
-          className="flex-1 max-w-xl flex items-center gap-2.5 h-10 rounded-xl bg-bg-soft border border-border-soft px-3.5 text-text-muted hover:border-border transition-colors"
+          className="flex-1 flex items-center gap-2.5 h-10 rounded-xl bg-bg-soft border border-border-soft px-3.5 text-text-muted hover:border-border transition-colors"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="text-sm truncate">Поиск или команда…</span>
@@ -41,8 +41,6 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, 
             Ctrl K
           </kbd>
         </button>
-
-        <div className="flex-1 hidden lg:block" />
 
         {/* Pomodoro chip */}
         {pomo.secondsLeft > 0 && (
@@ -76,16 +74,16 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, 
       </div>
 
       {/* Quick actions row */}
-      <div className="hidden md:flex items-center gap-1 px-4 sm:px-6 pb-2 -mt-1">
+      <div className="hidden md:flex items-center gap-1.5 px-4 sm:px-6 pb-2.5 -mt-0.5">
         {quickActions.map((a) => (
           <button
             key={a.label}
             onClick={a.onClick}
-            className="group flex items-center gap-2 h-8 px-3 rounded-lg text-sm text-text-muted hover:bg-bg-soft hover:text-text transition-colors"
+            className="flex items-center gap-2 h-8 px-3 rounded-lg text-sm text-text-muted hover:bg-bg-soft hover:text-text transition-colors duration-base"
           >
             <a.icon className="h-4 w-4" />
             <span>{a.label}</span>
-            <kbd className="text-[10px] text-text-dim border border-border-soft rounded px-1 opacity-0 group-hover:opacity-100 transition-opacity">{a.kbd}</kbd>
+            <kbd className="text-[10px] leading-none text-text-dim border border-border rounded px-1 py-0.5 bg-bg-card">{a.kbd}</kbd>
           </button>
         ))}
       </div>
