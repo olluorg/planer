@@ -35,8 +35,8 @@ export const CommandPalette: React.FC<{
       open={open}
       onOpenChange={onOpenChange}
       label="Палитра команд"
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-20 bg-black/50 backdrop-blur-sm animate-fade-in"
-      contentClassName="w-full max-w-xl border border-border bg-bg-card shadow-2xl outline-none animate-slide-up"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+      contentClassName="w-full max-w-xl rounded-xl overflow-hidden border border-border bg-bg-card shadow-2xl outline-none origin-top animate-scale-in"
     >
       <div className="flex items-center gap-2 border-b border-border px-3">
         <Search className="h-4 w-4 text-text-muted" />

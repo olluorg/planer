@@ -12,15 +12,19 @@ export const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof RD.Content>
 >(({ className, children, ...props }, ref) => (
   <RD.Portal>
-    <RD.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in" />
+    <RD.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
     <RD.Content
       ref={ref}
       className={cn(
         'fixed z-50 bg-bg-card border border-border-soft shadow-card p-6',
+        // вход/выход по data-state — Radix ждёт окончания анимации при закрытии
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 ease-emphasized',
         // mobile: bottom sheet
-        'inset-x-0 bottom-0 rounded-t-2xl max-h-[92vh] overflow-y-auto sheet-up',
-        // desktop: centered modal
-        'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:max-h-[85vh] sm:animate-slide-up',
+        'inset-x-0 bottom-0 rounded-t-2xl max-h-[92vh] overflow-y-auto',
+        'max-sm:data-[state=open]:slide-in-from-bottom-full max-sm:data-[state=closed]:slide-out-to-bottom-full',
+        // desktop: centered modal, spring-like scale+fade
+        'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:max-h-[85vh]',
+        'sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%] sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]',
         className,
       )}
       {...props}
