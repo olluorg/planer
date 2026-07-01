@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Responsive, WidthProvider, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -32,6 +32,19 @@ import { computeStreak, levelFromXp, xpToday, xpTotal } from '@/lib/gamification
 import { Mascot } from '@/components/Mascot';
 import { PRESETS } from '@/lib/dashboardPresets';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { TodayFocus } from '@/components/dashboard/TodayFocus';
+import { DayBrief } from '@/components/dashboard/DayBrief';
+import { TodayPlanList } from '@/components/dashboard/TodayPlanList';
+import { HabitDots } from '@/components/dashboard/HabitDots';
+import { WeeklyConsistency } from '@/components/dashboard/WeeklyConsistency';
+import { TimeAllocation } from '@/components/dashboard/TimeAllocation';
+import { WeekProgressChart } from '@/components/dashboard/WeekProgressChart';
+import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
+import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
+import { QuickCapture } from '@/components/dashboard/QuickCapture';
+import { quoteOfDay } from '@/lib/quotes';
+import { getUserName } from '@/lib/onboarding';
+import { Sparkles } from 'lucide-react';
 
 const BLOCKS = [
   { key: 'morning', label: '06:00 – 12:00', icon: Sun },
@@ -40,49 +53,81 @@ const BLOCKS = [
   { key: 'night', label: '20:00 – 23:00', icon: Moon },
 ] as const;
 
+// Раскладка по макету: жёсткие min/max держат пропорции карточек
 const DEFAULT_LAYOUT: Layout[] = [
-  { i: 'goals-week',    x: 0,  y: 0,  w: 12, h: 6 },
-  { i: 'block-morning', x: 0,  y: 6,  w: 2,  h: 7 },
-  { i: 'block-day',     x: 2,  y: 6,  w: 2,  h: 7 },
-  { i: 'block-evening', x: 4,  y: 6,  w: 2,  h: 7 },
-  { i: 'block-night',   x: 6,  y: 6,  w: 2,  h: 7 },
-  { i: 'notes',         x: 8,  y: 6,  w: 4,  h: 7 },
-  { i: 'plan-future',   x: 0,  y: 13, w: 12, h: 9 },
-  { i: 'focus',         x: 0,  y: 22, w: 4,  h: 4 },
-  { i: 'quests',        x: 4,  y: 22, w: 4,  h: 4 },
-  { i: 'weekly-challenge', x: 8, y: 22, w: 4, h: 4 },
-  { i: 'letter',        x: 0,  y: 34, w: 8,  h: 4 },
-  { i: 'quick-add',     x: 0,  y: 26, w: 4,  h: 4 },
-  { i: 'reflection',    x: 4,  y: 26, w: 4,  h: 4 },
-  { i: 'kpi-grid',      x: 8,  y: 26, w: 4,  h: 4 },
-  { i: 'leagues',       x: 0,  y: 30, w: 12, h: 4 },
+  // Ряд 1: фокус дня + сводка + коуч
+  { i: 'today-focus',    x: 0, y: 0,  w: 6, h: 5, minW: 4, minH: 4, maxH: 7 },
+  { i: 'day-brief',      x: 6, y: 0,  w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'coach',          x: 9, y: 0,  w: 3, h: 5, minW: 3, minH: 3, maxH: 7 },
+  // Ряд 2: план · привычки · постоянство · ближайшее
+  { i: 'today-plan',     x: 0, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
+  { i: 'habit-dots',     x: 3, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
+  { i: 'consistency',    x: 6, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
+  { i: 'upcoming',       x: 9, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
+  // Ряд 3: графики + быстрый захват
+  { i: 'time-alloc',     x: 0, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'week-progress',  x: 3, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'goals-progress', x: 6, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'quick-capture',  x: 9, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
+  // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
+  { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
+  { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'block-day',     x: 3,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'block-evening', x: 6,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'block-night',   x: 9,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'notes',         x: 0,  y: 29, w: 4,  h: 5, minW: 3, minH: 4 },
+  { i: 'plan-future',   x: 0,  y: 34, w: 12, h: 5, minW: 6, minH: 5, maxH: 6 },
+  { i: 'focus',         x: 0,  y: 39, w: 6,  h: 4, minW: 4, minH: 4 },
+  { i: 'quests',        x: 6,  y: 39, w: 3,  h: 4, minW: 3, minH: 4 },
+  { i: 'weekly-challenge', x: 9, y: 39, w: 3, h: 4, minW: 3, minH: 4 },
+  { i: 'letter',        x: 0,  y: 43, w: 6,  h: 4, minW: 4, minH: 3 },
+  { i: 'quick-add',     x: 6,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'reflection',    x: 9,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'kpi-grid',      x: 0,  y: 47, w: 6,  h: 4, minW: 4, minH: 4 },
+  { i: 'reminders',     x: 6,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'leagues',       x: 0,  y: 51, w: 12, h: 4, minW: 6, minH: 4 },
+];
+
+// Скрыты по умолчанию — включаются через «Показать скрытые» в редакторе
+const DEFAULT_HIDDEN = [
+  'goals-week', 'block-morning', 'block-day', 'block-evening', 'block-night',
+  'notes', 'plan-future', 'focus', 'quests', 'weekly-challenge', 'letter',
+  'quick-add', 'reflection', 'kpi-grid', 'reminders', 'leagues',
 ];
 
 // Mobile layout: single-column (4 cols), stacked vertically
 const MOBILE_LAYOUT: Layout[] = [
-  { i: 'goals-week',    x: 0, y: 0,  w: 4, h: 7  },
-  { i: 'block-morning', x: 0, y: 7,  w: 4, h: 7  },
-  { i: 'block-day',     x: 0, y: 14, w: 4, h: 7  },
-  { i: 'block-evening', x: 0, y: 21, w: 4, h: 7  },
-  { i: 'block-night',   x: 0, y: 28, w: 4, h: 7  },
-  { i: 'plan-future',   x: 0, y: 35, w: 4, h: 8  },
-  { i: 'focus',         x: 0, y: 43, w: 4, h: 4  },
-  { i: 'quick-add',     x: 0, y: 47, w: 4, h: 4  },
-  { i: 'reflection',    x: 0, y: 51, w: 4, h: 4  },
-  { i: 'notes',         x: 0, y: 55, w: 4, h: 5  },
-  { i: 'kpi-grid',      x: 0, y: 60, w: 4, h: 5  },
+  { i: 'today-focus',    x: 0, y: 0,  w: 4, h: 5 },
+  { i: 'day-brief',      x: 0, y: 5,  w: 4, h: 5 },
+  { i: 'today-plan',     x: 0, y: 10, w: 4, h: 6 },
+  { i: 'habit-dots',     x: 0, y: 16, w: 4, h: 6 },
+  { i: 'consistency',    x: 0, y: 22, w: 4, h: 6 },
+  { i: 'upcoming',       x: 0, y: 28, w: 4, h: 6 },
+  { i: 'time-alloc',     x: 0, y: 34, w: 4, h: 5 },
+  { i: 'week-progress',  x: 0, y: 39, w: 4, h: 5 },
+  { i: 'goals-progress', x: 0, y: 44, w: 4, h: 5 },
+  { i: 'quick-capture',  x: 0, y: 49, w: 4, h: 5 },
+  { i: 'coach',          x: 0, y: 54, w: 4, h: 4 },
 ];
 
 const ROW_HEIGHT = 48;
 
-export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'Доброй ночи';
+  if (h < 12) return 'Доброе утро';
+  if (h < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
+export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({ date, onStartFocus }) => {
   const nav = useNavigate();
   const { goals, tasks, habits, habitLogs, progress, reflections, timeEntries, xpLog, toggleTask, addProgress, upsertReflection, awardXp } = useStore();
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v5', DEFAULT_LAYOUT);
+  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v6', DEFAULT_LAYOUT);
   const [editing, setEditingRaw] = useState(false);
   const [backup, setBackup] = useState<Layout[] | null>(null);
   const enterEditor = () => { setBackup(JSON.parse(JSON.stringify(layout))); setEditingRaw(true); };
@@ -97,7 +142,7 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     setEditingRaw(false);
   };
   const revertToBackup = () => { if (backup) { setLayout(backup); } };
-  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v3', []);
+  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v4', DEFAULT_HIDDEN);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
   const [reminders, setReminders] = useLocalStorage<{ id: string; text: string; done: boolean }[]>(
     'dashboard.reminders',
@@ -227,14 +272,80 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
     nav('/reflection');
   };
 
-  const resetLayout = () => { setLayout(DEFAULT_LAYOUT); setHidden([]); };
+  const resetLayout = () => { setLayout(DEFAULT_LAYOUT); setHidden(DEFAULT_HIDDEN); };
   const hideWidget = (id: string) => setHidden((h) => [...new Set([...h, id])]);
   const showAll = () => setHidden([]);
 
   const visibleLayout = layout.filter((l) => !hidden.includes(l.i));
 
+  const quote = quoteOfDay();
+
   // Each widget is a function returning JSX. The grid item wraps it with the card frame.
   const widgets: Record<string, () => React.ReactNode> = {
+    // === Основные виджеты (по макету) — рендерят собственную карточку ===
+    'today-focus': () => (
+      <Cell editing={editing} onHide={() => hideWidget('today-focus')}>
+        <TodayFocus date={date} onStartFocus={() => onStartFocus?.()} />
+      </Cell>
+    ),
+    'day-brief': () => (
+      <Cell editing={editing} onHide={() => hideWidget('day-brief')}>
+        <DayBrief date={date} />
+      </Cell>
+    ),
+    'coach': () => (
+      <Cell editing={editing} onHide={() => hideWidget('coach')}>
+        <div className="h-full rounded-xl border border-accent/20 bg-gradient-to-br from-accent/10 to-accent/5 p-5 flex flex-col overflow-hidden">
+          <div className="flex items-center gap-1.5 text-label text-accent mb-3 shrink-0">
+            <Sparkles className="h-3.5 w-3.5" /> Коуч дня
+          </div>
+          <blockquote className="text-sm text-text leading-relaxed">«{quote.text}»</blockquote>
+          <div className="text-xs text-text-muted mt-2">— {quote.author}</div>
+        </div>
+      </Cell>
+    ),
+    'today-plan': () => (
+      <Cell editing={editing} onHide={() => hideWidget('today-plan')}>
+        <TodayPlanList date={date} />
+      </Cell>
+    ),
+    'habit-dots': () => (
+      <Cell editing={editing} onHide={() => hideWidget('habit-dots')}>
+        <HabitDots date={date} />
+      </Cell>
+    ),
+    'consistency': () => (
+      <Cell editing={editing} onHide={() => hideWidget('consistency')}>
+        <WeeklyConsistency />
+      </Cell>
+    ),
+    'upcoming': () => (
+      <Cell editing={editing} onHide={() => hideWidget('upcoming')}>
+        <UpcomingEvents date={date} />
+      </Cell>
+    ),
+    'time-alloc': () => (
+      <Cell editing={editing} onHide={() => hideWidget('time-alloc')}>
+        <TimeAllocation date={date} />
+      </Cell>
+    ),
+    'week-progress': () => (
+      <Cell editing={editing} onHide={() => hideWidget('week-progress')}>
+        <WeekProgressChart date={date} />
+      </Cell>
+    ),
+    'goals-progress': () => (
+      <Cell editing={editing} onHide={() => hideWidget('goals-progress')}>
+        <GoalsProgress />
+      </Cell>
+    ),
+    'quick-capture': () => (
+      <Cell editing={editing} onHide={() => hideWidget('quick-capture')}>
+        <QuickCapture date={date} />
+      </Cell>
+    ),
+
+    // === Дополнительные виджеты (скрыты по умолчанию) ===
     'goals-week': () => (
       <WidgetCard title="Цели на неделю" editing={editing} onHide={() => hideWidget('goals-week')} onClick={() => !editing && nav('/goals')}>
         {/* Mobile: стек, Desktop: 4-колоночная сетка */}
@@ -970,10 +1081,19 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="sm:flex sm:items-start">
+    <div className="page py-4 sm:py-6">
       {/* Main area */}
-      <div className="sm:flex-1 min-w-0">
-        <div className="p-3 sm:p-4">
+      <div className="min-w-0">
+        <div>
+          {/* Приветствие */}
+          <div className="mb-4 px-1">
+            <h1 className="text-h1 text-text flex items-center gap-2">
+              {greeting()}, {getUserName()} <span className="text-2xl">👋</span>
+            </h1>
+            <div className="text-sm text-text-muted mt-1">
+              Ты на <span className="text-accent font-semibold">{weekDoneRatio}%</span> ближе к своим целям на этой неделе.
+            </div>
+          </div>
           <div className="flex items-center justify-between mb-3 px-1">
             <div className="text-sm text-text-muted">
               {editing ? 'Перетаскивай и меняй размер. Нажми «Готово» чтобы сохранить.' : ''}
@@ -1040,139 +1160,6 @@ export const Dashboard: React.FC<{ date: Date }> = ({ date }) => {
         </div>
       </div>
 
-      {/* Sticky right panel */}
-      <div
-        className="hidden lg:flex w-[290px] shrink-0 flex-col sticky top-0 max-h-[calc(100vh-64px)] overflow-y-auto"
-        style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)' }}
-      >
-        {/* Progress Goals */}
-        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="section-label">Прогресс целей</div>
-          <div className="flex flex-col items-center gap-4">
-            <div style={{ filter: overallGoalProgress > 0 ? 'drop-shadow(0 0 20px rgba(132,204,22,0.25))' : undefined }}>
-              <Ring value={overallGoalProgress} size={130} stroke={11} glow>
-                <div className="text-center">
-                  <div className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent)' }}>{overallGoalProgress}%</div>
-                  <div className="text-[10px] text-text-dim mt-0.5">общий</div>
-                </div>
-              </Ring>
-            </div>
-            {velocityHint !== null && (
-              <div className="text-center text-xs px-4">
-                {velocityHint > 0 && <span className="text-accent font-medium">↗ +{velocityHint}% к прошлой неделе</span>}
-                {velocityHint === 0 && <span className="text-text-dim">→ темп без изменений</span>}
-                {velocityHint < 0 && <span style={{ color: 'var(--danger)' }}>↘ {velocityHint}% от прошлой недели</span>}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => nav('/goals')}
-            className="mt-4 w-full flex items-center justify-between text-xs text-text-dim hover:text-accent transition-colors"
-          >
-            <span>Все цели</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Statistics */}
-        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="section-label">Статистика</div>
-          <div className="space-y-4">
-            {fitnessStats.map((s) => {
-              const pct = Math.round((s.cur / s.max) * 100);
-              return (
-              <div key={s.label}>
-                <div className="flex justify-between mb-1.5">
-                  <span className="text-xs text-text-muted">{s.label}</span>
-                  <span className="text-xs font-semibold tabular-nums text-text">{fmtNum(s.cur, 1)}<span className="text-text-dim font-normal"> / {fmtNum(s.max, 0)}{s.unit ?? ''}</span></span>
-                </div>
-                <div className="h-1.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
-                  <div
-                    className="h-full progress-bar"
-                    style={{
-                      width: `${pct}%`,
-                      background: pct >= 80 ? 'var(--accent)' : pct >= 50 ? '#F59E0B' : '#6B7280',
-                      boxShadow: pct >= 80 ? '0 0 6px rgba(132,204,22,0.5)' : undefined,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-          </div>
-          <button onClick={() => nav('/analytics')} className="mt-3 w-full flex items-center justify-between text-xs text-text-dim hover:text-accent transition-colors">
-            <span>Вся статистика</span><ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Habits */}
-        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="section-label !mb-0">Привычки</div>
-            <button onClick={() => nav('/habits')} className="text-[10px] text-text-dim hover:text-accent transition-colors">Изменить</button>
-          </div>
-          <div className="space-y-3">
-            {habitWeek.slice(0, 6).map(({ habit, marks, done }) => (
-              <div key={habit.id} className="flex items-center gap-2">
-                <div className="text-[12px] flex-1 truncate" style={{ color: 'var(--text)' }}>{habit.title}</div>
-                <div className="flex gap-1">
-                  {marks.map((m, i) => (
-                    <div
-                      key={i}
-                      className="h-2 w-2"
-                      style={{
-                        borderRadius: '3px',
-                        background: m ? (habit.color ?? 'var(--accent)') : 'rgba(255,255,255,0.07)',
-                        boxShadow: m ? `0 0 5px ${habit.color ?? 'rgba(132,204,22,0.5)'}` : undefined,
-                      }}
-                    />
-                  ))}
-                </div>
-                <div className="text-[10px] tabular-nums w-6 text-right" style={{ color: done >= 5 ? 'var(--accent)' : 'var(--text-dim)' }}>{done}/7</div>
-              </div>
-            ))}
-            {habitWeek.length === 0 && <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Нет привычек</div>}
-          </div>
-        </div>
-
-        {/* Reminders */}
-        <div className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="section-label !mb-0">Напоминания</div>
-            <button onClick={addReminder} className="h-5 w-5 flex items-center justify-center text-text-dim hover:text-accent transition-colors">
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {reminders.length === 0 && <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Нет напоминаний</div>}
-            {reminders.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center gap-2 group"
-                style={{ padding: '8px 10px', borderRadius: '7px', transition: 'background 160ms' }}
-                onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
-                onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-              >
-                <Checkbox
-                  checked={r.done}
-                  onCheckedChange={() => setReminders((rs) => rs.map((x) => x.id === r.id ? { ...x, done: !x.done } : x))}
-                />
-                <span className={`flex-1 text-xs ${r.done ? 'line-through' : ''}`} style={{ color: r.done ? 'var(--text-dim)' : 'var(--text-muted)' }}>{r.text}</span>
-                <button
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ color: 'var(--text-dim)' }}
-                  onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-                  onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}
-                  onClick={() => setReminders((rs) => rs.filter((x) => x.id !== r.id))}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       <QuickAddDialog
         open={quickTab !== null}
         onOpenChange={(v) => !v && setQuickTab(null)}
@@ -1212,6 +1199,24 @@ const WidgetCard: React.FC<{
       <div className="section-label shrink-0">{title}</div>
     )}
     <div className="flex-1 min-h-0">{children}</div>
+    {editing && onHide && (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onHide(); }}
+        className="absolute top-1 right-1 p-1 text-text-dim hover:text-danger z-10"
+        title="Скрыть"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+    )}
+  </div>
+);
+
+// Тонкая обёртка для виджетов, рендерящих собственную карточку:
+// добавляет только редакторскую хромку и растягивает ребёнка на всю ячейку сетки.
+const Cell: React.FC<{ editing: boolean; onHide?: () => void; children: React.ReactNode }> = ({ editing, onHide, children }) => (
+  <div className="relative h-full">
+    <div className="h-full [&>*]:h-full">{children}</div>
     {editing && onHide && (
       <button
         type="button"

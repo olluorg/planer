@@ -4,7 +4,6 @@ import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { useStore } from './lib/store';
 import { Dashboard } from './pages/Dashboard';
-import { DashboardLavender } from './pages/DashboardLavender';
 import { QuickAddDialog } from './components/QuickAddDialog';
 import { CommandPalette } from './components/CommandPalette';
 import { PomodoroTimer } from './components/PomodoroTimer';
@@ -203,8 +202,8 @@ export default function App() {
             <Suspense fallback={<Loader />}>
               <Routes location={location}>
                 <Route path="/index.html" element={<Navigate to="/" replace />} />
-                <Route path="/" element={<DashboardLavender date={date} onDateChange={setDate} onStartFocus={() => setFocusOpen(true)} />} />
-                <Route path="/dashboard-bento" element={<Dashboard date={date} />} />
+                <Route path="/" element={<Dashboard date={date} onStartFocus={() => setFocusOpen(true)} />} />
+                <Route path="/dashboard-bento" element={<Navigate to="/" replace />} />
                 <Route path="/goals" element={<GoalsPage />} />
                 <Route path="/tasks" element={<TasksPage date={date} />} />
                 <Route path="/habits" element={<HabitsPage />} />
