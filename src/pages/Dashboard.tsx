@@ -1,10 +1,27 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Responsive, WidthProvider, type Layout } from 'react-grid-layout';
+import { Responsive, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
-const RGL = WidthProvider(Responsive);
+/** Ширина сетки через ResizeObserver: WidthProvider мерит до применения
+ *  стилей и не замечает появление правого рейла. */
+function useContainerWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Синхронный замер сразу (RO в фоновых вкладках может молчать) + RO/resize для изменений
+    const measure = () => setW(el.getBoundingClientRect().width);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
+  return [ref, w] as const;
+}
 import { CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Ring } from '@/components/ui/ring';
@@ -44,6 +61,7 @@ import { WeekProgressChart } from '@/components/dashboard/WeekProgressChart';
 import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
 import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
+import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
 import { Sparkles } from 'lucide-react';
@@ -57,19 +75,20 @@ const BLOCKS = [
 
 // Раскладка по макету: жёсткие min/max держат пропорции карточек
 const DEFAULT_LAYOUT: Layout[] = [
-  // Ряд 1: фокус дня + сводка + коуч
-  { i: 'today-focus',    x: 0, y: 0,  w: 6, h: 5, minW: 4, minH: 4, maxH: 7 },
-  { i: 'day-brief',      x: 6, y: 0,  w: 6, h: 5, minW: 3, minH: 4, maxH: 7 },
-  // Ряд 2: план · привычки · постоянство · ближайшее
-  { i: 'today-plan',     x: 0, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
-  { i: 'habit-dots',     x: 3, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
-  { i: 'consistency',    x: 6, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
-  { i: 'upcoming',       x: 9, y: 5,  w: 3, h: 6, minW: 3, minH: 4 },
-  // Ряд 3: графики + быстрый захват
-  { i: 'time-alloc',     x: 0, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'week-progress',  x: 3, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'goals-progress', x: 6, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'quick-capture',  x: 9, y: 11, w: 3, h: 5, minW: 3, minH: 4, maxH: 7 },
+  // Ряд 1: фокус дня + сводка (правее — фиксированный рейл с AI-коучем)
+  { i: 'today-focus',    x: 0, y: 0,  w: 7, h: 5, minW: 4, minH: 4, maxH: 7 },
+  { i: 'day-brief',      x: 7, y: 0,  w: 5, h: 5, minW: 3, minH: 4, maxH: 7 },
+  // Ряд 2: план · привычки · постоянство
+  { i: 'today-plan',     x: 0, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'habit-dots',     x: 4, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'consistency',    x: 8, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
+  // Ряд 3: графики
+  { i: 'time-alloc',     x: 0, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'week-progress',  x: 4, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'goals-progress', x: 8, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  // В рейле по умолчанию, но доступны и как виджеты сетки
+  { i: 'upcoming',       x: 0, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'quick-capture',  x: 4, y: 16, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
   // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
   { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
   { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
@@ -95,6 +114,7 @@ const DEFAULT_HIDDEN = [
   'goals-week', 'block-morning', 'block-day', 'block-evening', 'block-night',
   'notes', 'plan-future', 'focus', 'quests', 'weekly-challenge', 'letter',
   'quick-add', 'reflection', 'kpi-grid', 'reminders', 'leagues', 'coach',
+  'upcoming', 'quick-capture',
 ];
 
 // Mobile layout: single-column (4 cols), stacked vertically
@@ -104,11 +124,9 @@ const MOBILE_LAYOUT: Layout[] = [
   { i: 'today-plan',     x: 0, y: 10, w: 4, h: 6 },
   { i: 'habit-dots',     x: 0, y: 16, w: 4, h: 6 },
   { i: 'consistency',    x: 0, y: 22, w: 4, h: 6 },
-  { i: 'upcoming',       x: 0, y: 28, w: 4, h: 6 },
-  { i: 'time-alloc',     x: 0, y: 34, w: 4, h: 5 },
-  { i: 'week-progress',  x: 0, y: 39, w: 4, h: 5 },
-  { i: 'goals-progress', x: 0, y: 44, w: 4, h: 5 },
-  { i: 'quick-capture',  x: 0, y: 49, w: 4, h: 5 },
+  { i: 'time-alloc',     x: 0, y: 28, w: 4, h: 5 },
+  { i: 'week-progress',  x: 0, y: 33, w: 4, h: 5 },
+  { i: 'goals-progress', x: 0, y: 38, w: 4, h: 5 },
 ];
 
 const ROW_HEIGHT = 48;
@@ -151,7 +169,8 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
 
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v7', DEFAULT_LAYOUT);
+  const [gridRef, gridW] = useContainerWidth();
+  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v8', DEFAULT_LAYOUT);
   const [editing, setEditingRaw] = useState(false);
   const [backup, setBackup] = useState<Layout[] | null>(null);
   const enterEditor = () => { setBackup(JSON.parse(JSON.stringify(layout))); setEditingRaw(true); };
@@ -166,7 +185,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     setEditingRaw(false);
   };
   const revertToBackup = () => { if (backup) { setLayout(backup); } };
-  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v5', DEFAULT_HIDDEN);
+  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v6', DEFAULT_HIDDEN);
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
   const [reminders, setReminders] = useLocalStorage<{ id: string; text: string; done: boolean }[]>(
     'dashboard.reminders',
@@ -1135,6 +1154,10 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
               </Button>
             </div>
           </div>
+
+          {/* Три зоны: меню (App) · карточки · правый рейл */}
+          <div className="flex flex-col xl:flex-row gap-5 items-start">
+            <div ref={gridRef} className="flex-1 min-w-0 w-full">
           {editing && (
           <div className="flex items-center justify-between mb-3 px-1">
             <div className="text-sm text-text-muted">
@@ -1169,7 +1192,9 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
           </div>
           )}
 
-          <RGL
+          {gridW > 0 && (
+          <Responsive
+            width={gridW}
             className={editing ? 'editing' : ''}
             breakpoints={{ sm: 640, xs: 0 }}
             cols={{ sm: 12, xs: 4 }}
@@ -1195,7 +1220,17 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                 {widgets[l.i]?.()}
               </div>
             ))}
-          </RGL>
+          </Responsive>
+          )}
+            </div>
+
+            {/* Правый рейл: AI-коуч · ближайшее · быстрый захват */}
+            <aside className="w-full xl:w-[320px] shrink-0 flex flex-col gap-4">
+              <CoachPanel date={date} />
+              <UpcomingEvents date={date} />
+              <QuickCapture date={date} />
+            </aside>
+          </div>
         </div>
       </div>
 

@@ -4,13 +4,11 @@ import { useStore } from '@/lib/store';
 import { computeInsights } from '@/lib/insights';
 import { useTheme } from '@/lib/theme';
 import { ECharts } from '@/components/charts/ECharts';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, TriangleAlert, TrendingUp, Info } from 'lucide-react';
 
-const TONE_BG: Record<string, string> = {
-  positive: 'bg-success/10',
-  warning: 'bg-danger/10',
-  neutral: 'bg-bg-soft',
-  info: 'bg-accent/10',
+// Минимализм: единый светлый фон, монохромная SVG-иконка по тону
+const TONE_ICON: Record<string, React.ElementType> = {
+  warning: TriangleAlert, positive: TrendingUp, info: Sparkles, neutral: Info,
 };
 
 /** Распределение задач по часам дня (06–23) для мини-графика ритма */
@@ -47,11 +45,13 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
     return 'Высокий шанс выиграть день. Начни с главного.';
   }, [tasks, todayIso]);
 
-  const load = useMemo(
-    () => hourlyLoad(tasks.filter((t) => t.date === todayIso && !t.parent_id)),
-    [tasks, todayIso],
-  );
-  const hasLoad = load.some((v) => v > 0);
+  // Накопительный план дня: сколько задач в плане к каждому часу — кривая всегда растёт
+  const load = useMemo(() => {
+    const hourly = hourlyLoad(tasks.filter((t) => t.date === todayIso && !t.parent_id));
+    let acc = 0;
+    return hourly.map((v) => (acc += v));
+  }, [tasks, todayIso]);
+  const hasLoad = load[load.length - 1] > 0;
   const nowIdx = Math.min(17, Math.max(0, new Date().getHours() - 6));
 
   const chartOpt = {
@@ -65,14 +65,15 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
     yAxis: { type: 'value', show: false, max: (v: { max: number }) => Math.max(2, v.max) },
     tooltip: {
       trigger: 'axis',
-      formatter: (p: { name: string; value: number }[]) => `${p[0].name} · задач: ${p[0].value}`,
+      formatter: (p: { name: string; value: number }[]) => `к ${p[0].name} · в плане: ${p[0].value}`,
     },
     series: [{
       type: 'line',
-      smooth: 0.5,
+      smooth: 0.6,
       data: load,
       symbol: 'circle',
-      symbolSize: (_v: number, p: { dataIndex: number }) => (p.dataIndex === nowIdx ? 9 : 5),
+      showSymbol: true,
+      symbolSize: (_v: number, p: { dataIndex: number }) => (p.dataIndex === nowIdx ? 9 : p.dataIndex % 3 === 0 ? 5 : 0),
       itemStyle: { color: accent },
       lineStyle: { width: 2, color: accent },
       areaStyle: {
@@ -105,14 +106,16 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
           {insights.length === 0 ? (
             <div className="text-sm text-text-muted">Поработай несколько дней — появятся наблюдения о твоём ритме.</div>
           ) : (
-            insights.map((ins) => (
+            insights.map((ins) => {
+              const Icon = TONE_ICON[ins.tone] ?? Info;
+              return (
               <button
                 key={ins.id}
                 onClick={() => ins.link && nav(ins.link)}
                 className="w-full flex items-center gap-3 text-left group"
               >
-                <span className={`h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-base ${TONE_BG[ins.tone] ?? 'bg-bg-soft'}`}>
-                  {ins.icon}
+                <span className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center bg-accent/10">
+                  <Icon className="h-4 w-4 text-accent" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-semibold text-text leading-snug truncate group-hover:text-accent transition-colors duration-base">
@@ -121,7 +124,8 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
                   <div className="text-xs text-text-muted leading-snug truncate">{ins.body}</div>
                 </div>
               </button>
-            ))
+              );
+            })
           )}
         </div>
 
