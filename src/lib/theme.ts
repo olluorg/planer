@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'glass';
 
 const EVENT = 'reform-theme';
 const ACCENT_EVENT = 'reform-accent';
@@ -18,8 +18,24 @@ export type AccentId = typeof ACCENTS[number]['id'];
 
 export function applyTheme(t: Theme) {
   localStorage.setItem('theme', t);
-  document.documentElement.classList.toggle('dark', t === 'dark');
+  // glass строится поверх тёмной палитры
+  document.documentElement.classList.toggle('dark', t === 'dark' || t === 'glass');
+  document.documentElement.classList.toggle('glass', t === 'glass');
+  if (t === 'glass') applyAppWallpaper(getAppWallpaper());
   window.dispatchEvent(new CustomEvent(EVENT, { detail: t }));
+}
+
+/* Обои приложения (glass-тема): готовые из /wallpapers или свой dataURL */
+const WP_KEY = 'app.wallpaper.v1';
+export const APP_WALLPAPERS = ['/wallpapers/1.jpg', '/wallpapers/2.png', '/wallpapers/3.png', '/wallpapers/4.png', '/wallpapers/5.png', '/wallpapers/6.png', '/wallpapers/7.png', '/wallpapers/8.png', '/wallpapers/9.png'];
+
+export function getAppWallpaper(): string {
+  return localStorage.getItem(WP_KEY) || APP_WALLPAPERS[0];
+}
+
+export function applyAppWallpaper(src: string) {
+  try { localStorage.setItem(WP_KEY, src); } catch {}
+  document.documentElement.style.setProperty('--app-wallpaper', `url('${src}')`);
 }
 
 export function applyAccent(id: AccentId) {
@@ -56,7 +72,7 @@ export function useTheme() {
   const setAccent = (a: AccentId) => { applyAccent(a); setAccentState(a); };
 
   return {
-    theme, setTheme, toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
+    theme, setTheme, toggle: () => setTheme(theme === 'light' ? 'dark' : 'light'),
     accent, setAccent,
   };
 }

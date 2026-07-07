@@ -13,7 +13,8 @@ import { parseCsv, readFileText } from "@/lib/importCsv";
 import { isHeartbeatEnabled, setHeartbeatEnabled } from "@/lib/notifications";
 import { isSoundEnabled, setSoundEnabled, playSuccess } from "@/lib/sound";
 import { toast } from "@/lib/toast";
-import { ACCENTS } from "@/lib/theme";
+import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper } from "@/lib/theme";
+import { getIconStyle, setIconStyle, type IconStyle } from "@/lib/iconStyle";
 import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
@@ -216,7 +217,16 @@ export const SettingsPage = () => {
           >
             <Moon className="h-4 w-4" /> Тёмная
           </Button>
+          <Button
+            variant={theme === "glass" ? "default" : "soft"}
+            onClick={() => setTheme("glass")}
+          >
+            <Sparkles className="h-4 w-4" /> Glass
+          </Button>
         </div>
+        {theme === "glass" && <GlassWallpaperPicker />}
+        <div className="text-[11px] text-text-muted mt-4 mb-2">Иконки наград</div>
+        <IconStylePicker />
         <div className="text-[11px] text-text-muted mt-4 mb-2">Акцентный цвет</div>
         <div className="flex gap-2 flex-wrap">
           {ACCENTS.map((a) => (
@@ -433,6 +443,57 @@ export const SettingsPage = () => {
           <li>Работает офлайн</li>
         </ul>
       </Card>
+    </div>
+  );
+};
+
+/* Выбор обоев для glass-темы: готовые + свой файл */
+const GlassWallpaperPicker: React.FC = () => {
+  const [current, setCurrent] = useState(getAppWallpaper());
+  const pick = (src: string) => { applyAppWallpaper(src); setCurrent(src); };
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => pick(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+  return (
+    <div className="mt-4">
+      <div className="text-[11px] text-text-muted mb-2">Обои</div>
+      <div className="flex gap-2 flex-wrap items-center">
+        {APP_WALLPAPERS.map((w) => (
+          <button
+            key={w}
+            onClick={() => pick(w)}
+            className={`h-11 w-[72px] rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${current === w ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"}`}
+          >
+            <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
+          </button>
+        ))}
+        <label className="h-11 w-[72px] rounded-lg border-2 border-dashed border-border hover:border-accent flex flex-col items-center justify-center text-text-muted hover:text-text cursor-pointer transition-colors">
+          <Upload className="h-3.5 w-3.5" />
+          <span className="text-[9px] mt-0.5">Свой</span>
+          <input type="file" accept="image/*" className="hidden" onChange={onFile} />
+        </label>
+      </div>
+    </div>
+  );
+};
+
+/* Переключатель стиля игровых иконок: минималистичные SVG или эмодзи */
+const IconStylePicker: React.FC = () => {
+  const [style, setStyle] = useState<IconStyle>(getIconStyle());
+  const pick = (s: IconStyle) => { setIconStyle(s); setStyle(s); };
+  return (
+    <div className="flex gap-2">
+      <Button variant={style === "svg" ? "default" : "soft"} size="sm" onClick={() => pick("svg")}>
+        SVG (минимализм)
+      </Button>
+      <Button variant={style === "emoji" ? "default" : "soft"} size="sm" onClick={() => pick("emoji")}>
+        Эмодзи
+      </Button>
     </div>
   );
 };

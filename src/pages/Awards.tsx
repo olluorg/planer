@@ -13,13 +13,37 @@ import { Mascot } from '@/components/Mascot';
 import { renderShareCard, downloadDataUrl } from '@/lib/sharePng';
 import { leagueFor, xpInWeek } from '@/lib/leagues';
 import { Button } from '@/components/ui/button';
-import { Share2, Snowflake } from 'lucide-react';
+import { Share2, Snowflake, CheckCircle2, Target, BadgeCheck, Flame, Mountain, Star, Sparkles, NotebookPen, Timer, Zap, Trophy, Dices, Gem, Medal, type LucideIcon } from 'lucide-react';
+import { useIconStyle } from '@/lib/iconStyle';
 import { availableFreezes, useFreeze, FREEZES_PER_MONTH } from '@/lib/streakFreeze';
 import { addDays } from 'date-fns';
 import { weeklyXpHistory, monthlyXpHistory, bestWeek, bestMonth } from '@/lib/personalRecords';
 
+/* Минималистичные SVG-аналоги эмодзи-иконок достижений */
+const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
+  first_task: CheckCircle2,
+  tasks_10: Target,
+  tasks_100: BadgeCheck,
+  streak_3: Flame,
+  streak_7: Flame,
+  streak_30: Mountain,
+  level_5: Star,
+  level_10: Sparkles,
+  reflect_7: NotebookPen,
+  pomodoro_10: Timer,
+  pomodoro_50: Timer,
+  combo_first: Zap,
+  combo_5: Zap,
+  freeze_used: Snowflake,
+  weekly_winner: Trophy,
+  quest_full_day: Dices,
+  league_diamond: Gem,
+  habit_perfect_week: Medal,
+};
+
 export const AwardsPage = () => {
   const { tasks, habitLogs, reflections, xpLog, achievements } = useStore();
+  const iconStyle = useIconStyle();
   const [dailyGoal, setDailyGoal] = useLocalStorage<number>('gamification.dailyGoal', 100);
 
   const total = xpTotal(xpLog);
@@ -160,7 +184,7 @@ export const AwardsPage = () => {
               <Stat label="Лучшая неделя" value={bw ? `${bw.xp}` : '—'} sub={bw ? `от ${bw.label}` : ''} />
               <Stat label="Лучший месяц" value={bm ? `${bm.xp}` : '—'} sub={bm ? bm.label : ''} />
               <Stat label="Текущая неделя" value={`${curWeek}`} sub={`среднее ${avgWeek}`} />
-              <Stat label="Серия дней" value={`🔥${streak}`} />
+              <Stat label="Серия дней" value={iconStyle === 'svg' ? String(streak) : `🔥${streak}`} />
             </div>
             <div className="text-[10px] uppercase tracking-wider text-text-muted mb-2">XP за последние 8 недель</div>
             <div className="flex items-end gap-1 h-24">
@@ -190,12 +214,19 @@ export const AwardsPage = () => {
           {ACHIEVEMENTS.map((a) => {
             const unlocked = unlockedSet.has(a.key);
             const at = unlockedMap.get(a.key);
+            const SvgIcon = ACHIEVEMENT_ICONS[a.key];
             return (
               <div
                 key={a.key}
                 className={`border p-3 flex items-start gap-3 transition-all ${unlocked ? 'border-accent' : 'border-border opacity-50 grayscale'}`}
               >
-                <div className="text-3xl shrink-0">{a.icon}</div>
+                {iconStyle === 'svg' && SvgIcon ? (
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${unlocked ? 'bg-accent/15 text-accent' : 'bg-bg-soft text-text-muted'}`}>
+                    <SvgIcon className="h-5 w-5" />
+                  </div>
+                ) : (
+                  <div className="text-3xl shrink-0">{a.icon}</div>
+                )}
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate">{a.title}</div>
                   <div className="text-[11px] text-text-muted">{a.description}</div>

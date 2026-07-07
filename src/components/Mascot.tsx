@@ -11,7 +11,9 @@ export const Mascot: React.FC<{ streak: number; size?: number; className?: strin
   streak, size = 96, className,
 }) => {
   const mood = moodFromStreak(streak);
-  const body = mood === 'fire' ? '#f97316' : mood === 'happy' ? 'var(--accent)' : mood === 'neutral' ? '#737373' : '#404040';
+  // Токены вместо хардкода — маскот не должен быть тёмным пятном в светлой теме
+  const body = mood === 'fire' ? '#f97316' : mood === 'happy' ? 'var(--accent)' : mood === 'neutral' ? 'var(--text-dim)' : 'var(--text-muted)';
+  const face = 'rgba(0,0,0,0.78)';
   const eyeY = mood === 'sad' ? 50 : mood === 'fire' ? 42 : 46;
   const mouthPath = mood === 'sad' ? 'M 38 70 Q 50 60 62 70'
                   : mood === 'neutral' ? 'M 38 68 L 62 68'
@@ -34,8 +36,8 @@ export const Mascot: React.FC<{ streak: number; size?: number; className?: strin
       {/* body — rounded square */}
       <rect x="20" y="28" width="60" height="58" rx="14" ry="14" fill={body} />
       {/* eyes */}
-      <circle cx="38" cy={eyeY} r="4" fill="#0a0a0a" />
-      <circle cx="62" cy={eyeY} r="4" fill="#0a0a0a" />
+      <circle cx="38" cy={eyeY} r="4" fill={face} />
+      <circle cx="62" cy={eyeY} r="4" fill={face} />
       {mood !== 'sad' && (
         <>
           <circle cx="39" cy={eyeY - 1} r="1.2" fill="#fff" />
@@ -43,12 +45,12 @@ export const Mascot: React.FC<{ streak: number; size?: number; className?: strin
         </>
       )}
       {/* mouth */}
-      <path d={mouthPath} stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" fill="none" />
-      {/* streak badge */}
+      <path d={mouthPath} stroke={face} strokeWidth="3" strokeLinecap="round" fill="none" />
+      {/* streak badge — инвертированный чип, адаптивен к теме */}
       {streak > 0 && (
         <g>
-          <rect x="62" y="6" width="32" height="22" rx="2" fill="#0a0a0a" />
-          <text x="78" y="22" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#fff">
+          <rect x="62" y="6" width="32" height="22" rx="2" fill="var(--text)" />
+          <text x="78" y="22" textAnchor="middle" fontSize="14" fontWeight="bold" fill="var(--bg-card)">
             🔥{streak}
           </text>
         </g>

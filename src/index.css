@@ -76,6 +76,17 @@
     --warn:   #F59E0B;
   }
 
+  /* Liquid glass — накладывается ПОВЕРХ .dark: обои + полупрозрачные панели + blur */
+  .glass {
+    --bg:            transparent;
+    --bg-card:       rgba(16, 18, 30, 0.52);
+    --bg-elevated:   rgba(24, 26, 42, 0.62);
+    --bg-soft:       rgba(255, 255, 255, 0.05);
+    --bg-hover:      rgba(255, 255, 255, 0.10);
+    --border:        rgba(255, 255, 255, 0.10);
+    --border-soft:   rgba(255, 255, 255, 0.05);
+  }
+
   html, body, #root { height: 100%; }
 
   body {
@@ -88,6 +99,37 @@
   /* Плоский нейтральный фон — без ambient glow */
   .dark body {
     background: #06080B;
+  }
+
+  /* Glass: обои приложения + затемнение */
+  .glass body {
+    background: #0b0a14;
+  }
+  .glass body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: var(--app-wallpaper, url('/wallpapers/1.jpg'));
+    background-size: cover;
+    background-position: center;
+  }
+  .glass body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: rgba(5, 5, 12, 0.55);
+  }
+  /* Панели становятся стеклянными: blur на всём, что использует карточные фоны */
+  .glass [class*="bg-bg-card"],
+  .glass .card {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .glass aside, .glass header {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 
   *::-webkit-scrollbar { width: 4px; height: 4px; }

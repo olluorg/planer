@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+import { Sparkles, Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3 } from 'lucide-react';
 import { CATEGORIES, setOnboardingDone, setUserName, setUserCategories } from '@/lib/onboarding';
 import { useStore } from '@/lib/store';
 import { requestPermission, setHeartbeatEnabled } from '@/lib/notifications';
@@ -88,12 +88,14 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
               </p>
               <div className="grid grid-cols-3 gap-3 mt-8 w-full max-w-md text-xs">
                 {[
-                  { icon: '🎯', label: 'Цели и подцели' },
-                  { icon: '⚡', label: 'Pomodoro и фокус' },
-                  { icon: '📊', label: 'Прогнозы и аналитика' },
+                  { icon: Target, label: 'Цели и подцели' },
+                  { icon: Zap, label: 'Pomodoro и фокус' },
+                  { icon: BarChart3, label: 'Прогнозы и аналитика' },
                 ].map((f) => (
                   <div key={f.label} className="rounded-xl border border-border-soft p-3 text-center">
-                    <div className="text-2xl mb-1">{f.icon}</div>
+                    <div className="h-8 w-8 mx-auto mb-1.5 rounded-lg bg-accent/12 text-accent flex items-center justify-center">
+                      <f.icon className="h-4 w-4" />
+                    </div>
                     <div className="text-text-muted">{f.label}</div>
                   </div>
                 ))}
