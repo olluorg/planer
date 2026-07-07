@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { exec, getDB, query } from './db';
-import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task, TimeEntry, ChangeLog, XpEntry, Achievement } from './types';
+import type { Goal, Habit, HabitLog, HealthLog, HealthMetric, Milestone, ProgressRecord, Reflection, Task, TimeEntry, ChangeLog, XpEntry, Achievement } from './types';
 import { ACHIEVEMENTS, checkNewAchievements, computeStreak, levelFromXp, xpTotal, XP_REWARDS, type XpSource } from './gamification';
 import { useCombo } from './combo';
 import { playSuccess, playUnlock } from './sound';
@@ -14,6 +14,8 @@ interface State {
   tasks: Task[];
   habits: Habit[];
   habitLogs: HabitLog[];
+  healthLogs: HealthLog[];
+  milestones: Milestone[];
   progress: ProgressRecord[];
   reflections: Reflection[];
   timeEntries: TimeEntry[];
@@ -48,6 +50,13 @@ interface State {
   updateHabit: (id: string, p: Partial<Habit>) => void;
   removeHabit: (id: string) => void;
   toggleHabitLog: (habitId: string, date: string) => void;
+  // health
+  upsertHealthLog: (date: string, metric: HealthMetric, value: number) => void;
+  removeHealthLog: (id: string) => void;
+  // milestones
+  addMilestone: (m: { goal_id: string; title: string; value?: number | null; due_date?: string | null }) => void;
+  toggleMilestone: (id: string) => void;
+  removeMilestone: (id: string) => void;
   // progress
   addProgress: (r: Omit<ProgressRecord, 'id'>) => void;
   // reflections
@@ -62,6 +71,8 @@ export const useStore = create<State>((set, get) => ({
   tasks: [],
   habits: [],
   habitLogs: [],
+  healthLogs: [],
+  milestones: [],
   progress: [],
   reflections: [],
   timeEntries: [],
@@ -86,6 +97,8 @@ export const useStore = create<State>((set, get) => ({
       tasks,
       habits: query<Habit>('SELECT * FROM habits ORDER BY created_at ASC'),
       habitLogs: query<HabitLog>('SELECT * FROM habit_logs'),
+      healthLogs: query<HealthLog>('SELECT * FROM health_logs ORDER BY date ASC'),
+      milestones: query<Milestone>('SELECT * FROM milestones ORDER BY sort ASC, due_date ASC'),
       progress: query<ProgressRecord>('SELECT * FROM progress_records ORDER BY date ASC'),
       reflections: query<Reflection>('SELECT * FROM reflections ORDER BY date DESC'),
       timeEntries: query<TimeEntry>('SELECT * FROM time_entries ORDER BY started_at DESC'),
@@ -111,12 +124,13 @@ export const useStore = create<State>((set, get) => ({
       status: g.status ?? 'active',
       color: g.color ?? null,
       cover: g.cover ?? null,
+      health_metric: g.health_metric ?? null,
       created_at: now(),
       updated_at: now(),
     };
     exec(
-      `INSERT INTO goals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [goal.id, goal.parent_id, goal.title, goal.type, goal.metric, goal.start_value, goal.target_value, goal.current_value, goal.unit, goal.deadline, goal.status, goal.color, goal.cover, goal.created_at, goal.updated_at],
+      `INSERT INTO goals (id, parent_id, title, type, metric, start_value, target_value, current_value, unit, deadline, status, color, cover, health_metric, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [goal.id, goal.parent_id, goal.title, goal.type, goal.metric, goal.start_value, goal.target_value, goal.current_value, goal.unit, goal.deadline, goal.status, goal.color, goal.cover, goal.health_metric, goal.created_at, goal.updated_at],
     );
     get().reload();
     return goal;
@@ -133,8 +147,8 @@ export const useStore = create<State>((set, get) => ({
       }
     });
     exec(
-      `UPDATE goals SET parent_id=?, title=?, type=?, metric=?, start_value=?, target_value=?, current_value=?, unit=?, deadline=?, status=?, color=?, cover=?, updated_at=? WHERE id=?`,
-      [next.parent_id, next.title, next.type, next.metric, next.start_value, next.target_value, next.current_value, next.unit, next.deadline, next.status, next.color, next.cover, next.updated_at, id],
+      `UPDATE goals SET parent_id=?, title=?, type=?, metric=?, start_value=?, target_value=?, current_value=?, unit=?, deadline=?, status=?, color=?, cover=?, health_metric=?, updated_at=? WHERE id=?`,
+      [next.parent_id, next.title, next.type, next.metric, next.start_value, next.target_value, next.current_value, next.unit, next.deadline, next.status, next.color, next.cover, next.health_metric, next.updated_at, id],
     );
     get().reload();
   },
@@ -247,6 +261,43 @@ export const useStore = create<State>((set, get) => ({
       exec('INSERT INTO habit_logs VALUES (?,?,?,1)', [nanoid(10), habit_id, date]);
       get().awardXp('habit', habit_id);
     }
+    get().reload();
+  },
+
+  upsertHealthLog: (date, metric, value) => {
+    const ex = query<HealthLog>('SELECT * FROM health_logs WHERE date = ? AND metric = ?', [date, metric])[0];
+    if (ex) {
+      exec('UPDATE health_logs SET value = ? WHERE id = ?', [value, ex.id]);
+    } else {
+      exec('INSERT INTO health_logs VALUES (?,?,?,?,NULL)', [nanoid(10), date, metric, value]);
+    }
+    // Авто-прогресс: цели, привязанные к этой метрике здоровья, двигаются сами
+    const linked = query<Goal>(`SELECT * FROM goals WHERE health_metric = ? AND status = 'active'`, [metric]);
+    linked.forEach((g) => get().addProgress({ goal_id: g.id, date, value, note: 'авто из Здоровья' }));
+    get().reload();
+  },
+
+  removeHealthLog: (id) => {
+    exec('DELETE FROM health_logs WHERE id = ?', [id]);
+    get().reload();
+  },
+
+  addMilestone: (m) => {
+    const maxSort = query<{ s: number }>('SELECT COALESCE(MAX(sort),0) s FROM milestones WHERE goal_id = ?', [m.goal_id])[0]?.s ?? 0;
+    exec('INSERT INTO milestones VALUES (?,?,?,?,?,NULL,?)', [nanoid(10), m.goal_id, m.title, m.value ?? null, m.due_date ?? null, maxSort + 1]);
+    get().reload();
+  },
+
+  toggleMilestone: (id) => {
+    const ex = query<Milestone>('SELECT * FROM milestones WHERE id = ?', [id])[0];
+    if (!ex) return;
+    exec('UPDATE milestones SET done_at = ? WHERE id = ?', [ex.done_at ? null : now(), id]);
+    if (!ex.done_at) get().awardXp('task', id); // веха закрыта — награда как за задачу
+    get().reload();
+  },
+
+  removeMilestone: (id) => {
+    exec('DELETE FROM milestones WHERE id = ?', [id]);
     get().reload();
   },
 
@@ -424,16 +475,12 @@ export const useStore = create<State>((set, get) => ({
 function seed() {
   const ids = { g1: nanoid(10), g2: nanoid(10), g3: nanoid(10), g4: nanoid(10), g5: nanoid(10) };
   const t = now();
-  exec(`INSERT INTO goals VALUES (?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [ids.g1, 'Сбросить 5 кг', 'mid', 'weight', 80, 75, 76.8, 'кг', '2026-07-01', 'active', '#22c55e', null, t, t]);
-  exec(`INSERT INTO goals VALUES (?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [ids.g2, 'Пробежать 10 км', 'mid', 'distance', 0, 10, 6.2, 'км', '2026-09-01', 'active', '#22c55e', null, t, t]);
-  exec(`INSERT INTO goals VALUES (?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [ids.g3, 'Финансовая цель', 'long', 'money', 0, 200000, 120000, '₽', '2026-12-31', 'active', '#22c55e', null, t, t]);
-  exec(`INSERT INTO goals VALUES (?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [ids.g4, 'Отпуск в горах', 'long', 'event', 0, 1, 0.6, null, '2026-12-15', 'active', '#22c55e', null, t, t]);
-  exec(`INSERT INTO goals VALUES (?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [ids.g5, 'Улучшить форму', 'long', 'fitness', 0, 100, 30, '%', '2027-03-01', 'active', '#22c55e', null, t, t]);
+  const seedGoal = `INSERT INTO goals (id, parent_id, title, type, metric, start_value, target_value, current_value, unit, deadline, status, color, cover, health_metric, created_at, updated_at) VALUES (?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+  exec(seedGoal, [ids.g1, 'Сбросить 5 кг', 'mid', 'weight', 80, 75, 76.8, 'кг', '2026-07-01', 'active', '#22c55e', null, 'weight', t, t]);
+  exec(seedGoal, [ids.g2, 'Пробежать 10 км', 'mid', 'distance', 0, 10, 6.2, 'км', '2026-09-01', 'active', '#22c55e', null, null, t, t]);
+  exec(seedGoal, [ids.g3, 'Финансовая цель', 'long', 'money', 0, 200000, 120000, '₽', '2026-12-31', 'active', '#22c55e', null, null, t, t]);
+  exec(seedGoal, [ids.g4, 'Отпуск в горах', 'long', 'event', 0, 1, 0.6, null, '2026-12-15', 'active', '#22c55e', null, null, t, t]);
+  exec(seedGoal, [ids.g5, 'Улучшить форму', 'long', 'fitness', 0, 100, 30, '%', '2027-03-01', 'active', '#22c55e', null, null, t, t]);
 
   // weight progress, simulated decline
   for (let i = 60; i >= 0; i -= 3) {

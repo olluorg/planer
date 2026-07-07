@@ -18,7 +18,7 @@ export const DialogContent = React.forwardRef<
       className={cn(
         'fixed z-50 bg-bg-card border border-border-soft shadow-card p-6',
         // вход/выход по data-state — Radix ждёт окончания анимации при закрытии
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 ease-emphasized',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 data-[state=closed]:duration-200 ease-emphasized',
         // mobile: bottom sheet
         'inset-x-0 bottom-0 rounded-t-2xl max-h-[92vh] overflow-y-auto',
         'max-sm:data-[state=open]:slide-in-from-bottom-full max-sm:data-[state=closed]:slide-out-to-bottom-full',

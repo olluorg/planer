@@ -16,7 +16,7 @@ import { getChartColors } from '@/lib/chart-theme';
 const MOODS = ['😞', '😕', '😐', '🙂', '😊'];
 
 export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
-  const { reflections, tasks, upsertReflection } = useStore();
+  const { reflections, tasks, habits, habitLogs, timeEntries, healthLogs, upsertReflection } = useStore();
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const today = isoDate(date);
@@ -25,6 +25,7 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   const [done, setDone] = useState(cur?.done ?? '');
   const [notDone, setNotDone] = useState(cur?.not_done ?? '');
   const [reason, setReason] = useState(cur?.reason ?? '');
+  const [gratitude, setGratitude] = useState(cur?.note ?? '');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -32,15 +33,28 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
     setDone(cur?.done ?? '');
     setNotDone(cur?.not_done ?? '');
     setReason(cur?.reason ?? '');
+    setGratitude(cur?.note ?? '');
     setSaved(false);
   }, [today]);
 
   const save = async () => {
-    upsertReflection({ date: today, mood, done, not_done: notDone, reason });
+    upsertReflection({ date: today, mood, done, not_done: notDone, reason, note: gratitude });
     await persist();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+
+  // Итог дня — факты, на которые опирается рефлексия
+  const dayFacts = useMemo(() => {
+    const dt = tasks.filter((t) => t.date === today && !t.parent_id);
+    const doneTasks = dt.filter((t) => t.status === 'done');
+    const habitsDone = habits.filter((h) => habitLogs.some((l) => l.habit_id === h.id && l.date === today)).length;
+    const focusMin = Math.round(timeEntries
+      .filter((e) => e.type === 'pomodoro' && isoDate(new Date(e.started_at)) === today)
+      .reduce((s, e) => s + e.duration, 0) / 60);
+    const hl = healthLogs.filter((l) => l.date === today);
+    return { total: dt.length, done: doneTasks.length, top: doneTasks.slice(0, 3), habitsDone, habitsTotal: habits.length, focusMin, healthLogged: hl.length };
+  }, [tasks, habits, habitLogs, timeEntries, healthLogs, today]);
 
   const week = useMemo(() => {
     const start = startOfWeek(date, { weekStartsOn: 1 });
@@ -81,6 +95,22 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
       <Card className="lg:col-span-7">
         <CardTitle>Рефлексия · {format(date, 'd MMMM yyyy', { locale: ru })}</CardTitle>
 
+        {/* Итог дня: факты перед глазами, чтобы не рефлексировать вслепую */}
+        <div className="rounded-xl bg-bg-soft p-3.5 mb-5">
+          <div className="section-label !mb-2">Итог дня</div>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-small">
+            <span className="text-text-muted">Задачи: <b className="text-text tabular-nums">{dayFacts.done}/{dayFacts.total}</b></span>
+            <span className="text-text-muted">Привычки: <b className="text-text tabular-nums">{dayFacts.habitsDone}/{dayFacts.habitsTotal}</b></span>
+            <span className="text-text-muted">Фокус: <b className="text-text tabular-nums">{dayFacts.focusMin ? `${dayFacts.focusMin} мин` : '—'}</b></span>
+            <span className="text-text-muted">Здоровье: <b className="text-text tabular-nums">{dayFacts.healthLogged ? `${dayFacts.healthLogged} метрик` : '—'}</b></span>
+          </div>
+          {dayFacts.top.length > 0 && (
+            <div className="mt-2 text-caption text-text-muted">
+              Сделано: {dayFacts.top.map((t) => t.title).join(' · ')}{dayFacts.done > 3 ? ` · ещё ${dayFacts.done - 3}` : ''}
+            </div>
+          )}
+        </div>
+
         <div className="text-sm mb-2 text-text-muted">Как прошёл день?</div>
         <div className="flex gap-2 mb-5">
           {MOODS.map((e, i) => (
@@ -113,6 +143,13 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
               Планы на завтра
             </div>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Завтра я..." />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium mb-1.5">
+              <span className="h-5 w-5 rounded-md bg-accent/15 text-accent flex items-center justify-center text-xs">♥</span>
+              Благодарность
+            </div>
+            <Textarea value={gratitude} onChange={(e) => setGratitude(e.target.value)} placeholder="За что я благодарен сегодня..." />
           </div>
         </div>
 

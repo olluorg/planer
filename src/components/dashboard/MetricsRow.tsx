@@ -9,7 +9,7 @@ import { Target, CheckSquare, Flame, Zap } from 'lucide-react';
 
 export const MetricsRow: React.FC<{ date: Date }> = ({ date }) => {
   const nav = useNavigate();
-  const { tasks, habits, habitLogs, reflections, xpLog } = useStore();
+  const { tasks, habits, habitLogs, healthLogs, reflections, xpLog } = useStore();
 
   const m = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, i) => isoDate(addDays(date, -6 + i)));
@@ -34,10 +34,13 @@ export const MetricsRow: React.FC<{ date: Date }> = ({ date }) => {
       return habits.filter((h) => habitLogs.some((l) => l.habit_id === h.id && l.date === d)).length;
     });
 
-    // Energy: производная от XP за неделю (нормализовано) + настроение
+    // Energy: залогированная на странице Здоровье энергия (1–10) приоритетнее;
+    // иначе — производная от XP за неделю (нормализовано) + настроение
     const xpSeries = days.map((d) => xpLog.filter((e) => e.date === d).reduce((s, e) => s + e.amount, 0));
     const xpMax = Math.max(1, ...xpSeries);
     const energySeries = days.map((d, i) => {
+      const logged = healthLogs.find((l) => l.date === d && l.metric === 'energy');
+      if (logged) return Math.round(Math.max(0, Math.min(10, logged.value)) * 10);
       const refl = reflections.find((r) => r.date === d);
       const moodPart = refl?.mood != null ? (refl.mood / 4) * 50 : 25;
       const xpPart = (xpSeries[i] / xpMax) * 50;
@@ -53,7 +56,7 @@ export const MetricsRow: React.FC<{ date: Date }> = ({ date }) => {
       streak, streakSeries,
       energy, energyDelta, energySeries,
     };
-  }, [tasks, habits, habitLogs, reflections, xpLog, date]);
+  }, [tasks, habits, habitLogs, healthLogs, reflections, xpLog, date]);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

@@ -19,7 +19,7 @@ export const Checkbox = React.forwardRef<
     )}
     {...props}
   >
-    <RC.Indicator className="flex items-center justify-center animate-scale-in">
+    <RC.Indicator className="flex items-center justify-center animate-check-pop">
       <Check className="h-3 w-3 text-white" strokeWidth={3} />
     </RC.Indicator>
   </RC.Root>

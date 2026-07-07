@@ -115,6 +115,23 @@ CREATE TABLE IF NOT EXISTS achievements (
   key TEXT NOT NULL UNIQUE,
   unlocked_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS milestones (
+  id TEXT PRIMARY KEY,
+  goal_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  value REAL,
+  due_date TEXT,
+  done_at TEXT,
+  sort INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS health_logs (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  value REAL NOT NULL,
+  note TEXT,
+  UNIQUE(date, metric)
+);
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date);
 CREATE INDEX IF NOT EXISTS idx_tasks_goal ON tasks(goal_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(date);
@@ -122,6 +139,8 @@ CREATE INDEX IF NOT EXISTS idx_progress_goal ON progress_records(goal_id);
 CREATE INDEX IF NOT EXISTS idx_time_entries_task ON time_entries(task_id);
 CREATE INDEX IF NOT EXISTS idx_change_log_entity ON change_log(entity, entity_id);
 CREATE INDEX IF NOT EXISTS idx_xp_log_date ON xp_log(date);
+CREATE INDEX IF NOT EXISTS idx_health_logs_date ON health_logs(date);
+CREATE INDEX IF NOT EXISTS idx_milestones_goal ON milestones(goal_id);
 `;
 
 const POST_MIGRATE_INDEXES = `
@@ -144,6 +163,7 @@ function migrate(d: Database) {
   if (!columnExists(d, 'tasks', 'tags')) d.exec(`ALTER TABLE tasks ADD COLUMN tags TEXT`);
   if (!columnExists(d, 'tasks', 'estimate_min')) d.exec(`ALTER TABLE tasks ADD COLUMN estimate_min INTEGER`);
   if (!columnExists(d, 'tasks', 'start_time')) d.exec(`ALTER TABLE tasks ADD COLUMN start_time TEXT`);
+  if (!columnExists(d, 'goals', 'health_metric')) d.exec(`ALTER TABLE goals ADD COLUMN health_metric TEXT`);
   d.exec(POST_MIGRATE_INDEXES);
 }
 

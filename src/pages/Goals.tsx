@@ -3,6 +3,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -14,6 +15,8 @@ import { fmtNum, colorByPct } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
 import { ECharts } from '@/components/charts/ECharts';
 import { Ring } from '@/components/ui/ring';
+import { Sparkline } from '@/components/ui/sparkline';
+import { CountUp } from '@/components/ui/count-up';
 import { PageContainer } from '@/components/ui/page-container';
 import { GoalPath } from '@/components/GoalPath';
 import { useTheme } from '@/lib/theme';
@@ -21,13 +24,14 @@ import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 import type { Goal, GoalType } from '@/lib/types';
 
 export const GoalsPage = () => {
-  const { goals, progress, addGoal, removeGoal, updateGoal, addProgress, tasks, habits, habitLogs, reflections, timeEntries } = useStore();
+  const { goals, progress, addGoal, removeGoal, updateGoal, addProgress, tasks, habits, habitLogs, reflections, timeEntries, milestones, toggleTask, toggleHabitLog, addMilestone, toggleMilestone, removeMilestone } = useStore();
   const nav = useNavigate();
   const { theme } = useTheme();
   const cc = getChartColors(theme === 'dark');
   const [open, setOpen] = useState(false);
   const [statusTab, setStatusTab] = useState<'active' | 'done' | 'archived'>('active');
-  const [form, setForm] = useState({ title: '', type: 'mid' as GoalType, start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none' });
+  const [view, setView] = useState<'cards' | 'timeline' | 'tree'>('cards');
+  const [form, setForm] = useState({ title: '', type: 'mid' as GoalType, start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none', health_metric: '__none' });
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'progress' | 'deadline' | 'name'>('progress');
 
@@ -42,9 +46,10 @@ export const GoalsPage = () => {
       unit: form.unit || null,
       deadline: form.deadline || null,
       parent_id: form.parent_id === '__none' ? null : form.parent_id,
+      health_metric: form.health_metric === '__none' ? null : (form.health_metric as any),
     });
     setOpen(false);
-    setForm({ title: '', type: 'mid', start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none' });
+    setForm({ title: '', type: 'mid', start_value: '0', target_value: '100', unit: '', deadline: '', parent_id: '__none', health_metric: '__none' });
   };
 
   const isAchieved = (g: typeof goals[number]) => {
@@ -140,7 +145,14 @@ export const GoalsPage = () => {
             <TabsTrigger value="archived">Архив · {counts.archived}</TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+            <TabsList>
+              <TabsTrigger value="cards">Карточки</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="tree">Дерево</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <span className="text-caption text-text-muted">Сортировка</span>
           <Select value={sort} onValueChange={(v: any) => setSort(v)}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
@@ -161,7 +173,10 @@ export const GoalsPage = () => {
         </Card>
       )}
 
-      {heroGoal && (() => {
+      {view === 'timeline' && <GoalsTimeline goals={visible} />}
+      {view === 'tree' && <GoalsTree goals={visible} />}
+
+      {view === 'cards' && heroGoal && (() => {
         const g = heroGoal;
         const recs = progress.filter((p) => p.goal_id === g.id);
         const f = forecastGoal(g, recs, 30);
@@ -172,8 +187,6 @@ export const GoalsPage = () => {
         const gap = scheduleGap(g);
         const Icon = goalIcon(g.title);
         const accent = g.color || GOAL_PALETTE[0];
-        const ms = deriveMilestones(g);
-        const nextIdx = ms.findIndex((m) => !m.done);
         const typeLabel = { long: 'Долгосрочная', mid: 'Среднесрочная', short: 'Краткосрочная' }[g.type];
         const aiText = gap == null
           ? 'Добавь дедлайн и записывай прогресс — оценю темп и шанс достижения.'
@@ -200,12 +213,13 @@ export const GoalsPage = () => {
                     <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: accent }} />{typeLabel}</span>
                     {successPct != null && <><span className="text-text-dim">·</span><span>{successPct}% уверенность</span></>}
                     {daysLeft != null && <><span className="text-text-dim">·</span><span>{daysLeft < 0 ? 'просрочено' : `осталось ${daysLeft} дн`}</span></>}
+                    {g.health_metric && <><span className="text-text-dim">·</span><span className="text-accent">⛓ авто из Здоровья</span></>}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-caption text-text-muted uppercase tracking-wider">Прогноз достижения</div>
                   <div className="text-4xl font-bold tabular-nums leading-none mt-1" style={{ color: successPct == null ? 'var(--text-dim)' : successPct >= 70 ? '#22c55e' : successPct >= 40 ? '#f59e0b' : '#ef4444' }}>
-                    {successPct == null ? '—' : `${successPct}%`}
+                    {successPct == null ? '—' : <CountUp value={successPct} suffix="%" />}
                   </div>
                   {chance && <div className="text-caption text-text-muted mt-1">Шанс: {chance}</div>}
                 </div>
@@ -215,7 +229,7 @@ export const GoalsPage = () => {
                 <div>
                   <div className="flex items-center gap-3">
                     <Progress value={r} className="flex-1" barColor={accent} />
-                    <span className="text-h3 font-bold tabular-nums">{r}%</span>
+                    <CountUp value={r} suffix="%" className="text-h3 font-bold tabular-nums" />
                   </div>
                   <div className="text-caption text-text-muted mt-1.5">
                     {g.deadline ? `Дедлайн ${fmtDate(g.deadline)} · прогноз ${f.etaDate ?? '—'}` : 'Без дедлайна'}
@@ -224,25 +238,9 @@ export const GoalsPage = () => {
                 <ECharts height={90} option={forecastChart(g, recs, f, cc, accent)} />
               </div>
 
-              <div>
-                <div className="section-label !mb-2">Ближайшие вехи</div>
-                <div className="flex flex-wrap gap-2">
-                  {ms.map((m, k) => {
-                    const isNext = k === nextIdx;
-                    return (
-                      <div key={k} className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: m.done ? accent : isNext ? `${accent}80` : 'var(--border)' }}>
-                        <span className="h-4 w-4 rounded-full flex items-center justify-center shrink-0" style={{ background: m.done ? accent : 'transparent', border: m.done ? 'none' : `1.5px solid ${isNext ? accent : 'var(--border)'}` }}>
-                          {m.done && <CheckCircle2 className="h-3 w-3 text-white" />}
-                        </span>
-                        <div className="leading-tight">
-                          <div className="text-small font-medium tabular-nums">{fmtNum(m.value, 1)}{g.unit ? ` ${g.unit}` : ''}</div>
-                          <div className="text-caption text-text-muted">{m.done ? 'достигнута' : isNext ? 'следующая' : k === ms.length - 1 ? 'финиш' : 'впереди'}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <MilestoneChips goal={g} accent={accent} />
+
+              <GoalToday goal={g} accent={accent} />
 
               <div className="flex items-start gap-2.5 rounded-xl border border-accent/15 bg-accent/[0.06] p-3">
                 <Sparkles className="h-4 w-4 text-accent shrink-0 mt-0.5" />
@@ -263,7 +261,7 @@ export const GoalsPage = () => {
         );
       })()}
 
-      <div className="goals-grid">
+      {view === 'cards' && <div className="goals-grid">
         {gridGoals.map((g, i) => {
           const recs = progress.filter((p) => p.goal_id === g.id);
           const f = forecastGoal(g, recs, 30);
@@ -278,64 +276,57 @@ export const GoalsPage = () => {
           const children = goals.filter((x) => x.parent_id === g.id);
 
           return (
-            <Card key={g.id} className="hover:shadow-lift flex flex-col">
+            <Card key={g.id} className="group hover:shadow-lift flex flex-col">
               <div className="flex items-start gap-3">
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${accent}1f` }}>
-                  <Icon className="h-5 w-5" style={{ color: accent }} />
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${accent}1f` }}>
+                  <Icon className="h-4 w-4" style={{ color: accent }} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-h3 truncate">{g.title}</h2>
-                    <span className="inline-flex items-center gap-1.5 text-caption text-text-muted shrink-0">
-                      <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
-                      {typeLabel}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-small font-semibold truncate">{g.title}</h2>
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: accent }} title={typeLabel} />
                   </div>
-                  <div className="text-small text-text-muted mt-0.5 truncate">
+                  <div className="text-caption text-text-muted mt-0.5 truncate">
                     {g.metric || `${fmtNum(g.current_value, 1)} → ${fmtNum(g.target_value, 0)}${g.unit ? ` ${g.unit}` : ''}`}
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" className="shrink-0 text-text-dim hover:text-danger" onClick={() => removeGoal(g.id)}>
+                <Button variant="ghost" size="icon" className="shrink-0 text-text-dim hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeGoal(g.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="flex items-center gap-3 mt-4">
-                <Progress value={r} className="flex-1" barColor={accent} />
-                <span className="text-small font-semibold tabular-nums w-10 text-right">{r}%</span>
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-h2 font-bold tabular-nums leading-none" style={{ color: accent }}>{r}%</span>
+                <span className="ml-auto text-caption text-text-muted tabular-nums">
+                  {daysLeft == null ? '' : daysLeft < 0 ? 'просрочено' : `осталось ${daysLeft} дн`}
+                </span>
+              </div>
+              <Progress value={r} className="mt-1.5" barColor={accent} />
+
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-caption text-text-muted">
+                  Дедлайн: <b className="text-text font-medium">{g.deadline ? fmtDate(g.deadline) : '—'}</b>
+                  <span className="mx-1.5 text-text-dim">·</span>
+                  Прогноз: <b className={`font-medium ${successClass(successPct)}`}>{successPct == null ? '—' : `${successPct}%`}</b>
+                </span>
+                <Sparkline data={recs.length >= 2 ? recs.map((x) => x.value) : [g.start_value, g.current_value]} width={72} height={26} color={accent} />
               </div>
 
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                <GoalStat label="Старт" value={fmtDate(g.created_at)} />
-                <GoalStat label="Дедлайн" value={g.deadline ? fmtDate(g.deadline) : '—'} />
-                <GoalStat label="Осталось" value={daysLeft == null ? '—' : daysLeft < 0 ? 'просрочено' : `${daysLeft} дн`} />
-                <GoalStat label="Прогноз" value={successPct == null ? '—' : `${successPct}%`} valueClass={successClass(successPct)} />
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-border-soft">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="section-label !mb-0">Динамика прогресса</div>
-                  <span className="inline-flex items-center gap-1 text-caption text-text-muted">
-                    <TrendingUp className="h-3 w-3" />
-                    {f.etaDate ? f.etaDate : 'нет прогноза'}
-                  </span>
-                </div>
-                <ECharts height={120} option={forecastChart(g, recs, f, cc, accent)} />
+              <div className="mt-3 pt-3 border-t border-border-soft">
                 <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
               </div>
 
               {children.length > 0 && (
-                <div className="mt-4 border-t border-border-soft pt-3">
-                  <div className="section-label !mb-2">Подцели · {children.length}</div>
-                  <ul className="space-y-2">
+                <div className="mt-3 border-t border-border-soft pt-3">
+                  <ul className="space-y-1.5">
                     {children.map((c) => {
                       const cd = c.target_value - c.start_value || 1;
                       const cr = Math.round(Math.max(0, Math.min(1, (c.current_value - c.start_value) / cd)) * 100);
                       return (
-                        <li key={c.id} className="flex items-center gap-3 text-small">
+                        <li key={c.id} className="flex items-center gap-2.5 text-caption">
                           <span className="text-text-dim">↳</span>
-                          <span className="flex-1 truncate">{c.title}</span>
-                          <div className="w-24"><Progress value={cr} barColor={colorByPct(cr)} /></div>
+                          <span className="flex-1 truncate text-text-muted">{c.title}</span>
+                          <div className="w-16"><Progress value={cr} barColor={colorByPct(cr)} /></div>
                           <span className="text-caption text-text-muted tabular-nums w-8 text-right">{cr}%</span>
                         </li>
                       );
@@ -346,9 +337,9 @@ export const GoalsPage = () => {
             </Card>
           );
         })}
-      </div>
+      </div>}
 
-      {visible.length > 0 && (
+      {view === 'cards' && visible.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardTitle>Прогноз достижения целей</CardTitle>
@@ -542,6 +533,22 @@ export const GoalsPage = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={form.health_metric} onValueChange={(v) => setForm({ ...form, health_metric: v })}>
+              <SelectTrigger><SelectValue placeholder="Авто-прогресс из Здоровья" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Без авто-прогресса</SelectItem>
+                <SelectItem value="weight">Вес (кг)</SelectItem>
+                <SelectItem value="sleep">Сон (ч)</SelectItem>
+                <SelectItem value="steps">Шаги</SelectItem>
+                <SelectItem value="water">Вода (л)</SelectItem>
+                <SelectItem value="workout">Тренировка (мин)</SelectItem>
+                <SelectItem value="energy">Энергия (/10)</SelectItem>
+                <SelectItem value="calories">Питание (ккал)</SelectItem>
+              </SelectContent>
+            </Select>
+            {form.health_metric !== '__none' && (
+              <p className="text-caption text-text-muted">Каждый лог этой метрики на странице «Здоровье» будет автоматически записываться в прогресс цели.</p>
+            )}
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="ghost">Отмена</Button></DialogClose>
@@ -635,6 +642,334 @@ function nextMilestone(g: Goal): { value: number; frac: number; done: boolean; r
   const remainFrac = Math.max(0, Math.min(1, (next.value - g.current_value) / seg));
   return { ...next, remainFrac };
 }
+
+const pctOfG = (g: Goal) => Math.round(Math.max(0, Math.min(1, (g.current_value - g.start_value) / (g.target_value - g.start_value || 1))) * 100);
+
+/** Вехи цели: реальные из БД (кликабельные) с fallback на расчётные + inline-добавление. */
+const MilestoneChips: React.FC<{ goal: Goal; accent: string }> = ({ goal, accent }) => {
+  const { milestones, toggleMilestone, removeMilestone, addMilestone } = useStore();
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState('');
+  const [value, setValue] = useState('');
+  const real = milestones.filter((m) => m.goal_id === goal.id);
+
+  const submit = () => {
+    if (!title.trim()) return;
+    addMilestone({ goal_id: goal.id, title: title.trim(), value: value ? Number(value.replace(',', '.')) : null });
+    setTitle(''); setValue(''); setAdding(false);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="section-label !mb-0">Вехи</div>
+        <button onClick={() => setAdding((v) => !v)} className="inline-flex items-center gap-1 text-caption text-accent hover:underline">
+          <Plus className="h-3 w-3" /> Веха
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {real.length > 0 ? real.map((m) => {
+          const done = !!m.done_at;
+          return (
+            <div key={m.id} className="group/ms flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors" style={{ borderColor: done ? accent : 'var(--border)' }}>
+              <button
+                onClick={() => toggleMilestone(m.id)}
+                className="h-4 w-4 rounded-full flex items-center justify-center shrink-0 transition-all hover:scale-110"
+                style={{ background: done ? accent : 'transparent', border: done ? 'none' : `1.5px solid ${accent}80` }}
+                title={done ? 'Отменить' : 'Достигнута'}
+              >
+                {done && <CheckCircle2 className="h-3 w-3 text-white" />}
+              </button>
+              <div className="leading-tight">
+                <div className={`text-small font-medium ${done ? 'line-through text-text-muted' : ''}`}>{m.title}</div>
+                <div className="text-caption text-text-muted tabular-nums">
+                  {m.value != null && `${fmtNum(m.value, 1)}${goal.unit ? ` ${goal.unit}` : ''}`}
+                  {m.value != null && m.due_date && ' · '}
+                  {m.due_date && fmtDate(m.due_date)}
+                  {m.value == null && !m.due_date && (done ? 'достигнута' : 'впереди')}
+                </div>
+              </div>
+              <button onClick={() => removeMilestone(m.id)} className="opacity-0 group-hover/ms:opacity-100 transition-opacity text-text-dim hover:text-danger">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          );
+        }) : deriveMilestones(goal).map((m, k, arr) => {
+          const nextIdx = arr.findIndex((x) => !x.done);
+          const isNext = k === nextIdx;
+          return (
+            <div key={k} className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: m.done ? accent : isNext ? `${accent}80` : 'var(--border)' }}>
+              <span className="h-4 w-4 rounded-full flex items-center justify-center shrink-0" style={{ background: m.done ? accent : 'transparent', border: m.done ? 'none' : `1.5px solid ${isNext ? accent : 'var(--border)'}` }}>
+                {m.done && <CheckCircle2 className="h-3 w-3 text-white" />}
+              </span>
+              <div className="leading-tight">
+                <div className="text-small font-medium tabular-nums">{fmtNum(m.value, 1)}{goal.unit ? ` ${goal.unit}` : ''}</div>
+                <div className="text-caption text-text-muted">{m.done ? 'достигнута' : isNext ? 'следующая' : k === arr.length - 1 ? 'финиш' : 'впереди'}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {adding && (
+        <div className="flex gap-2 mt-2">
+          <Input placeholder="Название вехи" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} autoFocus />
+          <Input type="number" placeholder={goal.unit ? `Значение (${goal.unit})` : 'Значение'} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} className="w-40" />
+          <Button size="sm" onClick={submit}>Добавить</Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** «Что делать сегодня» по цели: связанные задачи на сегодня + привычки цели. */
+const GoalToday: React.FC<{ goal: Goal; accent: string }> = ({ goal, accent }) => {
+  const { tasks, habits, habitLogs, toggleTask, toggleHabitLog } = useStore();
+  const today = todayISO2();
+  const todayTasks = tasks.filter((t) => t.goal_id === goal.id && t.date === today && !t.parent_id);
+  const goalHabits = habits.filter((h) => h.goal_id === goal.id);
+  const minutes = todayTasks.filter((t) => t.status !== 'done').reduce((s, t) => s + (t.estimate_min ?? 0), 0);
+
+  if (todayTasks.length === 0 && goalHabits.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border p-3 text-caption text-text-muted">
+        Свяжи задачи и привычки с этой целью (поле «Цель» при создании) — здесь появится план действий на сегодня.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="section-label !mb-0">Что делать сегодня</div>
+        {minutes > 0 && <span className="text-caption text-text-muted tabular-nums">{minutes} мин действий</span>}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+        {todayTasks.map((t) => (
+          <label key={t.id} className="flex items-center gap-2.5 text-small cursor-pointer group/td">
+            <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+            <span className={`truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>{t.title}</span>
+            {t.start_time && <span className="ml-auto text-caption text-text-dim tabular-nums shrink-0">{t.start_time}</span>}
+          </label>
+        ))}
+        {goalHabits.map((h) => {
+          const done = habitLogs.some((l) => l.habit_id === h.id && l.date === today);
+          const color = h.color ?? accent;
+          return (
+            <label key={h.id} className="flex items-center gap-2.5 text-small cursor-pointer">
+              <button
+                onClick={() => toggleHabitLog(h.id, today)}
+                className="h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-all hover:scale-110"
+                style={{ background: done ? color : 'transparent', borderColor: color }}
+              >
+                {done && <CheckCircle2 className="h-3 w-3 text-white" />}
+              </button>
+              <span className={`truncate ${done ? 'text-text-muted' : 'text-text'}`}>{h.title}</span>
+              <span className="ml-auto text-caption text-text-dim shrink-0">привычка</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+function todayISO2(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const MONTHS_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+/** Timeline: полосы целей по календарной оси с вехами и маркером «сегодня». */
+const GoalsTimeline: React.FC<{ goals: Goal[] }> = ({ goals }) => {
+  const { milestones } = useStore();
+  if (goals.length === 0) return <Card className="p-8 text-center text-sm text-text-muted">Нет целей для таймлайна</Card>;
+
+  const now = Date.now();
+  const starts = goals.map((g) => new Date(g.created_at).getTime());
+  const ends = goals.map((g) => (g.deadline ? new Date(g.deadline).getTime() : now + 30 * 86400000));
+  const min = Math.min(...starts);
+  const max = Math.max(...ends, now);
+  const span = max - min || 1;
+  const pos = (t: number) => Math.max(0, Math.min(100, ((t - min) / span) * 100));
+
+  // Месячные деления
+  const ticks: { t: number; label: string }[] = [];
+  const c = new Date(min); c.setDate(1); c.setHours(0, 0, 0, 0);
+  while (c.getTime() <= max) {
+    ticks.push({ t: c.getTime(), label: `${MONTHS_RU[c.getMonth()]}${c.getMonth() === 0 ? ` '${String(c.getFullYear()).slice(2)}` : ''}` });
+    c.setMonth(c.getMonth() + 1);
+  }
+
+  return (
+    <Card className="overflow-x-auto">
+      <div className="min-w-[640px]">
+        {/* Ось месяцев */}
+        <div className="relative h-6 ml-[188px] mb-2">
+          {ticks.map((tk) => (
+            <span key={tk.t} className="absolute top-0 text-caption text-text-muted -translate-x-1/2" style={{ left: `${pos(tk.t)}%` }}>{tk.label}</span>
+          ))}
+        </div>
+        <div className="relative space-y-3">
+          {/* Маркер «сегодня» */}
+          <div className="absolute top-0 bottom-0 w-px bg-danger/60 z-10 pointer-events-none" style={{ left: `calc(188px + (100% - 188px) * ${pos(now) / 100})` }}>
+            <span className="absolute -top-0.5 -translate-x-1/2 h-1.5 w-1.5 rounded-full bg-danger" />
+          </div>
+          {goals.map((g, i) => {
+            const accent = g.color || GOAL_PALETTE[i % GOAL_PALETTE.length];
+            const s = new Date(g.created_at).getTime();
+            const e = g.deadline ? new Date(g.deadline).getTime() : now + 30 * 86400000;
+            const left = pos(s);
+            const width = Math.max(2, pos(e) - left);
+            const r = pctOfG(g);
+            const gms = milestones.filter((m) => m.goal_id === g.id && m.due_date);
+            const Icon = goalIcon(g.title);
+            return (
+              <div key={g.id} className="flex items-center gap-3">
+                <div className="w-44 shrink-0 flex items-center gap-2 min-w-0">
+                  <span className="h-6 w-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}1f` }}>
+                    <Icon className="h-3 w-3" style={{ color: accent }} />
+                  </span>
+                  <span className="text-small truncate">{g.title}</span>
+                  <span className="ml-auto text-caption text-text-muted tabular-nums shrink-0">{r}%</span>
+                </div>
+                <div className="flex-1 relative h-7 rounded-md bg-bg-soft">
+                  <div className="absolute top-1 bottom-1 rounded-md" style={{ left: `${left}%`, width: `${width}%`, background: `${accent}2e`, border: `1px solid ${accent}55` }}>
+                    <div className="h-full rounded-md" style={{ width: `${r}%`, background: `${accent}cc` }} />
+                  </div>
+                  {gms.map((m) => (
+                    <span
+                      key={m.id}
+                      title={`${m.title}${m.due_date ? ` · ${fmtDate(m.due_date)}` : ''}`}
+                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 z-[5]"
+                      style={{ left: `${pos(new Date(m.due_date!).getTime())}%`, background: m.done_at ? accent : 'var(--bg-card)', borderColor: accent }}
+                    />
+                  ))}
+                  {g.deadline && (
+                    <span className="absolute top-1/2 -translate-y-1/2 text-caption text-text-dim tabular-nums" style={{ left: `calc(${pos(e)}% + 6px)` }}>
+                      {fmtDate(g.deadline)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+/** Дерево: цель → вехи → подцели → связанные задачи и привычки. */
+const GoalsTree: React.FC<{ goals: Goal[] }> = ({ goals }) => {
+  const { goals: allGoals, milestones, tasks, habits, habitLogs, toggleMilestone, toggleTask, toggleHabitLog } = useStore();
+  const today = todayISO2();
+  if (goals.length === 0) return <Card className="p-8 text-center text-sm text-text-muted">Нет целей</Card>;
+
+  return (
+    <div className="space-y-3">
+      {goals.map((g, i) => {
+        const accent = g.color || GOAL_PALETTE[i % GOAL_PALETTE.length];
+        const Icon = goalIcon(g.title);
+        const r = pctOfG(g);
+        const gms = milestones.filter((m) => m.goal_id === g.id);
+        const children = allGoals.filter((x) => x.parent_id === g.id);
+        const linkedTasks = tasks.filter((t) => t.goal_id === g.id && !t.parent_id);
+        const activeTasks = linkedTasks.filter((t) => t.status !== 'done').slice(0, 5);
+        const doneCount = linkedTasks.filter((t) => t.status === 'done').length;
+        const linkedHabits = habits.filter((h) => h.goal_id === g.id);
+        return (
+          <Card key={g.id}>
+            <div className="flex items-center gap-3">
+              <span className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${accent}1f` }}>
+                <Icon className="h-4 w-4" style={{ color: accent }} />
+              </span>
+              <h3 className="text-h3 truncate flex-1">{g.title}</h3>
+              <div className="w-28 hidden sm:block"><Progress value={r} barColor={accent} /></div>
+              <span className="text-small font-semibold tabular-nums w-10 text-right">{r}%</span>
+            </div>
+            <div className="mt-3 ml-4 pl-5 border-l border-border-soft space-y-3">
+              {gms.length > 0 && (
+                <TreeSection label={`Вехи · ${gms.filter((m) => m.done_at).length}/${gms.length}`}>
+                  {gms.map((m) => (
+                    <li key={m.id} className="flex items-center gap-2.5 text-small">
+                      <button
+                        onClick={() => toggleMilestone(m.id)}
+                        className="h-4 w-4 rounded-full flex items-center justify-center shrink-0 transition-all hover:scale-110"
+                        style={{ background: m.done_at ? accent : 'transparent', border: m.done_at ? 'none' : `1.5px solid ${accent}80` }}
+                      >
+                        {m.done_at && <CheckCircle2 className="h-3 w-3 text-white" />}
+                      </button>
+                      <span className={m.done_at ? 'line-through text-text-muted' : 'text-text'}>{m.title}</span>
+                      {m.value != null && <span className="text-caption text-text-muted tabular-nums">{fmtNum(m.value, 1)}{g.unit ? ` ${g.unit}` : ''}</span>}
+                    </li>
+                  ))}
+                </TreeSection>
+              )}
+              {children.length > 0 && (
+                <TreeSection label={`Подцели · ${children.length}`}>
+                  {children.map((c) => (
+                    <li key={c.id} className="flex items-center gap-2.5 text-small">
+                      <Target className="h-3.5 w-3.5 text-text-dim shrink-0" />
+                      <span className="flex-1 truncate">{c.title}</span>
+                      <div className="w-20"><Progress value={pctOfG(c)} barColor={colorByPct(pctOfG(c))} /></div>
+                      <span className="text-caption text-text-muted tabular-nums w-8 text-right">{pctOfG(c)}%</span>
+                    </li>
+                  ))}
+                </TreeSection>
+              )}
+              {linkedTasks.length > 0 && (
+                <TreeSection label={`Задачи · ${doneCount}/${linkedTasks.length} выполнено`}>
+                  {activeTasks.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2.5 text-small">
+                      <Checkbox checked={false} onCheckedChange={() => toggleTask(t.id)} />
+                      <span className="flex-1 truncate">{t.title}</span>
+                      <span className="text-caption text-text-dim tabular-nums shrink-0">{t.date === today ? 'сегодня' : fmtDate(t.date)}</span>
+                    </li>
+                  ))}
+                  {linkedTasks.filter((t) => t.status !== 'done').length > 5 && (
+                    <li className="text-caption text-text-muted">…ещё {linkedTasks.filter((t) => t.status !== 'done').length - 5}</li>
+                  )}
+                </TreeSection>
+              )}
+              {linkedHabits.length > 0 && (
+                <TreeSection label={`Привычки · ${linkedHabits.length}`}>
+                  {linkedHabits.map((h) => {
+                    const done = habitLogs.some((l) => l.habit_id === h.id && l.date === today);
+                    const color = h.color ?? accent;
+                    return (
+                      <li key={h.id} className="flex items-center gap-2.5 text-small">
+                        <button
+                          onClick={() => toggleHabitLog(h.id, today)}
+                          className="h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-all hover:scale-110"
+                          style={{ background: done ? color : 'transparent', borderColor: color }}
+                        >
+                          {done && <CheckCircle2 className="h-3 w-3 text-white" />}
+                        </button>
+                        <span className="flex-1 truncate">{h.title}</span>
+                        <span className="text-caption text-text-dim">сегодня {done ? '✓' : '—'}</span>
+                      </li>
+                    );
+                  })}
+                </TreeSection>
+              )}
+              {gms.length === 0 && children.length === 0 && linkedTasks.length === 0 && linkedHabits.length === 0 && (
+                <p className="text-caption text-text-muted">Нет связей — добавь вехи в карточке цели, а задачам и привычкам укажи цель.</p>
+              )}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+const TreeSection: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div>
+    <div className="section-label !mb-1.5">{label}</div>
+    <ul className="space-y-1.5">{children}</ul>
+  </div>
+);
 
 function goalSphere(title: string): { label: string; color: string } {
   const t = title.toLowerCase();

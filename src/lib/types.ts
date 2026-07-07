@@ -17,6 +17,7 @@ export interface Goal {
   status: GoalStatus;
   color: string | null;
   cover: string | null;
+  health_metric: HealthMetric | null; // авто-прогресс из логов Здоровья
   created_at: string;
   updated_at: string;
 }
@@ -108,6 +109,26 @@ export interface Reflection {
   done: string | null;
   not_done: string | null;
   reason: string | null;
+  note: string | null;
+}
+
+export interface Milestone {
+  id: string;
+  goal_id: string;
+  title: string;
+  value: number | null;
+  due_date: string | null;
+  done_at: string | null;
+  sort: number;
+}
+
+export type HealthMetric = 'weight' | 'sleep' | 'steps' | 'water' | 'workout' | 'energy' | 'calories';
+
+export interface HealthLog {
+  id: string;
+  date: string;
+  metric: HealthMetric;
+  value: number;
   note: string | null;
 }
 

@@ -32,6 +32,7 @@ const SettingsPage = lazy(() => import('./pages/Settings').then((m) => ({ defaul
 const AwardsPage = lazy(() => import('./pages/Awards').then((m) => ({ default: m.AwardsPage })));
 const TemplatesPage = lazy(() => import('./pages/Templates').then((m) => ({ default: m.TemplatesPage })));
 const CalendarPage = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.CalendarPage })));
+const HealthPage = lazy(() => import('./pages/Health').then((m) => ({ default: m.HealthPage })));
 
 const Loader = () => (
   <div className="p-6 space-y-6">
@@ -219,6 +220,7 @@ export default function App() {
                 <Route path="/awards" element={<AwardsPage />} />
                 <Route path="/templates" element={<TemplatesPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/health" element={<HealthPage date={date} />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </Suspense>
