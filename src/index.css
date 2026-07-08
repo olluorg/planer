@@ -85,6 +85,10 @@
     --bg-hover:      rgba(255, 255, 255, 0.10);
     --border:        rgba(255, 255, 255, 0.10);
     --border-soft:   rgba(255, 255, 255, 0.05);
+    /* Текст ярче, чем в dark: серые тона нечитаемы поверх пёстрых обоев */
+    --text:          #F4F7FB;
+    --text-muted:    rgba(232, 238, 250, 0.72);
+    --text-dim:      rgba(226, 233, 246, 0.45);
   }
 
   html, body, #root { height: 100%; }
@@ -130,6 +134,19 @@
   .glass aside, .glass header {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Card hover по Motion System: subtle lift + shadow + border glow.
+     shadow-card — маркер любой карточки (и <Card>, и ручной разметки). */
+  [class*="shadow-card"] {
+    transition: box-shadow 200ms var(--ease-decelerate), transform 200ms var(--ease-decelerate), border-color 200ms var(--ease-decelerate);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    [class*="shadow-card"]:hover {
+      box-shadow: 0 8px 28px rgba(99, 102, 241, 0.16);
+      transform: translateY(-1px);
+      border-color: rgba(99, 102, 241, 0.25);
+    }
   }
 
   *::-webkit-scrollbar { width: 4px; height: 4px; }

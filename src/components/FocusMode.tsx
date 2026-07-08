@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 import { isoDate } from '@/lib/utils';
+import { compressImage } from '@/lib/imageCompress';
 import { QUOTES, quoteOfDay } from '@/lib/quotes';
 import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
@@ -271,6 +272,16 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
   const [blockNotifs, setBlockNotifs] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  // Зен-режим: при старте панели сворачиваются, круг-счётчик увеличивается
+  const [zen, setZen] = useState(false);
+  // Масштаб круга в зене — от высоты экрана (на 2K заметно крупнее, чем на ноутбуке)
+  const [zenScale, setZenScale] = useState(1.2);
+  useEffect(() => {
+    const calc = () => setZenScale(Math.min(1.85, Math.max(1.15, (window.innerHeight - 360) / 320)));
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
 
   const quote = useMemo(() => (open ? QUOTES[Math.floor(Math.random() * QUOTES.length)] : quoteOfDay()), [open]);
 
@@ -344,10 +355,12 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
       elapsedRef.current = 0;
     }
     setRunning(true);
+    setZen(true);
   };
-  const pause = () => setRunning(false);
+  const pause = () => { setRunning(false); setZen(false); };
   const stop = () => {
     setRunning(false);
+    setZen(false);
     if (entryRef.current) {
       finishTimeEntry(entryRef.current, elapsedRef.current);
       entryRef.current = null;
@@ -356,6 +369,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
   };
   const complete = () => {
     setRunning(false);
+    setZen(false);
     if (entryRef.current) {
       finishTimeEntry(entryRef.current, duration * 60);
       entryRef.current = null;
@@ -473,13 +487,14 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
     setWallpaper(src);
     try { localStorage.setItem(WP_KEY, src); } catch {}
   };
-  const uploadWallpaper = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadWallpaper = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => applyWallpaper(reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = '';
+    if (!file) return;
+    try {
+      // сжимаем: сырое фото в base64 пробивало квоту localStorage и «не добавлялось»
+      applyWallpaper(await compressImage(file));
+    } catch {}
   };
 
   const toggleFullscreen = async () => {
@@ -543,7 +558,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
 
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[300px_1fr_330px] gap-6 px-6 py-8 max-w-[1520px] mx-auto items-start min-h-[calc(100vh-84px)]">
         {/* ЛЕВО */}
-        <div className="order-2 lg:order-1 flex flex-col gap-4 lg:min-h-[70vh]">
+        <div className={`order-2 lg:order-1 flex flex-col gap-4 lg:min-h-[70vh] transition-[opacity,transform] duration-500 ease-out ${zen ? 'opacity-0 -translate-x-6 pointer-events-none' : ''}`}>
           <div className={`${glass} p-5`}>
             <div className="text-sm font-semibold mb-4">Цели фокус-сессии</div>
             {sessionTasks.length === 0 && <div className="text-sm text-white/40 mb-2">Добавь первую задачу ниже</div>}
@@ -619,9 +634,36 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
           </div>
         </div>
 
-        {/* ЦЕНТР */}
-        <div className="flex flex-col items-center gap-6 order-1 lg:order-2">
-          <div className="relative">
+        {/* ЦЕНТР — в зене центрируется по вертикали, круг растёт от размера экрана */}
+        <div className={`flex flex-col items-center order-1 lg:order-2 transition-[gap] duration-500 ${zen ? 'justify-center min-h-[calc(100vh-180px)] gap-10' : 'gap-6'}`}>
+          <div
+            className="relative transition-[transform,margin] duration-700"
+            style={{
+              transform: zen ? `scale(${zenScale})` : 'scale(1)',
+              // transform не раздвигает поток — компенсируем, чтобы круг не наезжал на задачу и панель
+              margin: zen ? `${Math.round((320 * (zenScale - 1)) / 2)}px ${Math.round((320 * (zenScale - 1)) / 2) + 80}px` : '0px',
+              transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            {/* Кнопки возврата панелей — крупные, у самого круга, масштабируются вместе с ним */}
+            {zen && (
+              <>
+                <button
+                  onClick={() => setZen(false)}
+                  className={`absolute -left-20 top-1/2 -translate-y-1/2 z-20 h-12 w-12 ${glass} !rounded-full flex items-center justify-center text-white/70 hover:text-white transition-[color,transform] hover:scale-110`}
+                  title="Показать цели сессии"
+                >
+                  <BarChart3 className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setZen(false)}
+                  className={`absolute -right-20 top-1/2 -translate-y-1/2 z-20 h-12 w-12 ${glass} !rounded-full flex items-center justify-center text-white/70 hover:text-white transition-[color,transform] hover:scale-110`}
+                  title="Показать звук и блокировки"
+                >
+                  <Volume2 className="h-5 w-5" />
+                </button>
+              </>
+            )}
             <svg width="320" height="320">
               <g stroke="rgba(255,255,255,0.18)">
                 {ticks.map((i) => {
@@ -736,8 +778,9 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
           <div className="text-xs text-white/35">Длительность фокуса: {duration} мин · Пробел — старт/пауза</div>
         </div>
 
+
         {/* ПРАВО */}
-        <div className="space-y-4 order-3">
+        <div className={`space-y-4 order-3 transition-[opacity,transform] duration-500 ease-out ${zen ? 'opacity-0 translate-x-6 pointer-events-none' : ''}`}>
           {/* Отвлечения */}
           <div className={`${glass} p-5`}>
             <div className="flex items-center gap-2 text-sm font-semibold mb-3">

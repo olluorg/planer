@@ -204,7 +204,7 @@ export default function App() {
           bellCount={inboxUnread || bellCount}
         />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
-          <div key={location.pathname} className="animate-fade-in h-full">
+          <div key={location.pathname} className="animate-[slide-up_240ms_cubic-bezier(0,0,0.2,1)] h-full">
             <Suspense fallback={<Loader />}>
               <Routes location={location}>
                 <Route path="/index.html" element={<Navigate to="/" replace />} />

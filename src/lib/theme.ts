@@ -5,13 +5,16 @@ export type Theme = 'dark' | 'light' | 'glass';
 const EVENT = 'reform-theme';
 const ACCENT_EVENT = 'reform-accent';
 
+/* Приглушённая минималистичная палитра — без кислотных тонов */
 export const ACCENTS = [
-  { id: 'green',  label: 'Лайм',       color: '#84CC16', soft: '#A3E635' },
-  { id: 'blue',   label: 'Синий',      color: '#3b82f6', soft: '#2563eb' },
-  { id: 'purple', label: 'Лаванда',    color: '#6366f1', soft: '#818cf8' },
-  { id: 'pink',   label: 'Розовый',    color: '#ec4899', soft: '#db2777' },
-  { id: 'orange', label: 'Оранжевый',  color: '#f97316', soft: '#ea580c' },
-  { id: 'cyan',   label: 'Бирюзовый',  color: '#06b6d4', soft: '#0891b2' },
+  { id: 'purple',   label: 'Лаванда',   color: '#6366f1', soft: '#818cf8' },
+  { id: 'steel',    label: 'Стальной',  color: '#4f7cac', soft: '#6b93bd' },
+  { id: 'sage',     label: 'Шалфей',    color: '#6f8f72', soft: '#8aa88d' },
+  { id: 'ocean',    label: 'Океан',     color: '#4e8f9e', soft: '#6aa7b5' },
+  { id: 'plum',     label: 'Слива',     color: '#8b6aa3', soft: '#a487b8' },
+  { id: 'rose',     label: 'Пыльная роза', color: '#b07a8c', soft: '#c295a4' },
+  { id: 'terracotta', label: 'Терракота', color: '#bd7a5f', soft: '#cf957d' },
+  { id: 'graphite', label: 'Графит',    color: '#64748b', soft: '#7e8da3' },
 ] as const;
 
 export type AccentId = typeof ACCENTS[number]['id'];

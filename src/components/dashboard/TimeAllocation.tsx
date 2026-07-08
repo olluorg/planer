@@ -47,18 +47,21 @@ export const TimeAllocation: React.FC<{ date: Date }> = ({ date }) => {
   };
 
   return (
-    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5">
-      <h3 className="text-base font-semibold text-text mb-2">Распределение времени</h3>
+    <div className="h-full rounded-xl bg-bg-card border border-border shadow-card p-5 flex flex-col">
+      <h3 className="text-base font-semibold text-text mb-2 shrink-0">Распределение времени</h3>
       {total === 0 ? (
-        <div className="flex h-[200px] items-center justify-center text-xs text-text-muted">Нет задач на этой неделе</div>
+        <div className="flex-1 flex items-center justify-center text-xs text-text-muted">Нет задач на этой неделе</div>
       ) : (
-        <div className="relative">
-          <ECharts option={option} height={200} />
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-2xl font-bold tabular-nums text-text leading-none">{total}</div>
-            <div className="text-[11px] text-text-muted mt-0.5">задач</div>
+        <>
+          {/* Donut растягивается на доступную высоту ячейки */}
+          <div className="relative flex-1 min-h-[120px]">
+            <ECharts option={option} height="100%" className="!h-full" />
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <div className="text-2xl font-bold tabular-nums text-text leading-none">{total}</div>
+              <div className="text-[11px] text-text-muted mt-0.5">задач</div>
+            </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 shrink-0">
             {data.map((d) => (
               <div key={d.name} className="flex items-center gap-1.5 text-xs text-text-muted">
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.itemStyle.color }} />
@@ -67,7 +70,7 @@ export const TimeAllocation: React.FC<{ date: Date }> = ({ date }) => {
               </div>
             ))}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

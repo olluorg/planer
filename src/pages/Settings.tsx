@@ -15,6 +15,7 @@ import { isSoundEnabled, setSoundEnabled, playSuccess } from "@/lib/sound";
 import { toast } from "@/lib/toast";
 import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper } from "@/lib/theme";
 import { getIconStyle, setIconStyle, type IconStyle } from "@/lib/iconStyle";
+import { compressImage } from "@/lib/imageCompress";
 import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
@@ -366,9 +367,9 @@ export const SettingsPage = () => {
             role="switch"
             aria-checked={heartbeat}
             onClick={() => toggleHeartbeat(!heartbeat)}
-            className={`relative w-10 h-6 transition-colors ${heartbeat ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
+            className={`relative w-10 h-6 shrink-0 rounded-full transition-colors ${heartbeat ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
           >
-            <span className={`absolute top-1 w-4 h-4 bg-white transition-transform ${heartbeat ? 'translate-x-5' : 'translate-x-1'}`} />
+            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${heartbeat ? 'translate-x-5' : 'translate-x-1'}`} />
           </button>
           <span className="text-sm">
             Утро (08:00) и вечер (21:00) — пуш с фокусом дня и напоминанием о рефлексии.
@@ -383,9 +384,9 @@ export const SettingsPage = () => {
             role="switch"
             aria-checked={sound}
             onClick={() => toggleSound(!sound)}
-            className={`relative w-10 h-6 transition-colors ${sound ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
+            className={`relative w-10 h-6 shrink-0 rounded-full transition-colors ${sound ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
           >
-            <span className={`absolute top-1 w-4 h-4 bg-white transition-transform ${sound ? 'translate-x-5' : 'translate-x-1'}`} />
+            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${sound ? 'translate-x-5' : 'translate-x-1'}`} />
           </button>
           <span className="text-sm">Короткий beep при выполнении задачи и unlock-ачивке.</span>
         </label>
@@ -451,13 +452,18 @@ export const SettingsPage = () => {
 const GlassWallpaperPicker: React.FC = () => {
   const [current, setCurrent] = useState(getAppWallpaper());
   const pick = (src: string) => { applyAppWallpaper(src); setCurrent(src); };
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => pick(reader.result as string);
-    reader.readAsDataURL(file);
     e.target.value = "";
+    if (!file) return;
+    try {
+      // сжимаем: сырые фото в base64 пробивают квоту localStorage и молча не сохранялись
+      const dataUrl = await compressImage(file);
+      pick(dataUrl);
+      toast.success("Обои применены");
+    } catch (err: any) {
+      toast.error("Не удалось загрузить обои", String(err?.message ?? err));
+    }
   };
   return (
     <div className="mt-4">

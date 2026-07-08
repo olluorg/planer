@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sparkles, Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3 } from 'lucide-react';
 import { CATEGORIES, setOnboardingDone, setUserName, setUserCategories } from '@/lib/onboarding';
+import { applyTheme, useTheme } from '@/lib/theme';
 import { useStore } from '@/lib/store';
 import { requestPermission, setHeartbeatEnabled } from '@/lib/notifications';
 
@@ -11,10 +12,11 @@ interface Props {
   onClose: () => void;
 }
 
-type StepId = 'welcome' | 'name' | 'categories' | 'notifications' | 'done';
+type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'notifications' | 'done';
 
 export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const addGoal = useStore((s) => s.addGoal);
+  const { theme } = useTheme();
   const [step, setStep] = useState<StepId>('welcome');
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
@@ -22,7 +24,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
 
   if (!open) return null;
 
-  const steps: StepId[] = ['welcome', 'name', 'categories', 'notifications', 'done'];
+  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'notifications', 'done'];
   const stepIdx = steps.indexOf(step);
 
   const next = () => {
@@ -100,6 +102,43 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {step === 'theme' && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <h2 className="text-2xl font-bold text-text">Выбери стиль</h2>
+              <p className="text-text-muted mt-2 text-sm">Как THEDAD будет выглядеть каждый день.</p>
+              <div className="grid grid-cols-2 gap-4 mt-8 w-full max-w-md">
+                <button
+                  onClick={() => applyTheme('light')}
+                  className={`rounded-xl border-2 p-3 transition-all hover:scale-[1.02] ${theme === 'light' ? 'border-accent' : 'border-border'}`}
+                >
+                  <div className="h-24 rounded-lg bg-[#f8fafc] border border-[#e2e8f0] p-2 space-y-1.5 text-left">
+                    <div className="h-2 w-1/2 rounded bg-[#6366f1]" />
+                    <div className="h-8 rounded bg-white border border-[#e2e8f0]" />
+                    <div className="h-8 rounded bg-white border border-[#e2e8f0]" />
+                  </div>
+                  <div className="text-sm font-semibold text-text mt-2.5">Minimalism</div>
+                  <div className="text-[11px] text-text-muted">Чистый светлый интерфейс</div>
+                </button>
+                <button
+                  onClick={() => applyTheme('glass')}
+                  className={`rounded-xl border-2 p-3 transition-all hover:scale-[1.02] ${theme === 'glass' ? 'border-accent' : 'border-border'}`}
+                >
+                  <div
+                    className="h-24 rounded-lg p-2 space-y-1.5 text-left bg-cover bg-center"
+                    style={{ backgroundImage: "url('/wallpapers/1.jpg')" }}
+                  >
+                    <div className="h-2 w-1/2 rounded bg-white/80" />
+                    <div className="h-8 rounded bg-black/35 backdrop-blur-sm border border-white/15" />
+                    <div className="h-8 rounded bg-black/35 backdrop-blur-sm border border-white/15" />
+                  </div>
+                  <div className="text-sm font-semibold text-text mt-2.5">Glass</div>
+                  <div className="text-[11px] text-text-muted">Обои и стеклянные панели</div>
+                </button>
+              </div>
+              <p className="text-[11px] text-text-dim mt-5">Тему всегда можно изменить в Настройках → Внешний вид.</p>
             </div>
           )}
 

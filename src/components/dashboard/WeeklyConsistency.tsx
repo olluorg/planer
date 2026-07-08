@@ -75,15 +75,18 @@ export const WeeklyConsistency: React.FC = () => {
   }, [rows, tasks]);
 
   return (
-    <div className="rounded-xl bg-bg-card border border-border shadow-card p-5 flex flex-col" style={{ containerType: 'inline-size' }}>
-      <div className="flex items-center justify-between mb-1">
+    <div className="h-full rounded-xl bg-bg-card border border-border shadow-card p-5 flex flex-col" style={{ containerType: 'inline-size' }}>
+      <div className="flex items-center justify-between mb-1 shrink-0">
         <h3 className="text-base font-semibold text-text">Постоянство</h3>
         <button onClick={() => nav('/analytics')} className="hm-more text-xs text-accent hover:underline">Подробнее</button>
       </div>
-      <div className="text-[11px] text-text-muted mb-4">{stats.activePct}% активных дней за {WEEKS} недель</div>
+      <div className="text-[11px] text-text-muted mb-4 shrink-0">{stats.activePct}% активных дней за {WEEKS} недель</div>
 
-      {/* Крупная сетка во всю ширину */}
-      <div className="grid gap-1 mx-auto w-full" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', maxWidth: '300px' }}>
+      {/* Сетка заполняет доступную высоту ячейки — не обрезается ни на каких экранах */}
+      <div
+        className="flex-1 min-h-0 grid gap-1 w-full max-w-[340px] mx-auto"
+        style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gridTemplateRows: `auto repeat(${WEEKS}, minmax(0, 1fr))` }}
+      >
         {WD.map((d) => (
           <div key={d} className="text-[10px] text-text-dim text-center font-medium pb-1">{d}</div>
         ))}
@@ -91,7 +94,7 @@ export const WeeklyConsistency: React.FC = () => {
           row.cells.map((c, di) => (
             <div
               key={`${row.weekStart.toISOString()}-${di}`}
-              className="aspect-square w-full rounded-[5px] transition-all hover:ring-2 hover:ring-accent/40"
+              className="w-full h-full min-h-[8px] rounded-[4px] transition-all hover:ring-2 hover:ring-accent/40"
               style={
                 c.future
                   ? { border: '1px dashed var(--border)' }
@@ -104,7 +107,7 @@ export const WeeklyConsistency: React.FC = () => {
       </div>
 
       {/* Легенда — непрерывный градиент */}
-      <div className="hm-legend flex items-center justify-end gap-2 mt-3 text-[10px] text-text-muted">
+      <div className="hm-legend flex items-center justify-end gap-2 mt-3 text-[10px] text-text-muted shrink-0">
         <span>меньше</span>
         <div
           className="h-2 w-24 rounded-full"
@@ -114,7 +117,7 @@ export const WeeklyConsistency: React.FC = () => {
       </div>
 
       {/* Мини-статистика */}
-      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border-soft">
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border-soft shrink-0">
         <Stat icon={<Flame className="h-4 w-4 text-warning" />} value={`${stats.streak}`} label="серия дней" />
         <Stat icon={<Trophy className="h-4 w-4 text-accent" />} value={stats.bestDay} label="лучший день" />
         <Stat icon={<CheckCircle2 className="h-4 w-4 text-success" />} value={`${stats.totalDone}`} label="выполнено" />

@@ -1131,8 +1131,9 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
           {/* Шапка: приветствие + дата · цитата дня вписана в фон + редактор */}
           <div className="mb-6 px-1 flex items-start justify-between gap-8">
             <div className="min-w-0">
-              <h1 className="text-h1 text-text flex items-center gap-3">
-                <span className="truncate">{greeting()}, {getUserName()}.</span> <WeatherChip />
+              {/* Мобайл: меньше кегль и перенос вместо обрезания имени */}
+              <h1 className="text-2xl sm:text-h1 text-text flex items-center flex-wrap gap-x-3 gap-y-1">
+                <span className="break-words">{greeting()}, {getUserName()}.</span> <WeatherChip />
               </h1>
               <div className="text-sm text-text-muted mt-1">
                 <span className="capitalize">{format(date, 'EEEE, d MMMM', { locale: ru })}</span>
