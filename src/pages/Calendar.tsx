@@ -111,7 +111,7 @@ const MonthView: React.FC<{
           return (
             <div
               key={iso}
-              className={`group min-h-[110px] border-b border-r border-border-soft p-2 last:border-r-0 transition-colors ${isCurMonth ? '' : 'bg-bg-soft/40'} hover:bg-bg-soft cursor-pointer`}
+              className={`group min-h-[110px] border-b border-r border-border-soft p-2 last:border-r-0 transition-colors ${isCurMonth ? '' : 'bg-bg-soft/40'} hover:bg-bg-hover hover:ring-1 hover:ring-inset hover:ring-accent/25 cursor-pointer`}
               onClick={() => onDayClick(d)}
             >
               <div className="flex items-center justify-between mb-1">
@@ -207,7 +207,7 @@ const WeekView: React.FC<{
           return (
             <div key={iso} className="border-l border-border-soft relative" onClick={() => onSlotClick(d)}>
               {HOURS.map((h) => (
-                <div key={h} className="h-14 border-b border-border-soft hover:bg-bg-soft/50 transition-colors" />
+                <div key={h} className="h-14 border-b border-border-soft hover:bg-bg-hover hover:ring-1 hover:ring-inset hover:ring-accent/20 transition-colors" />
               ))}
               {/* Absolute positioned events */}
               {dayTasks.map((t) => {

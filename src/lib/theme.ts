@@ -30,15 +30,40 @@ export function applyTheme(t: Theme) {
 
 /* Обои приложения (glass-тема): готовые из /wallpapers или свой dataURL */
 const WP_KEY = 'app.wallpaper.v1';
-export const APP_WALLPAPERS = ['/wallpapers/1.jpg', '/wallpapers/2.png', '/wallpapers/3.png', '/wallpapers/4.png', '/wallpapers/5.png', '/wallpapers/6.png', '/wallpapers/7.png', '/wallpapers/8.png', '/wallpapers/9.png'];
+export const APP_WALLPAPERS = Array.from({ length: 12 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
 
 export function getAppWallpaper(): string {
-  return localStorage.getItem(WP_KEY) || APP_WALLPAPERS[0];
+  const saved = localStorage.getItem(WP_KEY);
+  if (!saved) return APP_WALLPAPERS[0];
+  // старые пути (/wallpapers/2.png и т.п.) больше не существуют — откатываем на дефолт
+  if (saved.startsWith('/wallpapers/') && !APP_WALLPAPERS.includes(saved)) return APP_WALLPAPERS[0];
+  return saved;
 }
 
 export function applyAppWallpaper(src: string) {
   try { localStorage.setItem(WP_KEY, src); } catch {}
   document.documentElement.style.setProperty('--app-wallpaper', `url('${src}')`);
+}
+
+/* Пользовательские обои (dataURL) — сохраняются в список, чтобы не пропадать при переключении */
+const CUSTOM_WP_KEY = 'app.wallpaper.custom.v1';
+const MAX_CUSTOM_WP = 6;
+
+export function getCustomWallpapers(): string[] {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_WP_KEY) || '[]'); } catch { return []; }
+}
+
+/** Добавляет свой фон в список (в начало, с ограничением количества). Возвращает новый список. */
+export function addCustomWallpaper(dataUrl: string): string[] {
+  const list = [dataUrl, ...getCustomWallpapers().filter((x) => x !== dataUrl)].slice(0, MAX_CUSTOM_WP);
+  try { localStorage.setItem(CUSTOM_WP_KEY, JSON.stringify(list)); } catch {}
+  return list;
+}
+
+export function removeCustomWallpaper(dataUrl: string): string[] {
+  const list = getCustomWallpapers().filter((x) => x !== dataUrl);
+  try { localStorage.setItem(CUSTOM_WP_KEY, JSON.stringify(list)); } catch {}
+  return list;
 }
 
 export function applyAccent(id: AccentId) {

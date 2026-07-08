@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { computeInsights } from '@/lib/insights';
 import { getUserName } from '@/lib/onboarding';
-import { Bot, SendHorizontal, TriangleAlert, TrendingUp, Sparkles, Info } from 'lucide-react';
+import { askAI, hasAiKey } from '@/lib/ai';
+import { isoDate } from '@/lib/utils';
+import { Bot, SendHorizontal, TriangleAlert, TrendingUp, Sparkles, Info, Loader2 } from 'lucide-react';
 
 const TONE_ICON: Record<string, React.ElementType> = {
   warning: TriangleAlert, positive: TrendingUp, info: Sparkles, neutral: Info,
@@ -23,21 +25,50 @@ function greeting(): string {
   return 'Добрый вечер';
 }
 
-/** Ключ появится в настройках на этапе подключения AI-провайдера */
-export function hasAiKey(): boolean {
-  try { return Boolean(localStorage.getItem('thedad.ai.key')); } catch { return false; }
-}
-
 export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
   const nav = useNavigate();
   const { tasks, habits, habitLogs, reflections, timeEntries, goals, progress } = useStore();
   const [q, setQ] = useState('');
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const online = hasAiKey();
 
   const recs = useMemo(
     () => computeInsights({ today: date, tasks, habits, habitLogs, reflections, timeEntries, goals, progress }).slice(0, 3),
     [date, tasks, habits, habitLogs, reflections, timeEntries, goals, progress],
   );
+
+  // Контекст дня для модели — реальные данные пользователя
+  const buildContext = () => {
+    const d = isoDate(date);
+    const today = tasks.filter((t) => t.date === d && !t.parent_id);
+    const doneToday = today.filter((t) => t.status === 'done').length;
+    const activeGoals = goals.filter((g) => !g.parent_id && g.status === 'active').slice(0, 8);
+    return [
+      `Пользователь: ${getUserName()}. Дата: ${d}.`,
+      `Задачи на сегодня (${doneToday}/${today.length} выполнено): ${today.map((t) => `${t.status === 'done' ? '✓' : '○'} ${t.title}${t.start_time ? ` (${t.start_time})` : ''}`).join('; ') || 'нет'}.`,
+      `Активные цели: ${activeGoals.map((g) => g.title).join('; ') || 'нет'}.`,
+      `Привычки: ${habits.map((h) => h.title).join('; ') || 'нет'}.`,
+    ].join('\n');
+  };
+
+  const run = async (prompt: string) => {
+    setLoading(true);
+    setAnswer(null);
+    try {
+      const reply = await askAI([
+        { role: 'system', content: `Ты — краткий продуктивный AI-коуч в планере THEDAD. Отвечай по-русски, конкретно, без воды. Контекст:\n${buildContext()}` },
+        { role: 'user', content: prompt },
+      ]);
+      setAnswer(reply);
+    } catch (e: any) {
+      setAnswer(`Ошибка: ${e?.message ?? e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ask = () => { if (q.trim()) { run(q.trim()); setQ(''); } };
 
   return (
     <div className="rounded-xl bg-bg-card border border-border shadow-card p-4 flex flex-col gap-3">
@@ -96,6 +127,15 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
         })}
       </div>
 
+      {/* Ответ модели */}
+      {(loading || answer) && (
+        <div className="rounded-xl bg-bg-soft p-3 text-[13px] text-text leading-relaxed whitespace-pre-wrap">
+          {loading ? (
+            <span className="flex items-center gap-2 text-text-muted"><Loader2 className="h-4 w-4 animate-spin" /> Думаю…</span>
+          ) : answer}
+        </div>
+      )}
+
       {/* Действия */}
       <div className="rounded-xl bg-bg-soft p-3">
         <div className="text-[13px] text-text mb-2.5">
@@ -104,11 +144,19 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
         <div className="flex gap-2">
           {online ? (
             <>
-              <button className="flex-1 h-9 rounded-lg border border-accent/40 text-accent text-xs font-semibold hover:bg-accent/10 transition-colors duration-base">
+              <button
+                onClick={() => run('Составь оптимальный план на сегодня с учётом моих задач и целей: что делать в первую очередь, как распределить время. Кратко, по пунктам.')}
+                disabled={loading}
+                className="flex-1 h-9 rounded-lg border border-accent/40 text-accent text-xs font-semibold hover:bg-accent/10 transition-colors duration-base disabled:opacity-50"
+              >
                 Оптимизировать день
               </button>
-              <button className="flex-1 h-9 rounded-lg border border-border bg-bg-card text-xs font-medium text-text hover:bg-bg-hover transition-colors duration-base">
-                Другой план
+              <button
+                onClick={() => run('Что мне сейчас важнее всего сделать и почему? Одна рекомендация.')}
+                disabled={loading}
+                className="flex-1 h-9 rounded-lg border border-border bg-bg-card text-xs font-medium text-text hover:bg-bg-hover transition-colors duration-base disabled:opacity-50"
+              >
+                Что важнее всего?
               </button>
             </>
           ) : (
@@ -127,12 +175,14 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          disabled={!online}
+          onKeyDown={(e) => e.key === 'Enter' && ask()}
+          disabled={!online || loading}
           placeholder={online ? 'Спроси о чём угодно…' : 'Доступно после подключения ключа'}
           className="flex-1 bg-transparent outline-none text-sm text-text placeholder:text-text-dim disabled:cursor-not-allowed"
         />
         <button
-          disabled={!online || !q.trim()}
+          onClick={ask}
+          disabled={!online || !q.trim() || loading}
           className="h-7 w-7 rounded-full bg-accent text-white flex items-center justify-center disabled:opacity-40 transition-opacity duration-base"
           title="Отправить"
         >

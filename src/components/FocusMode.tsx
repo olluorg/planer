@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 import { isoDate } from '@/lib/utils';
 import { compressImage } from '@/lib/imageCompress';
+import { getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from '@/lib/theme';
 import { QUOTES, quoteOfDay } from '@/lib/quotes';
 import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
@@ -212,7 +213,7 @@ function parseYtId(url: string): string | null {
 
 /* ==================== Обои ==================== */
 
-const WALLPAPERS = ['/wallpapers/1.jpg', '/wallpapers/2.png', '/wallpapers/3.png', '/wallpapers/4.png', '/wallpapers/5.png', '/wallpapers/6.png', '/wallpapers/7.png', '/wallpapers/8.png', '/wallpapers/9.png'];
+const WALLPAPERS = Array.from({ length: 12 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
 const WP_KEY = 'focus.wallpaper.v1';
 
 const glass = 'rounded-xl bg-white/[0.05] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
@@ -266,6 +267,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
   const ytFrameRef = useRef<HTMLIFrameElement>(null);
 
   const [wallpaper, setWallpaper] = useState<string>(() => localStorage.getItem(WP_KEY) || WALLPAPERS[0]);
+  const [customWp, setCustomWp] = useState<string[]>(getCustomWallpapers);
   const [wpOpen, setWpOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -493,8 +495,14 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
     if (!file) return;
     try {
       // сжимаем: сырое фото в base64 пробивало квоту localStorage и «не добавлялось»
-      applyWallpaper(await compressImage(file));
+      const dataUrl = await compressImage(file);
+      setCustomWp(addCustomWallpaper(dataUrl)); // сохраняем в общий список, чтобы не пропало
+      applyWallpaper(dataUrl);
     } catch {}
+  };
+  const delWallpaper = (src: string) => {
+    setCustomWp(removeCustomWallpaper(src));
+    if (wallpaper === src) applyWallpaper(WALLPAPERS[0]);
   };
 
   const toggleFullscreen = async () => {
@@ -762,11 +770,21 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
 
           {wpOpen && (
             <div className={`${glass} p-3 flex items-center gap-2 flex-wrap max-w-lg justify-center`}>
-              {WALLPAPERS.map((w) => (
-                <button key={w} onClick={() => applyWallpaper(w)} className={`h-12 w-20 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${wallpaper === w ? 'border-white/90' : 'border-transparent opacity-70 hover:opacity-100'}`}>
-                  <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
-                </button>
-              ))}
+              {[...customWp, ...WALLPAPERS].map((w) => {
+                const isCustom = customWp.includes(w);
+                return (
+                  <div key={w} className="relative group/wp">
+                    <button onClick={() => applyWallpaper(w)} className={`h-12 w-20 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${wallpaper === w ? 'border-white/90' : 'border-transparent opacity-70 hover:opacity-100'}`}>
+                      <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    </button>
+                    {isCustom && (
+                      <button onClick={() => delWallpaper(w)} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/wp:opacity-100 transition-opacity" title="Удалить">
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
               <button onClick={() => fileRef.current?.click()} className="h-12 w-20 rounded-lg border-2 border-dashed border-white/25 hover:border-white/60 flex flex-col items-center justify-center text-white/40 hover:text-white transition-colors" title="Загрузить свой фон">
                 <Upload className="h-4 w-4" />
                 <span className="text-[9px] mt-0.5">Свой</span>

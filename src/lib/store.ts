@@ -6,7 +6,26 @@ import { ACHIEVEMENTS, checkNewAchievements, computeStreak, levelFromXp, xpTotal
 import { useCombo } from './combo';
 import { playSuccess, playUnlock } from './sound';
 import { todayISO } from './utils';
+import { nextRecurrenceDate } from './recurrence';
 import { syncTasksToExtension } from './extension';
+
+/** Переносит просроченные активные повторяющиеся задачи на сегодня (без дублей).
+ *  Так пропущенные повторы не копятся как «просрочено». */
+function rollRecurring() {
+  const today = todayISO();
+  const overdue = query<Task>(
+    `SELECT * FROM tasks WHERE recurrence IS NOT NULL AND status = 'active' AND parent_id IS NULL AND date < ?`,
+    [today],
+  );
+  for (const t of overdue) {
+    const dup = query<{ c: number }>(
+      'SELECT COUNT(*) c FROM tasks WHERE title = ? AND date = ? AND recurrence = ?',
+      [t.title, today, t.recurrence],
+    )[0]?.c ?? 0;
+    if (dup) exec('DELETE FROM tasks WHERE id = ?', [t.id]);
+    else exec('UPDATE tasks SET date = ?, updated_at = ? WHERE id = ?', [today, new Date().toISOString(), t.id]);
+  }
+}
 
 interface State {
   ready: boolean;
@@ -86,6 +105,7 @@ export const useStore = create<State>((set, get) => ({
     await getDB();
     const goalsCount = query<{ c: number }>('SELECT COUNT(*) c FROM goals')[0]?.c ?? 0;
     if (goalsCount === 0) seed();
+    rollRecurring(); // переносим просроченные активные повторы на сегодня
     get().reload();
     set({ ready: true });
   },
@@ -175,13 +195,14 @@ export const useStore = create<State>((set, get) => ({
       tags: t.tags ?? null,
       estimate_min: t.estimate_min ?? null,
       start_time: t.start_time ?? null,
+      recurrence: t.recurrence ?? null,
       completed_at: null,
       created_at: now(),
       updated_at: now(),
     };
     exec(
-      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, start_time, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.tags, task.estimate_min, task.start_time, task.completed_at, task.created_at, task.updated_at],
+      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, start_time, recurrence, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.tags, task.estimate_min, task.start_time, task.recurrence, task.completed_at, task.created_at, task.updated_at],
     );
     get().reload();
     return task;
@@ -192,8 +213,8 @@ export const useStore = create<State>((set, get) => ({
     if (!cur) return;
     const next = { ...cur, ...p, updated_at: now() };
     exec(
-      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, tags=?, estimate_min=?, start_time=?, completed_at=?, updated_at=? WHERE id=?`,
-      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.tags, next.estimate_min, next.start_time, next.completed_at, next.updated_at, id],
+      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, tags=?, estimate_min=?, start_time=?, recurrence=?, completed_at=?, updated_at=? WHERE id=?`,
+      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.tags, next.estimate_min, next.start_time, next.recurrence, next.completed_at, next.updated_at, id],
     );
     get().reload();
   },
@@ -209,6 +230,21 @@ export const useStore = create<State>((set, get) => ({
     if (!isDone) {
       useCombo.getState().recordCompletion();
       get().awardXp(cur.parent_id ? 'subtask' : 'task', id);
+      // Повторяющаяся задача выполнена → создаём следующий экземпляр
+      if (cur.recurrence && !cur.parent_id) {
+        const nextDate = nextRecurrenceDate(cur.recurrence, cur.date);
+        const exists = query<{ c: number }>(
+          'SELECT COUNT(*) c FROM tasks WHERE title = ? AND date = ? AND recurrence = ? AND status = ?',
+          [cur.title, nextDate, cur.recurrence, 'active'],
+        )[0]?.c ?? 0;
+        if (!exists) {
+          get().addTask({
+            title: cur.title, goal_id: cur.goal_id, date: nextDate, time_block: cur.time_block,
+            priority: cur.priority, tags: cur.tags, estimate_min: cur.estimate_min,
+            start_time: cur.start_time, recurrence: cur.recurrence,
+          });
+        }
+      }
     }
   },
 

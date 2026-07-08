@@ -4,7 +4,7 @@ import { resetDB, persist, DB_KEY } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import {
-  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles,
+  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X,
 } from "lucide-react";
 import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
@@ -13,9 +13,10 @@ import { parseCsv, readFileText } from "@/lib/importCsv";
 import { isHeartbeatEnabled, setHeartbeatEnabled } from "@/lib/notifications";
 import { isSoundEnabled, setSoundEnabled, playSuccess } from "@/lib/sound";
 import { toast } from "@/lib/toast";
-import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper } from "@/lib/theme";
+import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper, getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from "@/lib/theme";
 import { getIconStyle, setIconStyle, type IconStyle } from "@/lib/iconStyle";
 import { compressImage } from "@/lib/imageCompress";
+import { getAiConfig, setAiConfig, askAI } from "@/lib/ai";
 import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
@@ -243,6 +244,11 @@ export const SettingsPage = () => {
       </Card>
 
       <Card>
+        <CardTitle>AI-коуч</CardTitle>
+        <AiSettings />
+      </Card>
+
+      <Card>
         <CardTitle>База данных (SQLite WASM)</CardTitle>
         <div className="text-sm text-text-muted mb-4">
           Все данные хранятся локально в IndexedDB через WebAssembly-сборку
@@ -369,7 +375,7 @@ export const SettingsPage = () => {
             onClick={() => toggleHeartbeat(!heartbeat)}
             className={`relative w-10 h-6 shrink-0 rounded-full transition-colors ${heartbeat ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
           >
-            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${heartbeat ? 'translate-x-5' : 'translate-x-1'}`} />
+            <span className={`absolute top-1 left-0 w-4 h-4 rounded-full bg-white shadow transition-transform ${heartbeat ? 'translate-x-5' : 'translate-x-1'}`} />
           </button>
           <span className="text-sm">
             Утро (08:00) и вечер (21:00) — пуш с фокусом дня и напоминанием о рефлексии.
@@ -386,7 +392,7 @@ export const SettingsPage = () => {
             onClick={() => toggleSound(!sound)}
             className={`relative w-10 h-6 shrink-0 rounded-full transition-colors ${sound ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
           >
-            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${sound ? 'translate-x-5' : 'translate-x-1'}`} />
+            <span className={`absolute top-1 left-0 w-4 h-4 rounded-full bg-white shadow transition-transform ${sound ? 'translate-x-5' : 'translate-x-1'}`} />
           </button>
           <span className="text-sm">Короткий beep при выполнении задачи и unlock-ачивке.</span>
         </label>
@@ -448,9 +454,10 @@ export const SettingsPage = () => {
   );
 };
 
-/* Выбор обоев для glass-темы: готовые + свой файл */
+/* Выбор обоев для glass-темы: готовые + свои (сохраняются в список) */
 const GlassWallpaperPicker: React.FC = () => {
   const [current, setCurrent] = useState(getAppWallpaper());
+  const [custom, setCustom] = useState<string[]>(getCustomWallpapers());
   const pick = (src: string) => { applyAppWallpaper(src); setCurrent(src); };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -459,30 +466,109 @@ const GlassWallpaperPicker: React.FC = () => {
     try {
       // сжимаем: сырые фото в base64 пробивают квоту localStorage и молча не сохранялись
       const dataUrl = await compressImage(file);
+      setCustom(addCustomWallpaper(dataUrl)); // сохраняем в список, чтобы не пропало
       pick(dataUrl);
-      toast.success("Обои применены");
+      toast.success("Обои добавлены");
     } catch (err: any) {
       toast.error("Не удалось загрузить обои", String(err?.message ?? err));
     }
+  };
+  const del = (src: string) => {
+    setCustom(removeCustomWallpaper(src));
+    if (current === src) pick(APP_WALLPAPERS[0]);
   };
   return (
     <div className="mt-4">
       <div className="text-[11px] text-text-muted mb-2">Обои</div>
       <div className="flex gap-2 flex-wrap items-center">
-        {APP_WALLPAPERS.map((w) => (
-          <button
-            key={w}
-            onClick={() => pick(w)}
-            className={`h-11 w-[72px] rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${current === w ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"}`}
-          >
-            <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
-          </button>
-        ))}
+        {[...custom, ...APP_WALLPAPERS].map((w) => {
+          const isCustom = custom.includes(w);
+          return (
+            <div key={w} className="relative group">
+              <button
+                onClick={() => pick(w)}
+                className={`h-11 w-[72px] rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${current === w ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"}`}
+              >
+                <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
+              </button>
+              {isCustom && (
+                <button
+                  onClick={() => del(w)}
+                  className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-danger text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Удалить"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </div>
+          );
+        })}
         <label className="h-11 w-[72px] rounded-lg border-2 border-dashed border-border hover:border-accent flex flex-col items-center justify-center text-text-muted hover:text-text cursor-pointer transition-colors">
           <Upload className="h-3.5 w-3.5" />
           <span className="text-[9px] mt-0.5">Свой</span>
           <input type="file" accept="image/*" className="hidden" onChange={onFile} />
         </label>
+      </div>
+    </div>
+  );
+};
+
+/* Настройки AI-коуча: ключ хранится локально, запрос идёт напрямую к провайдеру */
+const AiSettings: React.FC = () => {
+  const [cfg, setCfg] = useState(getAiConfig());
+  const [show, setShow] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const save = (patch: Partial<typeof cfg>) => {
+    const next = { ...cfg, ...patch };
+    setCfg(next);
+    setAiConfig(next);
+  };
+  const test = async () => {
+    setTesting(true);
+    try {
+      const reply = await askAI([{ role: 'user', content: 'Ответь одним словом: работает?' }]);
+      toast.success('Ключ работает', reply.slice(0, 60));
+    } catch (e: any) {
+      toast.error('Не удалось подключиться', String(e?.message ?? e));
+    } finally {
+      setTesting(false);
+    }
+  };
+  return (
+    <div className="space-y-3">
+      <div className="text-sm text-text-muted">
+        Подключи свой ключ (OpenAI-совместимый) — коуч на дашборде начнёт отвечать и планировать день.
+        Ключ и запросы остаются на твоём устройстве, ничего не проходит через наши серверы.
+      </div>
+      <div>
+        <div className="text-[11px] text-text-muted mb-1">API-ключ</div>
+        <div className="flex gap-2">
+          <Input
+            type={show ? 'text' : 'password'}
+            placeholder="sk-…"
+            value={cfg.key}
+            onChange={(e) => save({ key: e.target.value })}
+            className="flex-1"
+          />
+          <Button variant="soft" size="sm" onClick={() => setShow((v) => !v)}>{show ? 'Скрыть' : 'Показать'}</Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div>
+          <div className="text-[11px] text-text-muted mb-1">Endpoint</div>
+          <Input placeholder="https://api.openai.com/v1/chat/completions" value={cfg.endpoint} onChange={(e) => save({ endpoint: e.target.value })} />
+        </div>
+        <div>
+          <div className="text-[11px] text-text-muted mb-1">Модель</div>
+          <Input placeholder="gpt-4o-mini" value={cfg.model} onChange={(e) => save({ model: e.target.value })} />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={test} disabled={!cfg.key || testing}>{testing ? 'Проверка…' : 'Проверить ключ'}</Button>
+        {cfg.key && <Button variant="soft" size="sm" onClick={() => save({ key: '' })}>Отключить</Button>}
+      </div>
+      <div className="text-[11px] text-text-dim">
+        Совместимо с OpenAI, OpenRouter, локальными LLM. Для Anthropic укажи прокси с OpenAI-форматом.
       </div>
     </div>
   );

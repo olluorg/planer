@@ -164,6 +164,7 @@ function migrate(d: Database) {
   if (!columnExists(d, 'tasks', 'estimate_min')) d.exec(`ALTER TABLE tasks ADD COLUMN estimate_min INTEGER`);
   if (!columnExists(d, 'tasks', 'start_time')) d.exec(`ALTER TABLE tasks ADD COLUMN start_time TEXT`);
   if (!columnExists(d, 'goals', 'health_metric')) d.exec(`ALTER TABLE goals ADD COLUMN health_metric TEXT`);
+  if (!columnExists(d, 'tasks', 'recurrence')) d.exec(`ALTER TABLE tasks ADD COLUMN recurrence TEXT`);
   d.exec(POST_MIGRATE_INDEXES);
 }
 

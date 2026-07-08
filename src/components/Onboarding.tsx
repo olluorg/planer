@@ -128,7 +128,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                 >
                   <div
                     className="h-24 rounded-lg p-2 space-y-1.5 text-left bg-cover bg-center"
-                    style={{ backgroundImage: "url('/wallpapers/1.jpg')" }}
+                    style={{ backgroundImage: "url('/wallpapers/wp1.jpg')" }}
                   >
                     <div className="h-2 w-1/2 rounded bg-white/80" />
                     <div className="h-8 rounded bg-black/35 backdrop-blur-sm border border-white/15" />

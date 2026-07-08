@@ -13,32 +13,45 @@ import { Mascot } from '@/components/Mascot';
 import { renderShareCard, downloadDataUrl } from '@/lib/sharePng';
 import { leagueFor, xpInWeek } from '@/lib/leagues';
 import { Button } from '@/components/ui/button';
-import { Share2, Snowflake, CheckCircle2, Target, BadgeCheck, Flame, Mountain, Star, Sparkles, NotebookPen, Timer, Zap, Trophy, Dices, Gem, Medal, type LucideIcon } from 'lucide-react';
+import { Share2, Snowflake, CheckCircle2, Target, BadgeCheck, Flame, Mountain, Star, Sparkles, NotebookPen, Timer, Zap, Trophy, Dices, Gem, Medal, Crown, type LucideIcon } from 'lucide-react';
 import { useIconStyle } from '@/lib/iconStyle';
 import { availableFreezes, useFreeze, FREEZES_PER_MONTH } from '@/lib/streakFreeze';
 import { addDays } from 'date-fns';
 import { weeklyXpHistory, monthlyXpHistory, bestWeek, bestMonth } from '@/lib/personalRecords';
+import { computeChallenges } from '@/lib/challenges';
 
 /* Минималистичные SVG-аналоги эмодзи-иконок достижений */
 const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   first_task: CheckCircle2,
   tasks_10: Target,
+  tasks_50: Target,
   tasks_100: BadgeCheck,
+  tasks_500: Trophy,
   streak_3: Flame,
   streak_7: Flame,
+  streak_14: Flame,
   streak_30: Mountain,
+  streak_100: Mountain,
   level_5: Star,
   level_10: Sparkles,
+  level_20: Star,
+  level_50: Crown,
   reflect_7: NotebookPen,
+  reflect_30: NotebookPen,
   pomodoro_10: Timer,
+  pomodoro_25: Timer,
   pomodoro_50: Timer,
+  pomodoro_100: Target,
   combo_first: Zap,
   combo_5: Zap,
+  combo_20: Zap,
   freeze_used: Snowflake,
   weekly_winner: Trophy,
+  weekly_winner_5: Gem,
   quest_full_day: Dices,
   league_diamond: Gem,
   habit_perfect_week: Medal,
+  habits_100: Medal,
 };
 
 export const AwardsPage = () => {
@@ -207,6 +220,8 @@ export const AwardsPage = () => {
         );
       })()}
 
+      <ChallengesCard />
+
       <Card>
         <CardTitle>Достижения</CardTitle>
         <div className="text-[11px] text-text-muted mb-3">{unlockedSet.size} / {ACHIEVEMENTS.length} разблокировано</div>
@@ -240,6 +255,53 @@ export const AwardsPage = () => {
         </div>
       </Card>
     </div>
+  );
+};
+
+/* Повторяющиеся челленджи — день / неделя / месяц (обновляются автоматически) */
+const CHALLENGE_LABELS: Record<'day' | 'week' | 'month', string> = { day: 'День', week: 'Неделя', month: 'Месяц' };
+
+const ChallengesCard: React.FC = () => {
+  const { tasks, habitLogs, reflections, timeEntries, xpLog } = useStore();
+  const groups = useMemo(
+    () => computeChallenges({ now: new Date(), tasks, habitLogs, reflections, timeEntries, xpLog }),
+    [tasks, habitLogs, reflections, timeEntries, xpLog],
+  );
+  const periods: ('day' | 'week' | 'month')[] = ['day', 'week', 'month'];
+  return (
+    <Card>
+      <CardTitle>Челленджи</CardTitle>
+      <div className="text-[11px] text-text-muted mb-3">Обновляются каждый день, неделю и месяц — держи ритм</div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {periods.map((p) => (
+          <div key={p}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold text-text uppercase tracking-wider">{CHALLENGE_LABELS[p]}</span>
+              <span className="text-[10px] text-text-dim tabular-nums">{groups[p].filter((c) => c.done).length}/{groups[p].length}</span>
+            </div>
+            <div className="space-y-2.5">
+              {groups[p].map((c) => (
+                <div key={c.key} className={`rounded-lg border p-2.5 transition-colors ${c.done ? 'border-accent/40 bg-accent/[0.06]' : 'border-border-soft'}`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {c.done
+                      ? <CheckCircle2 className="h-4 w-4 text-accent shrink-0" />
+                      : <span className="h-4 w-4 rounded-full border-2 border-border shrink-0" />}
+                    <span className={`text-xs flex-1 ${c.done ? 'text-text' : 'text-text-muted'}`}>{c.title}</span>
+                    <span className="text-[10px] text-accent tabular-nums shrink-0">+{c.reward}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-bg-soft overflow-hidden">
+                      <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${c.pct}%` }} />
+                    </div>
+                    <span className="text-[10px] text-text-muted tabular-nums shrink-0 w-12 text-right">{c.current}/{c.target}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 };
 

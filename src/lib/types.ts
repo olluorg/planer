@@ -2,6 +2,7 @@ export type GoalType = 'long' | 'mid' | 'short';
 export type GoalStatus = 'active' | 'done' | 'archived';
 export type TaskStatus = 'active' | 'done';
 export type TimeBlock = 'morning' | 'day' | 'evening' | 'night' | null;
+export type Recurrence = 'daily' | 'weekdays' | 'weekends' | 'weekly' | null;
 
 export interface Goal {
   id: string;
@@ -35,6 +36,7 @@ export interface Task {
   tags: string | null;
   estimate_min: number | null;
   start_time: string | null;
+  recurrence: Recurrence;
   completed_at: string | null;
   created_at: string;
   updated_at: string;

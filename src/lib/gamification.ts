@@ -162,6 +162,30 @@ export const ACHIEVEMENTS: AchievementDef[] = [
       }
       return false;
     } },
+  { key: 'tasks_50',        title: 'Полсотни',           description: 'Выполнено 50 задач',              icon: '🎯',
+    check: (c) => c.tasks.filter((t) => t.status === 'done').length >= 50 },
+  { key: 'tasks_500',       title: 'Пятьсот',            description: 'Выполнено 500 задач',             icon: '🏆',
+    check: (c) => c.tasks.filter((t) => t.status === 'done').length >= 500 },
+  { key: 'streak_14',       title: 'Две недели',         description: 'Streak 14 дней',                  icon: '🔥',
+    check: (c) => c.streak >= 14 },
+  { key: 'streak_100',      title: 'Сотка дней',         description: 'Streak 100 дней',                 icon: '🌋',
+    check: (c) => c.streak >= 100 },
+  { key: 'level_20',        title: 'Двадцатый уровень',  description: 'Достигни 20 уровня',              icon: '🌟',
+    check: (c) => c.level >= 20 },
+  { key: 'level_50',        title: 'Полтинник уровня',   description: 'Достигни 50 уровня',              icon: '👑',
+    check: (c) => c.level >= 50 },
+  { key: 'pomodoro_25',     title: '25 помидоров',       description: 'Заверши 25 pomodoro',             icon: '🍅',
+    check: (c) => c.pomodoroCount >= 25 },
+  { key: 'pomodoro_100',    title: 'Мастер фокуса',      description: 'Заверши 100 pomodoro',            icon: '🎯',
+    check: (c) => c.pomodoroCount >= 100 },
+  { key: 'reflect_30',      title: 'Месяц рефлексии',    description: '30 дней с рефлексией',            icon: '🧘',
+    check: (c) => c.reflections.length >= 30 },
+  { key: 'combo_20',        title: 'Мастер потока',      description: '20 combo за всё время',           icon: '⚡',
+    check: (c) => c.comboCount >= 20 },
+  { key: 'habits_100',      title: 'Сила привычки',      description: '100 отметок привычек',            icon: '🏅',
+    check: (c) => c.habitLogs.length >= 100 },
+  { key: 'weekly_winner_5', title: 'Пятикратный чемпион', description: 'Прошёл 5 недельных челленджей',  icon: '💎',
+    check: (c) => c.weeklyWins >= 5 },
 ];
 
 export function checkNewAchievements(ctx: AchievementContext, already: Achievement[]): AchievementDef[] {
