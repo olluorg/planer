@@ -61,6 +61,7 @@ import { WeekProgressChart } from '@/components/dashboard/WeekProgressChart';
 import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
 import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
+import { HealthWidget } from '@/components/dashboard/HealthWidget';
 import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
@@ -89,6 +90,7 @@ const DEFAULT_LAYOUT: Layout[] = [
   // В рейле по умолчанию, но доступны и как виджеты сетки
   { i: 'upcoming',       x: 0, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
   { i: 'quick-capture',  x: 4, y: 16, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'health',         x: 8, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
   // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
   { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
   { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
@@ -121,6 +123,7 @@ const DEFAULT_HIDDEN = [
 const MOBILE_LAYOUT: Layout[] = [
   { i: 'today-focus',    x: 0, y: 0,  w: 4, h: 5 },
   { i: 'day-brief',      x: 0, y: 5,  w: 4, h: 5 },
+  { i: 'health',         x: 0, y: 9, w: 4, h: 6 },
   { i: 'today-plan',     x: 0, y: 10, w: 4, h: 6 },
   { i: 'habit-dots',     x: 0, y: 16, w: 4, h: 6 },
   { i: 'consistency',    x: 0, y: 22, w: 4, h: 6 },
@@ -171,6 +174,12 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
 
   const [gridRef, gridW] = useContainerWidth();
   const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v8', DEFAULT_LAYOUT);
+  // Новые виджеты из DEFAULT_LAYOUT доезжают в сохранённую раскладку старых пользователей
+  useEffect(() => {
+    const missing = DEFAULT_LAYOUT.filter((d) => !layout.some((l) => l.i === d.i));
+    if (missing.length) setLayout([...layout, ...missing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [editing, setEditingRaw] = useState(false);
   const [backup, setBackup] = useState<Layout[] | null>(null);
   const enterEditor = () => { setBackup(JSON.parse(JSON.stringify(layout))); setEditingRaw(true); };
@@ -385,6 +394,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     'quick-capture': () => (
       <Cell editing={editing} onHide={() => hideWidget('quick-capture')}>
         <QuickCapture date={date} />
+      </Cell>
+    ),
+    'health': () => (
+      <Cell editing={editing} onHide={() => hideWidget('health')}>
+        <HealthWidget date={date} />
       </Cell>
     ),
 
@@ -1122,6 +1136,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       </WidgetCard>
     ),
   };
+
+  // Пустой старт — иллюстрированный экран «с чего начать» вместо пустой drag-сетки
+  if (goals.length === 0 && tasks.length === 0 && habits.length === 0 && reflections.length === 0) {
+    return <EmptyDashboard date={date} />;
+  }
 
   return (
     <div className="page py-4 sm:py-6">

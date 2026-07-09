@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3 } from 'lucide-react';
+import { Sparkles, Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3, Calendar as CalendarIcon, HeartPulse, NotebookPen } from 'lucide-react';
 import { CATEGORIES, setOnboardingDone, setUserName, setUserCategories } from '@/lib/onboarding';
 import { applyTheme, useTheme } from '@/lib/theme';
+import { Logo } from '@/components/ui/logo';
 import { useStore } from '@/lib/store';
 import { requestPermission, setHeartbeatEnabled } from '@/lib/notifications';
 
@@ -12,7 +13,7 @@ interface Props {
   onClose: () => void;
 }
 
-type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'notifications' | 'done';
+type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'cycle' | 'notifications' | 'done';
 
 export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const addGoal = useStore((s) => s.addGoal);
@@ -24,7 +25,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
 
   if (!open) return null;
 
-  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'notifications', 'done'];
+  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'cycle', 'notifications', 'done'];
   const stepIdx = steps.indexOf(step);
 
   const next = () => {
@@ -81,9 +82,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
         <div className="p-8 sm:p-10 min-h-[440px] flex flex-col">
           {step === 'welcome' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="h-16 w-16 rounded-2xl bg-accent text-white flex items-center justify-center mb-5 shadow-lift">
-                <Sparkles className="h-7 w-7" />
-              </div>
+              <Logo size={72} className="mb-5" />
               <h1 className="text-3xl font-bold text-text">Добро пожаловать в THEDAD</h1>
               <p className="text-text-muted mt-3 max-w-md leading-relaxed">
                 Планер целей с прогнозом результата. Всё хранится локально на вашем устройстве — данные ваши.
@@ -161,7 +160,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
             <div className="flex-1 flex flex-col">
               <Target className="h-6 w-6 text-accent mb-3" />
               <h2 className="text-2xl font-bold text-text">На каких сферах сфокусируетесь?</h2>
-              <p className="text-text-muted mt-2">Выберите 1–3. Под каждую создадим шаблонную цель — её можно отредактировать.</p>
+              <p className="text-text-muted mt-2">Выберите 1–3 — под каждую создадим стартовую цель. Или <b className="text-text">пропустите</b>: начнёте с чистого листа и добавите всё сами (в том числе из Шаблонов).</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
                 {CATEGORIES.map((c) => {
                   const active = chosen.includes(c.id);
@@ -190,6 +189,35 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                 })}
               </div>
               <div className="text-xs text-text-muted mt-4">Выбрано: {chosen.length} / 3</div>
+            </div>
+          )}
+
+          {step === 'cycle' && (
+            <div className="flex-1 flex flex-col justify-center">
+              <h2 className="text-2xl font-bold text-text text-center">Как это работает</h2>
+              <p className="text-text-muted mt-2 text-sm text-center max-w-md mx-auto">THEDAD — не просто список дел, а замкнутый цикл жизни. Каждый шаг питает следующий.</p>
+              <div className="mt-7 space-y-2.5 max-w-md mx-auto w-full">
+                {[
+                  { icon: Target, color: '#6366f1', title: 'Цели', body: 'Задаёшь направление и вехи' },
+                  { icon: CalendarIcon, color: '#8b5cf6', title: 'План', body: 'Раскладываешь день по времени' },
+                  { icon: Zap, color: '#f59e0b', title: 'Фокус', body: 'Действуешь — Focus Mode и привычки' },
+                  { icon: HeartPulse, color: '#22c55e', title: 'Здоровье', body: 'Тело питает энергию для целей' },
+                  { icon: NotebookPen, color: '#ec4899', title: 'Рефлексия', body: 'Смотришь итог — и цикл идёт заново' },
+                ].map((s, i, arr) => (
+                  <div key={s.title}>
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}1f` }}>
+                        <s.icon className="h-4.5 w-4.5" style={{ color: s.color }} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-text">{s.title}</div>
+                        <div className="text-xs text-text-muted">{s.body}</div>
+                      </div>
+                    </div>
+                    {i < arr.length - 1 && <div className="ml-[18px] my-0.5 h-3 w-px bg-border" />}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

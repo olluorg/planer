@@ -4,7 +4,7 @@ import { resetDB, persist, DB_KEY } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme } from "@/lib/theme";
 import {
-  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X,
+  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X, CalendarDays,
 } from "lucide-react";
 import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
@@ -17,7 +17,9 @@ import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper, getCustomW
 import { getIconStyle, setIconStyle, type IconStyle } from "@/lib/iconStyle";
 import { compressImage } from "@/lib/imageCompress";
 import { getAiConfig, setAiConfig, askAI } from "@/lib/ai";
-import { buildWeeklyMarkdown, downloadText } from "@/lib/report";
+import { parseIcs } from "@/lib/ics";
+import { SyncSettings } from "@/components/SyncSettings";
+import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
 import { Input } from "@/components/ui/input";
@@ -158,6 +160,14 @@ export const SettingsPage = () => {
     downloadText(`thedad-week-${new Date().toISOString().slice(0, 10)}.md`, md);
   };
 
+  const exportWeeklyPdf = () => {
+    const s = useStore.getState();
+    printWeeklyReport(new Date(), {
+      goals: s.goals, tasks: s.tasks, habits: s.habits,
+      habitLogs: s.habitLogs, progress: s.progress, reflections: s.reflections,
+    });
+  };
+
   const exportEncrypted = async () => {
     const pass = window.prompt('Пароль для шифрования (минимум 8 символов):');
     if (!pass || pass.length < 8) { alert('Слишком короткий пароль'); return; }
@@ -183,6 +193,19 @@ export const SettingsPage = () => {
       location.reload();
     } catch (e: any) {
       alert('Не удалось расшифровать: ' + (e?.message ?? e));
+    }
+  };
+
+  const importIcsFile = async (file: File) => {
+    try {
+      const text = await readFileText(file);
+      const events = parseIcs(text);
+      let imported = 0;
+      events.forEach((ev) => { addTask({ title: ev.title, date: ev.date, start_time: ev.start_time }); imported++; });
+      if (imported) toast.success(`Импортировано событий: ${imported}`, 'Из календаря (.ics)');
+      else toast.error('События не найдены', 'Проверь файл .ics');
+    } catch (e: any) {
+      toast.error('Ошибка импорта .ics', String(e?.message ?? e));
     }
   };
 
@@ -244,6 +267,11 @@ export const SettingsPage = () => {
       </Card>
 
       <Card>
+        <CardTitle>Синхронизация устройств</CardTitle>
+        <SyncSettings />
+      </Card>
+
+      <Card>
         <CardTitle>AI-коуч</CardTitle>
         <AiSettings />
       </Card>
@@ -288,6 +316,19 @@ export const SettingsPage = () => {
           <Button variant="soft" onClick={exportWeeklyReport}>
             <FileText /> Отчёт за неделю (.md)
           </Button>
+          <Button variant="soft" onClick={exportWeeklyPdf}>
+            <FileText /> Отчёт PDF
+          </Button>
+          <Button
+            variant="soft"
+            onClick={() => {
+              const ok = useStore.getState().seedDemoData();
+              if (ok) toast.success('Примеры загружены', 'Демо-цели, задачи и привычки');
+              else toast.info('У вас уже есть данные', 'Примеры добавляются только на чистый старт');
+            }}
+          >
+            <Sparkles /> Загрузить примеры
+          </Button>
           <Button
             variant="soft"
             onClick={() => { localStorage.removeItem('onboarding.done.v1'); location.reload(); }}
@@ -328,7 +369,17 @@ export const SettingsPage = () => {
               <span><FileJson /> JSON</span>
             </Button>
           </label>
+          <label>
+            <input
+              type="file" accept=".ics,text/calendar" className="hidden"
+              onChange={(e) => e.target.files?.[0] && importIcsFile(e.target.files[0])}
+            />
+            <Button variant="soft" asChild>
+              <span><CalendarDays /> Календарь .ics</span>
+            </Button>
+          </label>
         </div>
+        <div className="text-[11px] text-text-muted mt-2">.ics — экспорт из Google Calendar / Apple Calendar / Outlook: события станут задачами с датой и временем.</div>
       </Card>
 
       <Card>
@@ -381,7 +432,7 @@ export const SettingsPage = () => {
             Утро (08:00) и вечер (21:00) — пуш с фокусом дня и напоминанием о рефлексии.
           </span>
         </label>
-        <div className="text-[11px] text-text-muted mt-2">Работает только пока вкладка открыта (без сервера VAPID).</div>
+        <div className="text-[11px] text-text-muted mt-2">Системные уведомления приходят, пока приложение открыто (вкладка или установленное PWA). Для надёжности установи THEDAD как приложение и держи в фоне — фоновой доставки при полностью закрытом приложении нет (нужен сервер).</div>
 
         <CardTitle className="mt-6">Звук при действии</CardTitle>
         <label className="flex items-center gap-3 cursor-pointer">

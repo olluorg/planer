@@ -33,6 +33,7 @@ const AwardsPage = lazy(() => import('./pages/Awards').then((m) => ({ default: m
 const TemplatesPage = lazy(() => import('./pages/Templates').then((m) => ({ default: m.TemplatesPage })));
 const CalendarPage = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.CalendarPage })));
 const HealthPage = lazy(() => import('./pages/Health').then((m) => ({ default: m.HealthPage })));
+const LandingPage = lazy(() => import('./pages/Landing').then((m) => ({ default: m.LandingPage })));
 
 const Loader = () => (
   <div className="p-6 space-y-6">
@@ -76,7 +77,17 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentUnlocks.length]);
 
-  useEffect(() => { void init(); applyAccent(getAccent()); }, [init]);
+  useEffect(() => {
+    // QR-привязка: если открыли ссылку с #sync=, подтягиваем БД и перезагружаемся
+    (async () => {
+      try {
+        const m = await import('./lib/sync');
+        if (await m.importSyncFromHashIfPresent()) { window.location.reload(); return; }
+      } catch {}
+      void init();
+    })();
+    applyAccent(getAccent());
+  }, [init]);
 
   useEffect(() => {
     if (!ready) return;
@@ -185,6 +196,15 @@ export default function App() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Лендинг — вне оболочки приложения (без сайдбара/топбара)
+  if (location.pathname === '/landing') {
+    return (
+      <Suspense fallback={<Loader />}>
+        <LandingPage />
+      </Suspense>
     );
   }
 

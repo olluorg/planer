@@ -39,6 +39,14 @@ export const Toaster: React.FC = () => {
                 <div className="text-sm font-semibold text-text leading-snug">{t.message}</div>
                 {t.description && <div className="text-xs text-text-muted mt-0.5 leading-relaxed">{t.description}</div>}
               </div>
+              {t.action && (
+                <button
+                  onClick={() => { t.action!.onClick(); dismiss(t.id); }}
+                  className="shrink-0 text-xs font-semibold text-accent hover:underline px-1 self-center"
+                >
+                  {t.action.label}
+                </button>
+              )}
               <button
                 onClick={() => dismiss(t.id)}
                 className="shrink-0 h-6 w-6 rounded-md hover:bg-bg-soft flex items-center justify-center text-text-muted"

@@ -59,9 +59,7 @@ export const useCombo = create<ComboState>((set, get) => ({
         const prev = Number(localStorage.getItem('combo.lifetime.count.v1') || 0);
         localStorage.setItem('combo.lifetime.count.v1', String(prev + 1));
       } catch {}
-      try {
-        new Notification('THEDAD', { body: 'Поток! ×1.5 XP на 30 минут. Не теряй темп.' });
-      } catch {}
+      import('./notifications').then((m) => m.notify('THEDAD', { body: 'Поток! ×1.5 XP на 30 минут. Не теряй темп.' })).catch(() => {});
       try {
         // import dynamically to avoid circular module init
         import('./inbox').then((m) => m.useInbox.getState().add({

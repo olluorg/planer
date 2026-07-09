@@ -9,6 +9,19 @@ import { todayISO } from './utils';
 import { nextRecurrenceDate } from './recurrence';
 import { syncTasksToExtension } from './extension';
 
+/** Generic re-insert строки по её объекту (для undo-восстановления). */
+function insertRow(table: string, row: Record<string, any>) {
+  const keys = Object.keys(row);
+  const placeholders = keys.map(() => '?').join(',');
+  exec(`INSERT OR REPLACE INTO ${table} (${keys.join(',')}) VALUES (${placeholders})`, keys.map((k) => row[k]));
+}
+
+/** Удаление + toast «Отменить». onRestore восстанавливает всё (строки, связи) и делает reload. */
+function deleteWithUndo(label: string, doDelete: () => void, onRestore: () => void) {
+  doDelete();
+  import('./toast').then((m) => m.toast.action(`${label} удалено`, { label: 'Отменить', onClick: onRestore }));
+}
+
 /** Переносит просроченные активные повторяющиеся задачи на сегодня (без дублей).
  *  Так пропущенные повторы не копятся как «просрочено». */
 function rollRecurring() {
@@ -45,6 +58,8 @@ interface State {
   recentUnlocks: { key: string; ts: number }[];
   init: () => Promise<void>;
   reload: () => void;
+  /** Загрузить демо-примеры (по кнопке). Работает только если данных ещё нет. */
+  seedDemoData: () => boolean;
   // time entries
   startTimeEntry: (taskId: string | null, type?: 'pomodoro' | 'free') => TimeEntry;
   finishTimeEntry: (id: string, duration: number) => void;
@@ -103,8 +118,8 @@ export const useStore = create<State>((set, get) => ({
 
   init: async () => {
     await getDB();
-    const goalsCount = query<{ c: number }>('SELECT COUNT(*) c FROM goals')[0]?.c ?? 0;
-    if (goalsCount === 0) seed();
+    // Демо-данные больше НЕ сеются автоматически — чистый старт по умолчанию.
+    // Примеры можно загрузить вручную (Настройки) или получить цели из онбординга.
     rollRecurring(); // переносим просроченные активные повторы на сегодня
     get().reload();
     set({ ready: true });
@@ -127,6 +142,14 @@ export const useStore = create<State>((set, get) => ({
       achievements: query<Achievement>('SELECT * FROM achievements ORDER BY unlocked_at DESC'),
     });
     syncTasksToExtension(tasks);
+  },
+
+  seedDemoData: () => {
+    const count = query<{ c: number }>('SELECT COUNT(*) c FROM goals')[0]?.c ?? 0;
+    if (count > 0) return false; // не затираем существующие данные
+    seed();
+    get().reload();
+    return true;
   },
 
   addGoal: (g) => {
@@ -174,11 +197,28 @@ export const useStore = create<State>((set, get) => ({
   },
 
   removeGoal: (id) => {
-    exec('DELETE FROM goals WHERE id = ?', [id]);
-    exec('UPDATE tasks SET goal_id = NULL WHERE goal_id = ?', [id]);
-    exec('UPDATE habits SET goal_id = NULL WHERE goal_id = ?', [id]);
-    exec('DELETE FROM progress_records WHERE goal_id = ?', [id]);
-    get().reload();
+    const goal = query<Goal>('SELECT * FROM goals WHERE id = ?', [id]);
+    const progressRows = query<any>('SELECT * FROM progress_records WHERE goal_id = ?', [id]);
+    const milestoneRows = query<any>('SELECT * FROM milestones WHERE goal_id = ?', [id]);
+    const linkedTasks = query<any>('SELECT id FROM tasks WHERE goal_id = ?', [id]).map((t) => t.id);
+    const linkedHabits = query<any>('SELECT id FROM habits WHERE goal_id = ?', [id]).map((h) => h.id);
+    deleteWithUndo('Цель',
+      () => {
+        exec('DELETE FROM goals WHERE id = ?', [id]);
+        exec('UPDATE tasks SET goal_id = NULL WHERE goal_id = ?', [id]);
+        exec('UPDATE habits SET goal_id = NULL WHERE goal_id = ?', [id]);
+        exec('DELETE FROM progress_records WHERE goal_id = ?', [id]);
+        exec('DELETE FROM milestones WHERE goal_id = ?', [id]);
+        get().reload();
+      },
+      () => {
+        goal.forEach((r) => insertRow('goals', r));
+        progressRows.forEach((r) => insertRow('progress_records', r));
+        milestoneRows.forEach((r) => insertRow('milestones', r));
+        linkedTasks.forEach((tid) => exec('UPDATE tasks SET goal_id = ? WHERE id = ?', [id, tid]));
+        linkedHabits.forEach((hid) => exec('UPDATE habits SET goal_id = ? WHERE id = ?', [id, hid]));
+        get().reload();
+      });
   },
 
   addTask: (t) => {
@@ -249,8 +289,10 @@ export const useStore = create<State>((set, get) => ({
   },
 
   removeTask: (id) => {
-    exec('DELETE FROM tasks WHERE id = ?', [id]);
-    get().reload();
+    const rows = query<any>('SELECT * FROM tasks WHERE id = ? OR parent_id = ?', [id, id]);
+    deleteWithUndo('Задача',
+      () => { exec('DELETE FROM tasks WHERE id = ? OR parent_id = ?', [id, id]); get().reload(); },
+      () => { rows.forEach((r) => insertRow('tasks', r)); get().reload(); });
   },
 
   addHabit: (h) => {
@@ -284,9 +326,11 @@ export const useStore = create<State>((set, get) => ({
   },
 
   removeHabit: (id) => {
-    exec('DELETE FROM habits WHERE id = ?', [id]);
-    exec('DELETE FROM habit_logs WHERE habit_id = ?', [id]);
-    get().reload();
+    const habit = query<any>('SELECT * FROM habits WHERE id = ?', [id]);
+    const logs = query<any>('SELECT * FROM habit_logs WHERE habit_id = ?', [id]);
+    deleteWithUndo('Привычка',
+      () => { exec('DELETE FROM habits WHERE id = ?', [id]); exec('DELETE FROM habit_logs WHERE habit_id = ?', [id]); get().reload(); },
+      () => { habit.forEach((r) => insertRow('habits', r)); logs.forEach((r) => insertRow('habit_logs', r)); get().reload(); });
   },
 
   toggleHabitLog: (habit_id, date) => {

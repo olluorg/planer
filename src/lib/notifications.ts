@@ -1,5 +1,21 @@
-// Local Notifications API: schedules timeouts while the tab is open.
-// True web push (delivered when tab is closed) requires a server with VAPID keys.
+// Локальные напоминания: таймеры на переднем плане/в фоне вкладки.
+// Уведомления показываются через Service Worker registration — это системные
+// уведомления (с иконкой приложения), надёжнее, чем new Notification().
+// Настоящий web-push при полностью закрытом приложении требует сервера с VAPID.
+
+/** Показать уведомление максимально надёжным доступным способом. */
+export async function notify(title: string, opts: NotificationOptions & { tag?: string }): Promise<void> {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const options: NotificationOptions = { icon: '/wallpapers/wp1.jpg', badge: '/favicon.ico', ...opts };
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title, options);
+      return;
+    }
+  } catch { /* fallback ниже */ }
+  try { new Notification(title, options); } catch {}
+}
 
 export type Reminder = {
   id: string;
@@ -42,12 +58,18 @@ export function scheduleAll() {
     if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
     const delay = target.getTime() - now.getTime();
     const id = window.setTimeout(() => {
-      try {
-        new Notification('THEDAD', { body: r.text, tag: r.id });
-      } catch {}
+      void notify('THEDAD', { body: r.text, tag: r.id });
       scheduleAll();
     }, delay);
     timers.push(id);
+  });
+}
+
+// Браузер сильно тормозит таймеры в фоновой вкладке — при возврате фокуса
+// пере-планируем, чтобы пропущенные за это время напоминания не потерялись.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') scheduleAll();
   });
 }
 
@@ -69,7 +91,7 @@ function scheduleHeartbeatAt(hh: number, mm: number, body: () => string) {
   if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
   const delay = target.getTime() - now.getTime();
   const id = window.setTimeout(() => {
-    try { new Notification('THEDAD', { body: body(), tag: `heartbeat-${hh}` }); } catch {}
+    void notify('THEDAD', { body: body(), tag: `heartbeat-${hh}` });
     scheduleHeartbeatAt(hh, mm, body);
   }, delay);
   heartbeatTimers.push(id);

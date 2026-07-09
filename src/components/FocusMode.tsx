@@ -4,6 +4,7 @@ import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 import { isoDate } from '@/lib/utils';
 import { compressImage } from '@/lib/imageCompress';
 import { getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from '@/lib/theme';
+import { notify } from '@/lib/notifications';
 import { QUOTES, quoteOfDay } from '@/lib/quotes';
 import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
@@ -376,7 +377,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
       finishTimeEntry(entryRef.current, duration * 60);
       entryRef.current = null;
     }
-    if (!blockNotifs) { try { new Notification('Focus Mode', { body: `Сессия ${duration} мин завершена 🎉` }); } catch {} }
+    if (!blockNotifs) void notify('Focus Mode', { body: `Сессия ${duration} мин завершена 🎉` });
   };
 
   /* ===== Микшер ===== */

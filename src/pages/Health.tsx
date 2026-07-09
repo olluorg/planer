@@ -229,7 +229,7 @@ function moodOpt(days: string[], vals: (number | null)[], cc: any) {
   const EMOJI = ['', '😖', '😕', '😐', '🙂', '😄'];
   return {
     grid: { left: 40, right: 10, top: 10, bottom: 24 },
-    tooltip: { trigger: 'axis', backgroundColor: cc.tooltipBg, borderColor: cc.tooltipBorder, textStyle: { color: cc.tooltipText }, formatter: (ps: any[]) => ps.map((p) => `${p.axisValue}: ${EMOJI[p.value] ?? '—'} ${p.value ?? ''}`).join('<br/>') },
+    tooltip: { trigger: 'axis', backgroundColor: cc.tooltipBg, borderColor: cc.tooltipBorder, textStyle: { color: cc.tooltipText }, formatter: (ps: any[]) => ps.map((p) => `${p.axisValue}: ${EMOJI[p.value] ?? '—'} ${p.value ?? ''}`).join('\n') },
     xAxis: { type: 'category', data: days.map((x) => x.slice(5)), axisLabel: { color: cc.axis, fontSize: 9, hideOverlap: true }, axisTick: { show: false }, axisLine: { lineStyle: { color: cc.axisLine } } },
     yAxis: { type: 'value', min: 1, max: 5, interval: 1, axisLabel: { color: cc.axis, fontSize: 12, formatter: (v: number) => EMOJI[v] ?? '' }, splitLine: { lineStyle: { color: cc.splitLine } }, axisLine: { show: false }, axisTick: { show: false } },
     series: [{ type: 'line', smooth: true, connectNulls: true, data: vals, symbol: 'circle', symbolSize: 7, lineStyle: { color: '#8b5cf6', width: 2.5 }, itemStyle: { color: '#8b5cf6' }, areaStyle: { color: '#8b5cf61f' } }],

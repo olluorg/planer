@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thedad
+      POSTGRES_PASSWORD: thedad
+      POSTGRES_DB: thedad
+    volumes:
+      - thedad_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thedad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  sync:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://thedad:thedad@db:5432/thedad
+      PORT: 8787
+    ports:
+      - "8787:8787"
+
+volumes:
+  thedad_db:

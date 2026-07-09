@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { useMemo } from 'react';
 import { getUserName } from '@/lib/onboarding';
 import { quoteOfDay } from '@/lib/quotes';
+import { Logo } from '@/components/ui/logo';
 
 const items = [
   { to: '/', label: 'Главная', icon: LayoutGrid, end: true },
@@ -44,9 +45,7 @@ export const Sidebar = () => {
       <aside className="hidden sm:flex w-[210px] shrink-0 border-r border-border flex-col bg-bg-card">
         {/* Brand */}
         <div className="px-5 py-5 border-b border-border-soft shrink-0 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-accent text-white flex items-center justify-center shrink-0 shadow-lift">
-            <Sparkles className="h-5 w-5" />
-          </div>
+          <Logo size={40} className="shrink-0" />
           <div className="leading-tight">
             <div className="text-[15px] font-bold text-text">THEDAD</div>
             <div className="text-[11px] text-text-muted">Планер целей</div>
