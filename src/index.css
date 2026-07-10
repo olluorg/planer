@@ -91,6 +91,20 @@
     --text-dim:      rgba(226, 233, 246, 0.45);
   }
 
+  /* Glass-light — стеклянная светлая: те же обои, но панели светло-матовые, текст тёмный.
+     Идёт БЕЗ .dark, поэтому переопределяем то, что задал .glass (тёмные карты + светлый текст). */
+  .glass-light {
+    --bg-card:       rgba(255, 255, 255, 0.58);
+    --bg-elevated:   rgba(255, 255, 255, 0.68);
+    --bg-soft:       rgba(15, 18, 30, 0.05);
+    --bg-hover:      rgba(15, 18, 30, 0.09);
+    --border:        rgba(15, 18, 30, 0.12);
+    --border-soft:   rgba(15, 18, 30, 0.07);
+    --text:          #16181f;
+    --text-muted:    rgba(22, 24, 31, 0.66);
+    --text-dim:      rgba(22, 24, 31, 0.42);
+  }
+
   html, body, #root { height: 100%; }
 
   body {
@@ -125,6 +139,9 @@
     z-index: -1;
     background: rgba(5, 5, 12, 0.55);
   }
+  /* Светлая стеклянная тема осветляет обои, чтобы светлые панели читались */
+  .glass-light body { background: #e9ecf2; }
+  .glass-light body::after { background: rgba(240, 243, 248, 0.55); }
   /* Панели становятся стеклянными: blur на всём, что использует карточные фоны */
   .glass [class*="bg-bg-card"],
   .glass .card {
@@ -142,7 +159,9 @@
     transition: box-shadow 200ms var(--ease-decelerate), transform 200ms var(--ease-decelerate), border-color 200ms var(--ease-decelerate);
   }
   @media (hover: hover) and (pointer: fine) {
-    [class*="shadow-card"]:hover {
+    /* role="dialog"/"alertdialog" исключены: у модалок свой центрирующий transform
+       (-translate-x/y-1/2), и hover-lift сбивал бы его — окно «убегало» от курсора. */
+    [class*="shadow-card"]:not([role="dialog"]):not([role="alertdialog"]):hover {
       box-shadow: 0 8px 28px rgba(99, 102, 241, 0.16);
       transform: translateY(-1px);
       border-color: rgba(99, 102, 241, 0.25);

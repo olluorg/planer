@@ -66,6 +66,7 @@ import { HealthWidget } from '@/components/dashboard/HealthWidget';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
 import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
+import { hasAiKey } from '@/lib/ai';
 import { getUserName } from '@/lib/onboarding';
 import { Sparkles } from 'lucide-react';
 
@@ -1246,9 +1247,9 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
           )}
             </div>
 
-            {/* Правый рейл: AI-коуч · ближайшее · быстрый захват */}
+            {/* Правый рейл: AI-коуч (только при наличии ключа) · ближайшее · быстрый захват */}
             <aside className="w-full xl:w-[320px] shrink-0 flex flex-col gap-4">
-              <CoachPanel date={date} />
+              {hasAiKey() && <CoachPanel date={date} />}
               <UpcomingEvents date={date} />
               <QuickCapture date={date} />
             </aside>

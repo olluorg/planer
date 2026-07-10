@@ -113,10 +113,19 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                   onClick={() => applyTheme('light')}
                   className={`rounded-xl border-2 p-3 transition-all hover:scale-[1.02] ${theme === 'light' ? 'border-accent' : 'border-border'}`}
                 >
-                  <div className="h-24 rounded-lg bg-[#f8fafc] border border-[#e2e8f0] p-2 space-y-1.5 text-left">
-                    <div className="h-2 w-1/2 rounded bg-[#6366f1]" />
-                    <div className="h-8 rounded bg-white border border-[#e2e8f0]" />
-                    <div className="h-8 rounded bg-white border border-[#e2e8f0]" />
+                  {/* Мини-интерфейс: шапка + виджеты + кольцо прогресса — на светлой поверхности */}
+                  <div className="h-24 rounded-lg bg-[#f4f6fb] border border-[#e2e8f0] p-2 flex gap-1.5 text-left overflow-hidden">
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      <div className="h-2 w-2/3 rounded-full bg-[#6366f1]" />
+                      <div className="flex-1 rounded-md bg-white border border-[#e6ebf3] p-1 flex flex-col gap-1">
+                        <div className="h-1.5 w-4/5 rounded-full bg-[#c7d0e0]" />
+                        <div className="h-1.5 w-3/5 rounded-full bg-[#dbe2ee]" />
+                      </div>
+                      <div className="h-4 rounded-md bg-white border border-[#e6ebf3]" />
+                    </div>
+                    <div className="w-9 shrink-0 rounded-md bg-white border border-[#e6ebf3] flex items-center justify-center">
+                      <div className="h-6 w-6 rounded-full border-[3px] border-[#6366f1] border-r-[#e2e8f0] border-b-[#e2e8f0]" />
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-text mt-2.5">Minimalism</div>
                   <div className="text-[11px] text-text-muted">Чистый светлый интерфейс</div>
@@ -125,13 +134,22 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                   onClick={() => applyTheme('glass')}
                   className={`rounded-xl border-2 p-3 transition-all hover:scale-[1.02] ${theme === 'glass' ? 'border-accent' : 'border-border'}`}
                 >
+                  {/* Тот же мини-интерфейс, но панели — матовое стекло поверх обоев */}
                   <div
-                    className="h-24 rounded-lg p-2 space-y-1.5 text-left bg-cover bg-center"
+                    className="h-24 rounded-lg p-2 flex gap-1.5 text-left overflow-hidden bg-cover bg-center"
                     style={{ backgroundImage: "url('/wallpapers/wp14.jpg')" }}
                   >
-                    <div className="h-2 w-1/2 rounded bg-white/80" />
-                    <div className="h-8 rounded bg-black/35 backdrop-blur-sm border border-white/15" />
-                    <div className="h-8 rounded bg-black/35 backdrop-blur-sm border border-white/15" />
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      <div className="h-2 w-2/3 rounded-full bg-white/85" />
+                      <div className="flex-1 rounded-md bg-white/15 backdrop-blur-sm border border-white/25 p-1 flex flex-col gap-1">
+                        <div className="h-1.5 w-4/5 rounded-full bg-white/60" />
+                        <div className="h-1.5 w-3/5 rounded-full bg-white/35" />
+                      </div>
+                      <div className="h-4 rounded-md bg-white/15 backdrop-blur-sm border border-white/25" />
+                    </div>
+                    <div className="w-9 shrink-0 rounded-md bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center">
+                      <div className="h-6 w-6 rounded-full border-[3px] border-white/85 border-r-white/25 border-b-white/25" />
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-text mt-2.5">Glass</div>
                   <div className="text-[11px] text-text-muted">Обои и стеклянные панели</div>

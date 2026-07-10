@@ -2,7 +2,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { resetDB, persist, DB_KEY } from "@/lib/db";
 import { useStore } from "@/lib/store";
-import { useTheme } from "@/lib/theme";
+import { useTheme, isGlass } from "@/lib/theme";
 import {
   Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X, CalendarDays,
 } from "lucide-react";
@@ -243,13 +243,23 @@ export const SettingsPage = () => {
             <Moon className="h-4 w-4" /> Тёмная
           </Button>
           <Button
-            variant={theme === "glass" ? "default" : "soft"}
-            onClick={() => setTheme("glass")}
+            variant={isGlass(theme) ? "default" : "soft"}
+            onClick={() => setTheme(theme === "glass-light" ? "glass-light" : "glass")}
           >
             <Sparkles className="h-4 w-4" /> Glass
           </Button>
         </div>
-        {theme === "glass" && <GlassWallpaperPicker />}
+        {isGlass(theme) && (
+          <div className="mt-3 flex gap-2">
+            <Button variant={theme === "glass" ? "default" : "soft"} size="sm" onClick={() => setTheme("glass")}>
+              <Moon className="h-3.5 w-3.5" /> Тёмное стекло
+            </Button>
+            <Button variant={theme === "glass-light" ? "default" : "soft"} size="sm" onClick={() => setTheme("glass-light")}>
+              <Sun className="h-3.5 w-3.5" /> Светлое стекло
+            </Button>
+          </div>
+        )}
+        {isGlass(theme) && <GlassWallpaperPicker />}
         <div className="text-[11px] text-text-muted mt-4 mb-2">Иконки наград</div>
         <IconStylePicker />
         <div className="text-[11px] text-text-muted mt-4 mb-2">Акцентный цвет</div>

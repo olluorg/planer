@@ -6,7 +6,7 @@ import {
   Plus, Search, Moon, Sun, Download, Crosshair, Keyboard,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 
 export const CommandPalette: React.FC<{
   open: boolean;
@@ -58,7 +58,7 @@ export const CommandPalette: React.FC<{
           <Item icon={Plus} label="Записать показатель" shortcut="P" onSelect={() => { close(); onAddProgress(); }} />
           {onFocusMode && <Item icon={Crosshair} label="Focus Mode (Deep Work)" shortcut="⇧F" onSelect={() => { close(); onFocusMode(); }} />}
           {onShortcuts && <Item icon={Keyboard} label="Горячие клавиши" shortcut="?" onSelect={() => { close(); onShortcuts(); }} />}
-          <Item icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'} onSelect={() => { toggle(); close(); }} />
+          <Item icon={isDarkMode(theme) ? Sun : Moon} label={isDarkMode(theme) ? 'Светлый режим' : 'Тёмный режим'} onSelect={() => { toggle(); close(); }} />
         </Command.Group>
 
         <Command.Group heading="Переход" className="text-[11px] uppercase tracking-wider text-text-muted px-2 py-1 mt-2">

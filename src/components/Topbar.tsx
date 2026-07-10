@@ -1,6 +1,6 @@
 import { Search, Plus, Bell, Timer, Sun, Moon, Pause, Play, Square, Crosshair, Lightbulb, CheckSquare, NotebookPen, Target, Zap } from 'lucide-react';
 import { Button } from './ui/button';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 
 interface Props {
@@ -42,19 +42,19 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, 
           </kbd>
         </button>
 
-        {/* Pomodoro chip */}
+        {/* Pomodoro chip — нейтральный, читается на любой теме (текст следует за --text) */}
         {pomo.secondsLeft > 0 && (
-          <div className="flex items-center gap-1.5 rounded-lg bg-accent/10 border border-accent/30 px-2.5 h-9">
+          <div className="flex items-center gap-1.5 rounded-lg bg-bg-card/80 border border-border px-2.5 h-9">
             <Timer className="h-3.5 w-3.5 text-accent" />
-            <button onClick={onTimer} className="tabular-nums text-xs font-medium text-accent" title={pomo.taskTitle ?? 'Свободный таймер'}>
+            <button onClick={onTimer} className="tabular-nums text-xs font-medium text-text" title={pomo.taskTitle ?? 'Свободный таймер'}>
               {fmtSec(pomo.secondsLeft)}
             </button>
             {pomo.running ? (
-              <button onClick={() => pomo.pauseAction?.()} className="text-accent/70 hover:text-accent" title="Пауза"><Pause className="h-3.5 w-3.5" /></button>
+              <button onClick={() => pomo.pauseAction?.()} className="text-text-muted hover:text-text" title="Пауза"><Pause className="h-3.5 w-3.5" /></button>
             ) : (
-              <button onClick={() => pomo.resumeAction?.()} className="text-accent hover:text-accent-soft" title="Старт"><Play className="h-3.5 w-3.5" /></button>
+              <button onClick={() => pomo.resumeAction?.()} className="text-text-muted hover:text-text" title="Старт"><Play className="h-3.5 w-3.5" /></button>
             )}
-            <button onClick={() => pomo.stopAction?.()} className="text-accent/70 hover:text-danger" title="Стоп"><Square className="h-3.5 w-3.5" /></button>
+            <button onClick={() => pomo.stopAction?.()} className="text-text-muted hover:text-danger" title="Стоп"><Square className="h-3.5 w-3.5" /></button>
           </div>
         )}
 
@@ -67,8 +67,8 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, 
             <Bell />
             {bellCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-danger ring-2 ring-bg" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggle} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          <Button variant="ghost" size="icon" onClick={toggle} title={isDarkMode(theme) ? 'Светлый режим' : 'Тёмный режим'}>
+            {isDarkMode(theme) ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </div>
       </div>

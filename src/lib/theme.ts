@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 
-export type Theme = 'dark' | 'light' | 'glass';
+// Две оси: стиль (minimalism | glass) и режим (light | dark).
+// 'glass' = стеклянная тёмная (историческое значение, не мигрируем), 'glass-light' = стеклянная светлая.
+export type Theme = 'dark' | 'light' | 'glass' | 'glass-light';
 
 const EVENT = 'reform-theme';
 const ACCENT_EVENT = 'reform-accent';
+
+/** Стеклянная тема (любой режим). */
+export const isGlass = (t: Theme) => t === 'glass' || t === 'glass-light';
+/** Тёмный режим (для иконок/графиков): dark и стеклянная-тёмная. */
+export const isDarkMode = (t: Theme) => t === 'dark' || t === 'glass';
 
 /* Приглушённая минималистичная палитра — без кислотных тонов */
 export const ACCENTS = [
@@ -21,10 +28,11 @@ export type AccentId = typeof ACCENTS[number]['id'];
 
 export function applyTheme(t: Theme) {
   localStorage.setItem('theme', t);
-  // glass строится поверх тёмной палитры
-  document.documentElement.classList.toggle('dark', t === 'dark' || t === 'glass');
-  document.documentElement.classList.toggle('glass', t === 'glass');
-  if (t === 'glass') applyAppWallpaper(getAppWallpaper());
+  const root = document.documentElement;
+  root.classList.toggle('dark', isDarkMode(t));            // glass-dark тоже тёмный
+  root.classList.toggle('glass', isGlass(t));
+  root.classList.toggle('glass-light', t === 'glass-light'); // светлые панели поверх обоев
+  if (isGlass(t)) applyAppWallpaper(getAppWallpaper());
   window.dispatchEvent(new CustomEvent(EVENT, { detail: t }));
 }
 
@@ -100,8 +108,13 @@ export function useTheme() {
   const setTheme = (t: Theme) => { applyTheme(t); setThemeState(t); };
   const setAccent = (a: AccentId) => { applyAccent(a); setAccentState(a); };
 
-  return {
-    theme, setTheme, toggle: () => setTheme(theme === 'light' ? 'dark' : 'light'),
-    accent, setAccent,
-  };
+  // Переключатель меняет только режим (свет/тьма) ВНУТРИ выбранного стиля,
+  // не перекидывая glass↔minimalism.
+  const toggle = () => setTheme(
+    isGlass(theme)
+      ? (theme === 'glass' ? 'glass-light' : 'glass')
+      : (theme === 'light' ? 'dark' : 'light'),
+  );
+
+  return { theme, setTheme, toggle, accent, setAccent };
 }
