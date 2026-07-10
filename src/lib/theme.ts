@@ -30,13 +30,14 @@ export function applyTheme(t: Theme) {
 
 /* Обои приложения (glass-тема): готовые из /wallpapers или свой dataURL */
 const WP_KEY = 'app.wallpaper.v1';
-export const APP_WALLPAPERS = Array.from({ length: 12 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
+export const APP_WALLPAPERS = Array.from({ length: 20 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
+export const DEFAULT_WALLPAPER = '/wallpapers/wp14.jpg';
 
 export function getAppWallpaper(): string {
   const saved = localStorage.getItem(WP_KEY);
-  if (!saved) return APP_WALLPAPERS[0];
+  if (!saved) return DEFAULT_WALLPAPER;
   // старые пути (/wallpapers/2.png и т.п.) больше не существуют — откатываем на дефолт
-  if (saved.startsWith('/wallpapers/') && !APP_WALLPAPERS.includes(saved)) return APP_WALLPAPERS[0];
+  if (saved.startsWith('/wallpapers/') && !APP_WALLPAPERS.includes(saved)) return DEFAULT_WALLPAPER;
   return saved;
 }
 

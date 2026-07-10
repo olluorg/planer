@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Responsive, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -7,10 +7,11 @@ import 'react-resizable/css/styles.css';
 /** Ширина сетки через ResizeObserver: WidthProvider мерит до применения
  *  стилей и не замечает появление правого рейла. */
 function useContainerWidth() {
-  const ref = useRef<HTMLDivElement>(null);
+  // callback-ref: контейнер появляется позже (после пустого экрана), поэтому
+  // замер нужно переподключать на каждое присоединение узла, а не один раз на маунте
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [w, setW] = useState(0);
   useEffect(() => {
-    const el = ref.current;
     if (!el) return;
     // Синхронный замер сразу (RO в фоновых вкладках может молчать) + RO/resize для изменений
     const measure = () => setW(el.getBoundingClientRect().width);
@@ -19,8 +20,8 @@ function useContainerWidth() {
     ro.observe(el);
     window.addEventListener('resize', measure);
     return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-  }, []);
-  return [ref, w] as const;
+  }, [el]);
+  return [setEl, w] as const;
 }
 import { CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';

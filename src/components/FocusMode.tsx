@@ -214,7 +214,7 @@ function parseYtId(url: string): string | null {
 
 /* ==================== Обои ==================== */
 
-const WALLPAPERS = Array.from({ length: 12 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
+const WALLPAPERS = Array.from({ length: 20 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
 const WP_KEY = 'focus.wallpaper.v1';
 
 const glass = 'rounded-xl bg-white/[0.05] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
