@@ -30,7 +30,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import {
   Plus, ChevronRight, Sun, Moon, Lock, Unlock, RotateCcw, Trash2,
-  CheckSquare, Repeat, NotebookPen, Dumbbell, Timer, Target,
+  CheckSquare, Repeat, NotebookPen, Dumbbell, Timer, Target, Maximize2,
   Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
 } from 'lucide-react';
 import { getWeather, type Weather } from '@/lib/weather';
@@ -136,6 +136,29 @@ const MOBILE_LAYOUT: Layout[] = [
 ];
 
 const ROW_HEIGHT = 48;
+
+// Виджет → страница, которую он раскрывает по клику на ⤢ (навигация через виджеты)
+const WIDGET_PAGE: Record<string, string> = {
+  'today-focus': 'plan',
+  'today-plan': 'tasks',
+  'habit-dots': 'habits',
+  'consistency': 'analytics',
+  'time-alloc': 'analytics',
+  'week-progress': 'analytics',
+  'goals-progress': 'goals',
+  'goals-week': 'goals',
+  'kpi-grid': 'goals',
+  'upcoming': 'calendar',
+  'calendar': 'calendar',
+  'health': 'health',
+  'reflection': 'reflection',
+  'quests': 'awards',
+  'weekly-challenge': 'awards',
+  'leagues': 'awards',
+  'plan-future': 'goals',
+};
+
+const openPage = (page: string) => window.dispatchEvent(new CustomEvent('thedad:expand', { detail: { page } }));
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -1239,8 +1262,17 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             draggableCancel="button,input,textarea,label,a,select"
           >
             {visibleLayout.map((l) => (
-              <div key={l.i} className="bento-item">
+              <div key={l.i} className="bento-item group/bento relative">
                 {widgets[l.i]?.()}
+                {!editing && WIDGET_PAGE[l.i] && (
+                  <button
+                    onClick={() => openPage(WIDGET_PAGE[l.i])}
+                    className="absolute top-2 right-2 z-20 h-7 w-7 rounded-lg bg-bg-soft/85 backdrop-blur text-text-muted hover:text-text hover:bg-bg-hover flex items-center justify-center opacity-0 group-hover/bento:opacity-100 transition-opacity"
+                    title="Открыть страницу"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             ))}
           </Responsive>

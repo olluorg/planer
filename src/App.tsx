@@ -6,6 +6,7 @@ import { useStore } from './lib/store';
 import { Dashboard } from './pages/Dashboard';
 import { QuickAddDialog } from './components/QuickAddDialog';
 import { CommandPalette } from './components/CommandPalette';
+import { WidgetExpandModal } from './components/WidgetExpandModal';
 import { Confetti } from './components/Confetti';
 import { FocusMode } from './components/FocusMode';
 import { Onboarding } from './components/Onboarding';
@@ -54,6 +55,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusOpen, setFocusOpen] = useState(false);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const [expandPage, setExpandPage] = useState<string | null>(null);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -148,13 +150,19 @@ export default function App() {
       setFocusTaskId(id);
       setFocusOpen(true);
     };
+    const onExpand = (e: Event) => {
+      const page = (e as CustomEvent<{ page?: string }>).detail?.page ?? null;
+      setExpandPage(page);
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('thedad:quick-capture', onQuick);
     window.addEventListener('thedad:focus-mode', onFocus);
+    window.addEventListener('thedad:expand', onExpand);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('thedad:quick-capture', onQuick);
       window.removeEventListener('thedad:focus-mode', onFocus);
+      window.removeEventListener('thedad:expand', onExpand);
     };
   }, []);
 
@@ -265,6 +273,22 @@ export default function App() {
         onFocusMode={() => setFocusOpen(true)}
         onShortcuts={() => setShortcutsOpen(true)}
       />
+      <WidgetExpandModal open={!!expandPage} onClose={() => setExpandPage(null)}>
+        <Suspense fallback={<Loader />}>
+          {expandPage === 'goals' && <GoalsPage />}
+          {expandPage === 'tasks' && <TasksPage date={date} />}
+          {expandPage === 'habits' && <HabitsPage />}
+          {expandPage === 'plan' && <PlanPage date={date} />}
+          {expandPage === 'analytics' && <AnalyticsPage />}
+          {expandPage === 'reflection' && <ReflectionPage date={date} />}
+          {expandPage === 'calendar' && <CalendarPage />}
+          {expandPage === 'health' && <HealthPage date={date} />}
+          {expandPage === 'awards' && <AwardsPage />}
+          {expandPage === 'templates' && <TemplatesPage />}
+          {expandPage === 'history' && <HistoryPage />}
+          {expandPage === 'settings' && <SettingsPage />}
+        </Suspense>
+      </WidgetExpandModal>
       <FocusMode open={focusOpen} initialTaskId={focusTaskId} onClose={() => { setFocusOpen(false); setFocusTaskId(null); }} />
       <Onboarding open={onboardOpen} onClose={() => setOnboardOpen(false)} />
       <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} />
