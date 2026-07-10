@@ -168,42 +168,24 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="h-full flex bg-bg">
-        {/* Sidebar skeleton */}
-        <div className="hidden sm:flex w-[210px] shrink-0 border-r border-border flex-col p-5 gap-3">
-          <div className="flex items-center gap-3">
-            <div className="skeleton h-10 w-10 rounded-xl" />
-            <div className="flex-1 space-y-1.5">
-              <div className="skeleton h-3 w-20" />
-              <div className="skeleton h-2 w-16" />
-            </div>
-          </div>
-          <div className="mt-4 space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton h-8 w-full rounded-lg" />)}
-          </div>
+      <div className="h-full flex flex-col bg-bg">
+        {/* Topbar skeleton */}
+        <div className="h-16 border-b border-border-soft px-6 flex items-center gap-3">
+          <div className="skeleton h-8 w-8 rounded-lg" />
+          <div className="skeleton h-9 w-24 rounded-lg" />
+          <div className="skeleton h-10 flex-1 rounded-xl" />
+          <div className="skeleton h-9 w-9 rounded-lg" />
         </div>
         {/* Main skeleton */}
-        <div className="flex-1 flex flex-col">
-          <div className="h-20 border-b border-border px-8 flex items-center">
-            <div className="space-y-2">
-              <div className="skeleton h-6 w-64" />
-              <div className="skeleton h-3 w-40" />
-            </div>
-          </div>
-          <div className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-            <div className="space-y-6">
-              <div className="skeleton h-44 w-full rounded-2xl" />
-              <div className="skeleton h-72 w-full rounded-2xl" />
-              <div className="grid grid-cols-3 gap-6">
-                <div className="skeleton h-40 rounded-2xl" />
-                <div className="skeleton h-40 rounded-2xl" />
-                <div className="skeleton h-40 rounded-2xl" />
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div className="skeleton h-64 rounded-2xl" />
-              <div className="skeleton h-48 rounded-2xl" />
-            </div>
+        <div className="flex-1 p-6 space-y-6">
+          <div className="skeleton h-10 w-72" />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="skeleton h-44 rounded-2xl" />
+            <div className="skeleton h-44 rounded-2xl" />
+            <div className="skeleton h-44 rounded-2xl" />
+            <div className="skeleton h-44 rounded-2xl" />
+            <div className="skeleton h-44 rounded-2xl" />
+            <div className="skeleton h-44 rounded-2xl" />
           </div>
         </div>
       </div>
@@ -225,8 +207,6 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar
           onAdd={() => setQuickTab('task')}
-          onAddNote={() => setQuickTab('task')}
-          onAddGoal={() => setQuickTab('goal')}
           onFocusMode={() => setFocusOpen(true)}
           onInsights={() => setInsightsOpen((v) => !v)}
           onBell={() => setInboxOpen((v) => !v)}

@@ -64,9 +64,7 @@ import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
 import { HealthWidget } from '@/components/dashboard/HealthWidget';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
-import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
-import { hasAiKey } from '@/lib/ai';
 import { getUserName } from '@/lib/onboarding';
 import { Sparkles } from 'lucide-react';
 
@@ -118,8 +116,7 @@ const DEFAULT_LAYOUT: Layout[] = [
 const DEFAULT_HIDDEN = [
   'goals-week', 'block-morning', 'block-day', 'block-evening', 'block-night',
   'notes', 'plan-future', 'focus', 'quests', 'weekly-challenge', 'letter',
-  'quick-add', 'reflection', 'kpi-grid', 'reminders', 'leagues', 'coach',
-  'upcoming', 'quick-capture',
+  'quick-add', 'kpi-grid', 'reminders', 'leagues', 'coach',
 ];
 
 // Mobile layout: single-column (4 cols), stacked vertically
@@ -1201,9 +1198,9 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             </div>
           </div>
 
-          {/* Три зоны: меню (App) · карточки · правый рейл */}
-          <div className="flex flex-col xl:flex-row gap-5 items-start">
-            <div ref={gridRef} className="flex-1 min-w-0 w-full">
+          {/* Дашборд на всю ширину — правый рейл убран, всё живёт в виджетах */}
+          <div>
+            <div ref={gridRef} className="min-w-0 w-full">
           {editing && (
           <div className="flex items-center justify-between mb-3 px-1">
             <div className="text-sm text-text-muted">
@@ -1278,13 +1275,6 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
           </Responsive>
           )}
             </div>
-
-            {/* Правый рейл: AI-коуч (только при наличии ключа) · ближайшее · быстрый захват */}
-            <aside className="w-full xl:w-[320px] shrink-0 flex flex-col gap-4">
-              {hasAiKey() && <CoachPanel date={date} />}
-              <UpcomingEvents date={date} />
-              <QuickCapture date={date} />
-            </aside>
           </div>
         </div>
       </div>

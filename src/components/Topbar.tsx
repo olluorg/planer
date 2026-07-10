@@ -1,11 +1,12 @@
-import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, CheckSquare, NotebookPen, Target, Zap } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, Settings, Trophy, LayoutTemplate, History, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { useTheme, isDarkMode } from '@/lib/theme';
+import { Logo } from './ui/logo';
+import { getUserName } from '@/lib/onboarding';
 
 interface Props {
   onAdd?: () => void;
-  onAddNote?: () => void;
-  onAddGoal?: () => void;
   onBell?: () => void;
   onFocusMode?: () => void;
   onInsights?: () => void;
@@ -13,24 +14,80 @@ interface Props {
   bellCount?: number;
 }
 
-export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onBell, onFocusMode, onInsights, onPalette, bellCount = 0 }) => {
-  const { theme, toggle } = useTheme();
+// Служебные страницы теперь живут в меню у аватара (сайдбар убран). Открываются модалкой.
+const UTILITY = [
+  { page: 'settings', label: 'Настройки', icon: Settings },
+  { page: 'awards', label: 'Награды', icon: Trophy },
+  { page: 'templates', label: 'Шаблоны', icon: LayoutTemplate },
+  { page: 'history', label: 'История', icon: History },
+] as const;
 
-  const quickActions = [
-    { icon: CheckSquare, label: 'Задача', kbd: 'T', onClick: onAdd },
-    { icon: NotebookPen, label: 'Заметка', kbd: 'N', onClick: onAddNote },
-    { icon: Crosshair, label: 'Фокус', kbd: 'F', onClick: onFocusMode },
-    { icon: Target, label: 'Цель', kbd: 'G', onClick: onAddGoal },
-    { icon: Zap, label: 'Захват', kbd: 'Q', onClick: onAdd },
-  ];
+const openPage = (page: string) => window.dispatchEvent(new CustomEvent('thedad:expand', { detail: { page } }));
+
+/** Меню-замена сайдбара: аватар → служебные страницы. */
+const AppMenu: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 rounded-lg pl-1 pr-1.5 h-9 hover:bg-bg-soft transition-colors"
+        title={getUserName()}
+      >
+        <span className="h-7 w-7 rounded-full bg-gradient-to-br from-accent to-accent-soft text-white flex items-center justify-center text-xs font-bold shrink-0">
+          {getUserName().slice(0, 1).toUpperCase()}
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 text-text-dim" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 z-50 w-52 rounded-xl bg-bg-card border border-border shadow-card p-1.5 animate-[slide-up_140ms_ease-out]">
+          <div className="px-2.5 py-1.5 text-[13px] font-semibold text-text truncate">{getUserName()}</div>
+          <div className="my-1 border-t border-border-soft" />
+          {UTILITY.map((it) => (
+            <button
+              key={it.page}
+              onClick={() => { openPage(it.page); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-text-muted hover:bg-bg-soft hover:text-text transition-colors"
+            >
+              <it.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+              <span>{it.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onInsights, onPalette, bellCount = 0 }) => {
+  const { theme, toggle } = useTheme();
 
   return (
     <header className="shrink-0 border-b border-border-soft">
-      <div className="flex items-center h-16 px-4 sm:px-6 gap-3">
+      <div className="flex items-center h-16 px-4 sm:px-6 gap-2 sm:gap-3">
+        {/* Бренд + единственная точка входа в Фокус — сверху слева */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Logo size={30} className="shrink-0" />
+          <span className="hidden md:block text-[15px] font-bold text-text">THEDAD</span>
+        </div>
+        <Button variant="soft" size="sm" onClick={onFocusMode} className="shrink-0 gap-1.5" title="Focus Mode (Ctrl+Shift+F)">
+          <Crosshair className="h-4 w-4" /> <span className="hidden sm:inline">Фокус</span>
+        </Button>
+
         {/* Search / command */}
         <button
           onClick={onPalette}
-          className="flex-1 flex items-center gap-2.5 h-10 rounded-xl bg-bg-soft border border-border-soft px-3.5 text-text-muted hover:border-border transition-colors"
+          className="flex-1 min-w-0 flex items-center gap-2.5 h-10 rounded-xl bg-bg-soft border border-border-soft px-3.5 text-text-muted hover:border-border transition-colors"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="text-sm truncate">Поиск или команда…</span>
@@ -40,9 +97,8 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onBell, o
         </button>
 
         {/* Action icons */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 shrink-0">
           <Button variant="ghost" size="icon" onClick={onAdd} title="Добавить"><Plus /></Button>
-          <Button variant="ghost" size="icon" onClick={onFocusMode} title="Focus Mode (Ctrl+Shift+F)" className="hidden sm:inline-flex"><Crosshair /></Button>
           <Button variant="ghost" size="icon" onClick={onInsights} title="Инсайты (Ctrl+I)" className="hidden sm:inline-flex"><Lightbulb /></Button>
           <Button variant="ghost" size="icon" onClick={onBell} title="Уведомления" className="relative">
             <Bell />
@@ -51,22 +107,8 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onBell, o
           <Button variant="ghost" size="icon" onClick={toggle} title={isDarkMode(theme) ? 'Светлый режим' : 'Тёмный режим'}>
             {isDarkMode(theme) ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
+          <AppMenu />
         </div>
-      </div>
-
-      {/* Quick actions row */}
-      <div className="hidden md:flex items-center gap-1.5 px-4 sm:px-6 pb-2.5 -mt-0.5">
-        {quickActions.map((a) => (
-          <button
-            key={a.label}
-            onClick={a.onClick}
-            className="flex items-center gap-2 h-8 px-3 rounded-lg text-sm text-text-muted hover:bg-bg-soft hover:text-text transition-colors duration-base"
-          >
-            <a.icon className="h-4 w-4" />
-            <span>{a.label}</span>
-            <kbd className="text-[10px] leading-none text-text-dim border border-border rounded px-1 py-0.5 bg-bg-card">{a.kbd}</kbd>
-          </button>
-        ))}
       </div>
     </header>
   );
