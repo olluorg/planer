@@ -1,13 +1,11 @@
-import { Search, Plus, Bell, Timer, Sun, Moon, Pause, Play, Square, Crosshair, Lightbulb, CheckSquare, NotebookPen, Target, Zap } from 'lucide-react';
+import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, CheckSquare, NotebookPen, Target, Zap } from 'lucide-react';
 import { Button } from './ui/button';
 import { useTheme, isDarkMode } from '@/lib/theme';
-import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 
 interface Props {
   onAdd?: () => void;
   onAddNote?: () => void;
   onAddGoal?: () => void;
-  onTimer?: () => void;
   onBell?: () => void;
   onFocusMode?: () => void;
   onInsights?: () => void;
@@ -15,9 +13,8 @@ interface Props {
   bellCount?: number;
 }
 
-export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, onBell, onFocusMode, onInsights, onPalette, bellCount = 0 }) => {
+export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onBell, onFocusMode, onInsights, onPalette, bellCount = 0 }) => {
   const { theme, toggle } = useTheme();
-  const pomo = usePomodoroState();
 
   const quickActions = [
     { icon: CheckSquare, label: 'Задача', kbd: 'T', onClick: onAdd },
@@ -41,22 +38,6 @@ export const Topbar: React.FC<Props> = ({ onAdd, onAddNote, onAddGoal, onTimer, 
             Ctrl K
           </kbd>
         </button>
-
-        {/* Pomodoro chip — нейтральный, читается на любой теме (текст следует за --text) */}
-        {pomo.secondsLeft > 0 && (
-          <div className="flex items-center gap-1.5 rounded-lg bg-bg-card/80 border border-border px-2.5 h-9">
-            <Timer className="h-3.5 w-3.5 text-accent" />
-            <button onClick={onTimer} className="tabular-nums text-xs font-medium text-text" title={pomo.taskTitle ?? 'Свободный таймер'}>
-              {fmtSec(pomo.secondsLeft)}
-            </button>
-            {pomo.running ? (
-              <button onClick={() => pomo.pauseAction?.()} className="text-text-muted hover:text-text" title="Пауза"><Pause className="h-3.5 w-3.5" /></button>
-            ) : (
-              <button onClick={() => pomo.resumeAction?.()} className="text-text-muted hover:text-text" title="Старт"><Play className="h-3.5 w-3.5" /></button>
-            )}
-            <button onClick={() => pomo.stopAction?.()} className="text-text-muted hover:text-danger" title="Стоп"><Square className="h-3.5 w-3.5" /></button>
-          </div>
-        )}
 
         {/* Action icons */}
         <div className="flex items-center gap-0.5">

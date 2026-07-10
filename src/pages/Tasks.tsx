@@ -11,7 +11,6 @@ import { PageContainer } from '@/components/ui/page-container';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import type { Task } from '@/lib/types';
-import { PomodoroTimer } from '@/components/PomodoroTimer';
 import {
   DndContext, DragOverlay, PointerSensor, useDroppable, useDraggable, useSensor, useSensors,
   type DragEndEvent,
@@ -39,7 +38,6 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
   const [startTime, setStartTime] = useState<string>('');
   const [recurrence, setRecurrence] = useState<string>('__none');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [pomodoroFor, setPomodoroFor] = useState<Task | null>(null);
   const [search, setSearch] = useState('');
   const [showAllSections, setShowAllSections] = useState<Record<number, boolean>>({});
   const SECTION_LIMIT = 6;
@@ -139,7 +137,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
           </div>
           <div className="text-caption text-text-muted tabular-nums w-16 text-right shrink-0">{dueLabel}</div>
           <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
-            <Button variant="ghost" size="icon" title="Pomodoro" onClick={() => setPomodoroFor(task)}>
+            <Button variant="ghost" size="icon" title="Фокус на задаче" onClick={() => window.dispatchEvent(new CustomEvent('thedad:focus-mode', { detail: { taskId: task.id } }))}>
               <Play className="h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="icon" title="Подзадача" onClick={() => {
@@ -334,8 +332,6 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
           </DragOverlay>
         </DndContext>
       )}
-
-      <PomodoroTimer task={pomodoroFor} onClose={() => setPomodoroFor(null)} />
     </PageContainer>
   );
 };

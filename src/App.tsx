@@ -6,7 +6,6 @@ import { useStore } from './lib/store';
 import { Dashboard } from './pages/Dashboard';
 import { QuickAddDialog } from './components/QuickAddDialog';
 import { CommandPalette } from './components/CommandPalette';
-import { PomodoroTimer } from './components/PomodoroTimer';
 import { Confetti } from './components/Confetti';
 import { FocusMode } from './components/FocusMode';
 import { Onboarding } from './components/Onboarding';
@@ -53,8 +52,8 @@ export default function App() {
   const [date, setDate] = useState(new Date());
   const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [timerOpen, setTimerOpen] = useState(false);
   const [focusOpen, setFocusOpen] = useState(false);
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -144,7 +143,11 @@ export default function App() {
       }
     };
     const onQuick = () => setQuickTab('task');
-    const onFocus = () => setFocusOpen(true);
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent<{ taskId?: string }>).detail?.taskId ?? null;
+      setFocusTaskId(id);
+      setFocusOpen(true);
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('thedad:quick-capture', onQuick);
     window.addEventListener('thedad:focus-mode', onFocus);
@@ -216,7 +219,6 @@ export default function App() {
           onAdd={() => setQuickTab('task')}
           onAddNote={() => setQuickTab('task')}
           onAddGoal={() => setQuickTab('goal')}
-          onTimer={() => setTimerOpen(true)}
           onFocusMode={() => setFocusOpen(true)}
           onInsights={() => setInsightsOpen((v) => !v)}
           onBell={() => setInboxOpen((v) => !v)}
@@ -263,8 +265,7 @@ export default function App() {
         onFocusMode={() => setFocusOpen(true)}
         onShortcuts={() => setShortcutsOpen(true)}
       />
-      <PomodoroTimer task={null} open={timerOpen} onClose={() => setTimerOpen(false)} />
-      <FocusMode open={focusOpen} onClose={() => setFocusOpen(false)} />
+      <FocusMode open={focusOpen} initialTaskId={focusTaskId} onClose={() => { setFocusOpen(false); setFocusTaskId(null); }} />
       <Onboarding open={onboardOpen} onClose={() => setOnboardOpen(false)} />
       <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} />
       <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />

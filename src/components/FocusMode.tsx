@@ -12,7 +12,13 @@ import {
   Lock, BellOff, Maximize, BarChart3, Upload, CloudLightning, FlameKindling, MoonStar,
 } from 'lucide-react';
 
-const PRESETS = [90, 60, 30, 15] as const;
+// Помидоро-циклы: работа + отдых (мин). Когда цикл завершается — переходим к новой задаче.
+const CYCLES = [
+  { work: 75, rest: 15 },
+  { work: 50, rest: 10 },
+  { work: 25, rest: 5 },
+  { work: 12, rest: 3 },
+] as const;
 
 /* ==================== Интенсивность сессии ==================== */
 
@@ -233,15 +239,19 @@ const Toggle: React.FC<{ on: boolean; onToggle: () => void }> = ({ on, onToggle 
 
 interface Props {
   open: boolean;
+  initialTaskId?: string | null;
   onClose: () => void;
 }
 
-export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
+export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => {
   const { tasks, timeEntries, toggleTask, addTask, startTimeEntry, finishTimeEntry } = useStore();
   const setGlobal = usePomodoroState((s) => s.set);
 
-  const [duration, setDuration] = useState(90);
-  const [secondsLeft, setSecondsLeft] = useState(90 * 60);
+  const [cycleIdx, setCycleIdx] = useState(2); // 25/5 по умолчанию (классический помидор)
+  const cycle = CYCLES[cycleIdx];
+  const [phase, setPhase] = useState<'work' | 'rest'>('work');
+  const phaseMin = phase === 'work' ? cycle.work : cycle.rest;
+  const [secondsLeft, setSecondsLeft] = useState(CYCLES[2].work * 60);
   const [running, setRunning] = useState(false);
   const tickRef = useRef<number | null>(null);
   const entryRef = useRef<string | null>(null);
@@ -319,9 +329,11 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
 
   useEffect(() => {
     if (open) {
-      setSecondsLeft(duration * 60);
+      setPhase('work');
+      setSecondsLeft(cycle.work * 60);
       setRunning(false);
       elapsedRef.current = 0;
+      if (initialTaskId) setSelectedId(initialTaskId); // фокус на конкретной задаче (из списка задач)
     } else {
       stop();
       stopAllSound();
@@ -331,28 +343,38 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  useEffect(() => { if (!running) setSecondsLeft(duration * 60); }, [duration, running]);
+  // Пока таймер стоит — держим счётчик в синхроне с выбранным циклом/фазой
+  useEffect(() => { if (!running) setSecondsLeft(phaseMin * 60); }, [cycleIdx, phase, running, phaseMin]);
 
   useEffect(() => {
     if (!running) return;
     tickRef.current = window.setInterval(() => {
       setSecondsLeft((s) => {
-        if (s <= 1) { complete(); return 0; }
+        if (s <= 1) { onPhaseEnd(); return 0; }
         elapsedRef.current += 1;
         return s - 1;
       });
     }, 1000);
     return () => { if (tickRef.current) window.clearInterval(tickRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
+  }, [running, phase, cycleIdx]);
 
   useEffect(() => {
-    setGlobal({ running, phase: 'work', secondsLeft, taskTitle: currentTask?.title ?? 'Focus' });
+    setGlobal({ running, phase, secondsLeft, taskTitle: currentTask?.title ?? 'Focus' });
     return () => setGlobal({ running: false, secondsLeft: 0, taskTitle: null });
-  }, [running, secondsLeft, setGlobal, currentTask]);
+  }, [running, phase, secondsLeft, setGlobal, currentTask]);
+
+  // Следующая невыполненная задача после текущей (для авто-перехода между помидорами)
+  const nextTaskAfter = (id: string | null): string | null => {
+    const pending = sessionTasks.filter((t) => t.status !== 'done');
+    if (pending.length === 0) return null;
+    if (!id) return pending[0].id;
+    const idx = pending.findIndex((t) => t.id === id);
+    return pending[(idx + 1) % pending.length]?.id ?? pending[0].id;
+  };
 
   const start = () => {
-    if (!entryRef.current) {
+    if (!entryRef.current && phase === 'work') {
       const e = startTimeEntry(currentTask?.id ?? null, 'pomodoro');
       entryRef.current = e.id;
       elapsedRef.current = 0;
@@ -370,14 +392,23 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
     }
     elapsedRef.current = 0;
   };
-  const complete = () => {
-    setRunning(false);
-    setZen(false);
-    if (entryRef.current) {
-      finishTimeEntry(entryRef.current, duration * 60);
-      entryRef.current = null;
+  // Конец фазы: работа → отдых; отдых → следующая задача + новый помидор. Таймер продолжает идти.
+  const onPhaseEnd = () => {
+    if (phase === 'work') {
+      if (entryRef.current) { finishTimeEntry(entryRef.current, cycle.work * 60); entryRef.current = null; }
+      if (!blockNotifs) void notify('Focus Mode', { body: `Помидор ${cycle.work} мин завершён — отдых ${cycle.rest} мин` });
+      setPhase('rest');
+      setSecondsLeft(cycle.rest * 60);
+    } else {
+      const next = nextTaskAfter(selectedId);
+      setSelectedId(next);
+      setPhase('work');
+      setSecondsLeft(cycle.work * 60);
+      const e = startTimeEntry(next ?? null, 'pomodoro');
+      entryRef.current = e.id;
+      elapsedRef.current = 0;
+      if (!blockNotifs) void notify('Focus Mode', { body: next ? 'Новый помидор — следующая задача' : 'Новый помидор' });
     }
-    if (!blockNotifs) void notify('Focus Mode', { body: `Сессия ${duration} мин завершена 🎉` });
   };
 
   /* ===== Микшер ===== */
@@ -536,8 +567,9 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
 
   if (!open) return null;
 
-  const total = duration * 60;
+  const total = phaseMin * 60;
   const pct = total ? (total - secondsLeft) / total : 0;
+  const ringColor = phase === 'rest' ? 'rgba(147,197,253,0.95)' : 'rgba(255,255,255,0.92)';
   const R = 138;
   const ticks = Array.from({ length: 60 }, (_, i) => i);
 
@@ -694,7 +726,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
                 <circle cx="160" cy="160" r={R} stroke="rgba(255,255,255,0.10)" strokeWidth="5" fill="none" />
                 <circle
                   cx="160" cy="160" r={R}
-                  stroke="rgba(255,255,255,0.92)" strokeWidth="5" fill="none"
+                  stroke={ringColor} strokeWidth="5" fill="none"
                   strokeDasharray={2 * Math.PI * R}
                   strokeDashoffset={(1 - pct) * 2 * Math.PI * R}
                   strokeLinecap="round"
@@ -703,10 +735,15 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
               </g>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <button onClick={cycleIntensity} className={`${glass} !rounded-full px-3.5 py-1 text-xs text-white/75 hover:text-white transition-colors mb-3`} title="Интенсивность сессии — клик меняет">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/80 mr-1.5 align-middle" />
-                {INTENSITY.find((x) => x.key === intensity)!.label}
-              </button>
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`${glass} !rounded-full px-3 py-1 text-xs font-medium ${phase === 'rest' ? 'text-blue-200' : 'text-white/80'}`}>
+                  {phase === 'rest' ? '☕ Перерыв' : '🍅 Работа'}
+                </span>
+                <button onClick={cycleIntensity} className={`${glass} !rounded-full px-3.5 py-1 text-xs text-white/75 hover:text-white transition-colors`} title="Интенсивность сессии — клик меняет">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/80 mr-1.5 align-middle" />
+                  {INTENSITY.find((x) => x.key === intensity)!.label}
+                </button>
+              </div>
               <div className="text-[60px] font-bold tabular-nums leading-none">{fmtSec(secondsLeft)}</div>
               <div className="flex items-center gap-2 mt-4">
                 {!running ? (
@@ -718,7 +755,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
                     <Pause className="h-4 w-4" /> Пауза
                   </button>
                 )}
-                <button onClick={() => { stop(); setSecondsLeft(duration * 60); }} className="h-10 w-10 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-colors" title="Сброс таймера">
+                <button onClick={() => { stop(); setPhase('work'); setSecondsLeft(cycle.work * 60); }} className="h-10 w-10 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-colors" title="Сброс таймера">
                   <Square className="h-4 w-4" />
                 </button>
               </div>
@@ -743,15 +780,17 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
               <Youtube className="h-4.5 w-4.5" />
             </button>
             <span className="h-6 w-px bg-white/10" />
-            {PRESETS.map((m) => (
+            <span className="text-xs text-white/45 pl-1 pr-0.5 select-none" title="Помидоро: работа / отдых (мин)">🍅</span>
+            {CYCLES.map((c, i) => (
               <button
-                key={m}
-                onClick={() => setDuration(m)}
+                key={c.work}
+                onClick={() => { setCycleIdx(i); setPhase('work'); if (!running) setSecondsLeft(c.work * 60); }}
                 disabled={running}
+                title={`${c.work} мин работа · ${c.rest} мин отдых`}
                 className={`h-10 w-10 rounded-full text-sm font-semibold transition-all disabled:opacity-40 ${
-                  duration === m ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'
+                  cycleIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'
                 }`}
-              >{m}</button>
+              >{c.work}</button>
             ))}
             <span className="h-6 w-px bg-white/10" />
             <button onClick={toggleSoundPause} disabled={!anySound && !ytActive} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30" title={soundPaused ? 'Продолжить звук' : 'Пауза звука'}>
@@ -794,7 +833,7 @@ export const FocusMode: React.FC<Props> = ({ open, onClose }) => {
             </div>
           )}
 
-          <div className="text-xs text-white/35">Длительность фокуса: {duration} мин · Пробел — старт/пауза</div>
+          <div className="text-xs text-white/35">Помидор {cycle.work}/{cycle.rest} мин · {phase === 'rest' ? 'перерыв' : 'работа'} · Пробел — старт/пауза</div>
         </div>
 
 
