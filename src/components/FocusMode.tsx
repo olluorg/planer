@@ -20,15 +20,6 @@ const CYCLES = [
   { work: 12, rest: 3 },
 ] as const;
 
-/* ==================== Интенсивность сессии ==================== */
-
-const INTENSITY = [
-  { key: 'light', label: 'Лёгкий фокус' },
-  { key: 'work', label: 'Работа' },
-  { key: 'deep', label: 'Глубокая работа' },
-] as const;
-type IntensityKey = typeof INTENSITY[number]['key'];
-
 const PRIORITY_COLOR: Record<number, string> = { 1: '#ef4444', 2: '#f59e0b', 3: '#64748b' };
 
 /* ==================== Звуковой микшер (WebAudio, всё генеративное) ==================== */
@@ -258,7 +249,6 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const elapsedRef = useRef(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [intensityManual, setIntensityManual] = useState<IntensityKey | null>(null);
   const [newTask, setNewTask] = useState('');
 
   // Микшер: громкость каждого слоя 0..1 (0 = выключен)
@@ -277,7 +267,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const [ytUrl, setYtUrl] = useState('');
   const ytFrameRef = useRef<HTMLIFrameElement>(null);
 
-  const [wallpaper, setWallpaper] = useState<string>(() => localStorage.getItem(WP_KEY) || WALLPAPERS[0]);
+  const [wallpaper, setWallpaper] = useState<string>(() => localStorage.getItem(WP_KEY) || WALLPAPERS[13]);
   const [customWp, setCustomWp] = useState<string[]>(getCustomWallpapers);
   const [wpOpen, setWpOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -306,12 +296,6 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const doneCount = sessionTasks.filter((t) => t.status === 'done').length;
   const sessionPct = sessionTasks.length ? Math.round((doneCount / sessionTasks.length) * 100) : 0;
   const currentTask = selectedId ? sessionTasks.find((t) => t.id === selectedId) ?? null : null;
-
-  const intensity: IntensityKey = intensityManual ?? (currentTask ? (currentTask.priority === 1 ? 'deep' : currentTask.priority === 2 ? 'work' : 'light') : 'work');
-  const cycleIntensity = () => {
-    const idx = INTENSITY.findIndex((x) => x.key === intensity);
-    setIntensityManual(INTENSITY[(idx + 1) % INTENSITY.length].key);
-  };
 
   const focusToday = useMemo(() => Math.round(timeEntries
     .filter((e) => e.type === 'pomodoro' && isoDate(new Date(e.started_at)) === today)
@@ -342,9 +326,6 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  // Пока таймер стоит — держим счётчик в синхроне с выбранным циклом/фазой
-  useEffect(() => { if (!running) setSecondsLeft(phaseMin * 60); }, [cycleIdx, phase, running, phaseMin]);
 
   useEffect(() => {
     if (!running) return;
@@ -534,7 +515,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   };
   const delWallpaper = (src: string) => {
     setCustomWp(removeCustomWallpaper(src));
-    if (wallpaper === src) applyWallpaper(WALLPAPERS[0]);
+    if (wallpaper === src) applyWallpaper(WALLPAPERS[13]);
   };
 
   const toggleFullscreen = async () => {
@@ -592,9 +573,6 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
           <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-white/80" /> Focus Mode</span>
           <span className="text-white/35 text-xs">вход <kbd className="bg-white/10 rounded px-1 py-0.5">⌘K</kbd> · выход <kbd className="bg-white/10 rounded px-1 py-0.5">Esc</kbd></span>
         </div>
-        <button onClick={close} className={`flex items-center gap-2 ${glass} px-3 py-2 text-sm text-white/70 hover:text-white transition-colors`}>
-          <Square className="h-3.5 w-3.5 text-red-400" /> Завершить сессию
-        </button>
       </div>
 
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[300px_1fr_330px] gap-6 px-6 py-8 max-w-[1520px] mx-auto items-start min-h-[calc(100vh-84px)]">
@@ -735,15 +713,6 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
               </g>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`${glass} !rounded-full px-3 py-1 text-xs font-medium ${phase === 'rest' ? 'text-blue-200' : 'text-white/80'}`}>
-                  {phase === 'rest' ? '☕ Перерыв' : '🍅 Работа'}
-                </span>
-                <button onClick={cycleIntensity} className={`${glass} !rounded-full px-3.5 py-1 text-xs text-white/75 hover:text-white transition-colors`} title="Интенсивность сессии — клик меняет">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/80 mr-1.5 align-middle" />
-                  {INTENSITY.find((x) => x.key === intensity)!.label}
-                </button>
-              </div>
               <div className="text-[60px] font-bold tabular-nums leading-none">{fmtSec(secondsLeft)}</div>
               <div className="flex items-center gap-2 mt-4">
                 {!running ? (
@@ -774,12 +743,8 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
             )}
           </div>
 
-          {/* Панель управления */}
-          <div className={`flex items-center gap-1.5 ${glass} p-2 flex-wrap justify-center`}>
-            <button onClick={() => setYtOpen((v) => !v)} className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${ytOpen || ytActive ? 'text-red-300 bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'}`} title="YouTube для фокуса">
-              <Youtube className="h-4.5 w-4.5" />
-            </button>
-            <span className="h-6 w-px bg-white/10" />
+          {/* Панель управления — тоже сворачивается в зене */}
+          <div className={`flex items-center gap-1.5 ${glass} p-2 flex-wrap justify-center transition-opacity duration-500 ${zen ? 'opacity-0 pointer-events-none' : ''}`}>
             <span className="text-xs text-white/45 pl-1 pr-0.5 select-none" title="Помидоро: работа / отдых (мин)">🍅</span>
             {CYCLES.map((c, i) => (
               <button
@@ -803,12 +768,15 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
               <SkipForward className="h-4 w-4" />
             </button>
             <span className="h-6 w-px bg-white/10" />
+            <button onClick={() => setYtOpen((v) => !v)} className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${ytOpen || ytActive ? 'text-red-300 bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'}`} title="YouTube для фокуса">
+              <Youtube className="h-4.5 w-4.5" />
+            </button>
             <button onClick={() => setWpOpen((v) => !v)} className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${wpOpen ? 'text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'}`} title="Сменить фон">
               <ImageIcon className="h-4 w-4" />
             </button>
           </div>
 
-          {wpOpen && (
+          {wpOpen && !zen && (
             <div className={`${glass} p-3 flex items-center gap-2 flex-wrap max-w-lg justify-center`}>
               {[...customWp, ...WALLPAPERS].map((w) => {
                 const isCustom = customWp.includes(w);
@@ -833,7 +801,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
             </div>
           )}
 
-          <div className="text-xs text-white/35">Помидор {cycle.work}/{cycle.rest} мин · {phase === 'rest' ? 'перерыв' : 'работа'} · Пробел — старт/пауза</div>
+          <div className={`text-xs text-white/35 transition-opacity duration-500 ${zen ? 'opacity-0 pointer-events-none' : ''}`}>Помидор {cycle.work}/{cycle.rest} мин · {phase === 'rest' ? 'перерыв' : 'работа'} · Пробел — старт/пауза</div>
         </div>
 
 
