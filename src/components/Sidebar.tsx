@@ -149,7 +149,6 @@ export const Sidebar = () => {
             </div>
             <div className="flex-1 min-w-0 leading-tight">
               <div className="text-[13px] font-semibold text-text truncate">{getUserName()}</div>
-              <div className="text-[10px] text-text-muted">Pro версия</div>
             </div>
             <ChevronRight className="h-4 w-4 text-text-dim shrink-0" />
           </NavLink>
