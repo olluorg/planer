@@ -62,6 +62,7 @@ import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
 import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
 import { HealthWidget } from '@/components/dashboard/HealthWidget';
+import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
 import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';

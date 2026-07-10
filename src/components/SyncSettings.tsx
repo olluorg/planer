@@ -8,7 +8,9 @@ import {
 } from '@/lib/sync';
 import { RefreshCw, QrCode, LogOut, UploadCloud, DownloadCloud, Cloud } from 'lucide-react';
 
-const DEFAULT_SERVER = 'http://localhost:8787';
+// Прод-адрес задаётся при сборке: VITE_SYNC_SERVER_URL (см. .env.example).
+// Без него — локальный сервер для разработки.
+const DEFAULT_SERVER = import.meta.env.VITE_SYNC_SERVER_URL || 'http://localhost:8787';
 
 export const SyncSettings: React.FC = () => {
   const [cfg, setCfg] = useState<SyncConfig | null>(getSync());

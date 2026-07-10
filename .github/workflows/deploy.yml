@@ -23,6 +23,11 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
         name: Build (GitHub Pages)
+        env:
+          # Адрес прод sync-сервера. Задать в Settings → Secrets and variables →
+          # Actions → Variables: VITE_SYNC_SERVER_URL = https://sync.thedad.ru
+          # Не задан → в сборке останется localhost, и синк у тестеров не заработает.
+          VITE_SYNC_SERVER_URL: ${{ vars.VITE_SYNC_SERVER_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

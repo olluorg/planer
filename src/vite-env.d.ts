@@ -1,5 +1,13 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  /** Адрес sync-сервера в проде, напр. https://sync.example.com */
+  readonly VITE_SYNC_SERVER_URL?: string;
+}
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 declare module '*.wasm?url' {
   const src: string;
   export default src;

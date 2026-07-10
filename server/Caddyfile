@@ -1,0 +1,5 @@
+# Caddy автоматически получает и продлевает TLS-сертификат Let's Encrypt для SYNC_DOMAIN.
+{$SYNC_DOMAIN} {
+	encode gzip
+	reverse_proxy sync:8787
+}

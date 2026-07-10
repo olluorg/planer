@@ -1,0 +1,50 @@
+# Прод-стек sync-сервера: Postgres + сервер + Caddy (HTTPS с авто-сертификатами).
+# Запуск на хосте с публичным IP и доменом, указывающим на него:
+#   SYNC_DOMAIN=sync.example.com POSTGRES_PASSWORD=<сильный> docker compose -f docker-compose.prod.yml up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thedad
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задай POSTGRES_PASSWORD}
+      POSTGRES_DB: thedad
+    volumes:
+      - thedad_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thedad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # наружу порт не публикуем — БД доступна только внутри сети compose
+
+  sync:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://thedad:${POSTGRES_PASSWORD}@db:5432/thedad
+      PORT: 8787
+    expose:
+      - "8787"   # только внутрь сети, наружу — через Caddy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [sync]
+    environment:
+      SYNC_DOMAIN: ${SYNC_DOMAIN:?задай SYNC_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  thedad_db:
+  caddy_data:
+  caddy_config:
