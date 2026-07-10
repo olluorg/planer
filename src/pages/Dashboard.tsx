@@ -63,6 +63,7 @@ import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
 import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
 import { HealthWidget } from '@/components/dashboard/HealthWidget';
+import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
@@ -92,6 +93,7 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: 'upcoming',       x: 0, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
   { i: 'quick-capture',  x: 4, y: 16, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
   { i: 'health',         x: 8, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'calendar',       x: 0, y: 22, w: 4, h: 7, minW: 3, minH: 6 },
   // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
   { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
   { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
@@ -422,6 +424,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     'health': () => (
       <Cell editing={editing} onHide={() => hideWidget('health')}>
         <HealthWidget date={date} />
+      </Cell>
+    ),
+    'calendar': () => (
+      <Cell editing={editing} onHide={() => hideWidget('calendar')}>
+        <CalendarWidget date={date} />
       </Cell>
     ),
 
