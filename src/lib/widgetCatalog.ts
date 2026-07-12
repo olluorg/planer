@@ -60,6 +60,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 
   // — Спорт и здоровье
   { id: 'health',     label: 'Здоровье',            description: 'Шаги, сон, вода и другие метрики', category: 'health', icon: HeartPulse, w: 4, h: 6, minW: 3, minH: 4 },
+  { id: 'workout',    label: 'Зарядка 7 минут',     description: '7 упражнений × 1 минута, каждый раз новый набор', category: 'health', icon: Dumbbell, w: 4, h: 6, minW: 3, minH: 5 },
   { id: 'stats',      label: 'Фитнес-статистика',   description: 'Шаги, калории, тренировки, вода', category: 'health', icon: Dumbbell, w: 4, h: 5, minW: 3, minH: 4 },
   { id: 'reflection', label: 'Рефлексия',           description: 'Быстрая оценка настроения дня', category: 'health', icon: Smile, w: 3, h: 4, minW: 3, minH: 3 },
 
