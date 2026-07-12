@@ -1,0 +1,16 @@
+{
+  "schema": "thedad.widget/v1",
+  "id": "focus-minutes-month",
+  "name": "Секунды фокуса за 30 дней",
+  "author": "THEDAD examples",
+  "icon": "timer",
+  "defaultSize": { "w": 3, "h": 5 },
+  "source": {
+    "collection": "timeEntries",
+    "range": "last-30-days"
+  },
+  "render": {
+    "type": "stat",
+    "value": "duration"
+  }
+}

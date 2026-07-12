@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3, Calendar as CalendarIcon, HeartPulse, NotebookPen } from 'lucide-react';
+import { Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3, Calendar as CalendarIcon, HeartPulse, NotebookPen, Maximize2 } from 'lucide-react';
 import { CATEGORIES, setOnboardingDone, setUserName, setUserCategories } from '@/lib/onboarding';
 import { applyTheme, useTheme } from '@/lib/theme';
 import { Logo } from '@/components/ui/logo';
@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
 }
 
-type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'cycle' | 'notifications' | 'done';
+type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'cycle' | 'widgets' | 'notifications' | 'done';
 
 export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const addGoal = useStore((s) => s.addGoal);
@@ -25,7 +25,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
 
   if (!open) return null;
 
-  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'cycle', 'notifications', 'done'];
+  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'cycle', 'widgets', 'notifications', 'done'];
   const stepIdx = steps.indexOf(step);
 
   const next = () => {
@@ -113,18 +113,29 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                   onClick={() => applyTheme('light')}
                   className={`rounded-xl border-2 p-3 transition-all hover:scale-[1.02] ${theme === 'light' ? 'border-accent' : 'border-border'}`}
                 >
-                  {/* Мини-интерфейс: шапка + виджеты + кольцо прогресса — на светлой поверхности */}
-                  <div className="h-24 rounded-lg bg-[#f4f6fb] border border-[#e2e8f0] p-2 flex gap-1.5 text-left overflow-hidden">
-                    <div className="flex flex-col gap-1 flex-1 min-w-0">
-                      <div className="h-2 w-2/3 rounded-full bg-[#6366f1]" />
-                      <div className="flex-1 rounded-md bg-white border border-[#e6ebf3] p-1 flex flex-col gap-1">
-                        <div className="h-1.5 w-4/5 rounded-full bg-[#c7d0e0]" />
-                        <div className="h-1.5 w-3/5 rounded-full bg-[#dbe2ee]" />
+                  {/* Мини-интерфейс: контрастная серая подложка + белые карточки с тенью,
+                      график и кольцо — чтобы пример читался, а не выглядел «просто белым» */}
+                  <div className="h-24 rounded-lg bg-[#e9edf4] border border-[#d4dbe6] p-2 flex gap-1.5 text-left overflow-hidden">
+                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <div className="h-2.5 w-2.5 rounded-full bg-[#6366f1]" />
+                        <div className="h-2 w-1/2 rounded-full bg-[#94a3b8]" />
                       </div>
-                      <div className="h-4 rounded-md bg-white border border-[#e6ebf3]" />
+                      <div className="flex-1 rounded-md bg-white border border-[#dde3ee] shadow-sm p-1.5 flex flex-col gap-1">
+                        <div className="h-1.5 w-4/5 rounded-full bg-[#6366f1]/70" />
+                        <div className="h-1.5 w-3/5 rounded-full bg-[#b6c1d6]" />
+                        <div className="h-1.5 w-2/3 rounded-full bg-[#d3dbe8]" />
+                      </div>
+                      {/* мини-график */}
+                      <div className="h-5 rounded-md bg-white border border-[#dde3ee] shadow-sm flex items-end gap-0.5 px-1.5 pb-0.5">
+                        {[40, 70, 55, 90, 65].map((h, i) => (
+                          <div key={i} className="flex-1 rounded-sm bg-[#6366f1]" style={{ height: `${h}%`, opacity: 0.45 + i * 0.12 }} />
+                        ))}
+                      </div>
                     </div>
-                    <div className="w-9 shrink-0 rounded-md bg-white border border-[#e6ebf3] flex items-center justify-center">
+                    <div className="w-10 shrink-0 rounded-md bg-white border border-[#dde3ee] shadow-sm flex flex-col items-center justify-center gap-1">
                       <div className="h-6 w-6 rounded-full border-[3px] border-[#6366f1] border-r-[#e2e8f0] border-b-[#e2e8f0]" />
+                      <div className="h-1 w-5 rounded-full bg-[#d3dbe8]" />
                     </div>
                   </div>
                   <div className="text-sm font-semibold text-text mt-2.5">Minimalism</div>
@@ -236,6 +247,39 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {step === 'widgets' && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <h2 className="text-2xl font-bold text-text">Виджеты раскрываются в страницы</h2>
+              <p className="text-text-muted mt-2 text-sm max-w-md">
+                Дашборд — это и есть навигация. Наведи на виджет и нажми
+                <span className="inline-flex items-center justify-center h-5 w-5 mx-1 rounded bg-bg-soft border border-border-soft align-middle"><Maximize2 className="h-3 w-3 text-text-muted" /></span>
+                в правом нижнем углу — виджет развернётся в полную страницу с подробным отчётом.
+              </p>
+              {/* Иллюстрация: виджет → разворот в страницу */}
+              <div className="mt-7 flex items-center gap-3 w-full max-w-md justify-center">
+                <div className="relative w-32 h-24 rounded-lg bg-bg-soft border border-border p-2 text-left shrink-0">
+                  <div className="h-1.5 w-2/3 rounded-full bg-accent/60 mb-1.5" />
+                  <div className="h-1.5 w-1/2 rounded-full bg-border mb-1" />
+                  <div className="h-1.5 w-3/5 rounded-full bg-border" />
+                  <div className="absolute bottom-1.5 right-1.5 h-5 w-5 rounded bg-bg-card border border-border shadow-sm flex items-center justify-center">
+                    <Maximize2 className="h-3 w-3 text-accent" />
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-text-dim shrink-0" />
+                <div className="relative flex-1 h-32 rounded-lg bg-bg-soft border border-accent/40 p-2.5 text-left shadow-[0_8px_24px_rgba(99,102,241,0.12)]">
+                  <div className="h-2 w-1/3 rounded-full bg-accent/70 mb-2" />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div className="h-8 rounded bg-bg-card border border-border-soft" />
+                    <div className="h-8 rounded bg-bg-card border border-border-soft" />
+                    <div className="h-8 rounded bg-bg-card border border-border-soft col-span-2" />
+                  </div>
+                  <div className="text-[10px] text-text-dim mt-1.5">Полная страница: детали, отчёты, действия</div>
+                </div>
+              </div>
+              <p className="text-[11px] text-text-dim mt-5">Состав дашборда меняется в редакторе раскладки — плитка «+» добавляет новые виджеты.</p>
             </div>
           )}
 

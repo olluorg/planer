@@ -10,6 +10,7 @@ import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
   CheckCircle2, Flame, Waves, CloudRain, Wind, TreePine, Image as ImageIcon,
   Lock, BellOff, Maximize, BarChart3, Upload, CloudLightning, FlameKindling, MoonStar,
+  ChevronDown, Coffee,
 } from 'lucide-react';
 
 // Помидоро-циклы: работа + отдых (мин). Когда цикл завершается — переходим к новой задаче.
@@ -19,6 +20,10 @@ const CYCLES = [
   { work: 25, rest: 5 },
   { work: 12, rest: 3 },
 ] as const;
+
+// Простой таймер — только работа, без фаз отдыха. 🍅 переключает между режимами.
+const TIMERS = [90, 60, 30, 15] as const;
+const MODE_KEY = 'focus.mode.v1';
 
 const PRIORITY_COLOR: Record<number, string> = { 1: '#ef4444', 2: '#f59e0b', 3: '#64748b' };
 
@@ -216,6 +221,33 @@ const WP_KEY = 'focus.wallpaper.v1';
 
 const glass = 'rounded-xl bg-white/[0.05] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
 
+/* Панели фокуса скрываются по клику на заголовок; состояние переживает перезаход */
+const PANELS_KEY = 'focus.panels.v1';
+function loadCollapsed(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(PANELS_KEY) || '{}'); } catch { return {}; }
+}
+
+const Panel: React.FC<{
+  title: string;
+  icon?: React.ElementType;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}> = ({ title, icon: Icon, collapsed, onToggle, children }) => (
+  <div className={`${glass} overflow-hidden`}>
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-5 py-3 text-sm font-semibold text-left text-white/85 hover:text-white transition-colors"
+      title={collapsed ? 'Показать' : 'Скрыть'}
+    >
+      {Icon && <Icon className="h-4 w-4 shrink-0 text-white/50" />}
+      <span className="flex-1 min-w-0 truncate">{title}</span>
+      <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+    </button>
+    {!collapsed && <div className="px-5 pb-5">{children}</div>}
+  </div>
+);
+
 /* Аккуратный тумблер (фикс поехавшей вёрстки) */
 const Toggle: React.FC<{ on: boolean; onToggle: () => void }> = ({ on, onToggle }) => (
   <button
@@ -238,11 +270,23 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const { tasks, timeEntries, toggleTask, addTask, startTimeEntry, finishTimeEntry } = useStore();
   const setGlobal = usePomodoroState((s) => s.set);
 
+  // 🍅 переключает тип сессий: помодоро (работа+отдых) ↔ простой таймер (только работа)
+  const [pomodoro, setPomodoro] = useState(() => localStorage.getItem(MODE_KEY) !== 'timer');
   const [cycleIdx, setCycleIdx] = useState(2); // 25/5 по умолчанию (классический помидор)
-  const cycle = CYCLES[cycleIdx];
+  const [timerIdx, setTimerIdx] = useState(1); // 60 мин по умолчанию для простого таймера
+  const work = pomodoro ? CYCLES[cycleIdx].work : TIMERS[timerIdx];
+  const rest = pomodoro ? CYCLES[cycleIdx].rest : 0;
   const [phase, setPhase] = useState<'work' | 'rest'>('work');
-  const phaseMin = phase === 'work' ? cycle.work : cycle.rest;
+  const phaseMin = phase === 'work' ? work : rest;
   const [secondsLeft, setSecondsLeft] = useState(CYCLES[2].work * 60);
+  // Свёрнутые панели (скрываются кликом по заголовку)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
+  // def — состояние по умолчанию (стата исторически свёрнута)
+  const togglePanel = (id: string, def = false) => setCollapsed((c) => {
+    const next = { ...c, [id]: !(c[id] ?? def) };
+    try { localStorage.setItem(PANELS_KEY, JSON.stringify(next)); } catch {}
+    return next;
+  });
   const [running, setRunning] = useState(false);
   const tickRef = useRef<number | null>(null);
   const entryRef = useRef<string | null>(null);
@@ -274,7 +318,6 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
 
   const [blockNotifs, setBlockNotifs] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
-  const [statsOpen, setStatsOpen] = useState(false);
   // Зен-режим: при старте панели сворачиваются, круг-счётчик увеличивается
   const [zen, setZen] = useState(false);
   // Масштаб круга в зене — от высоты экрана (на 2K заметно крупнее, чем на ноутбуке)
@@ -314,7 +357,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   useEffect(() => {
     if (open) {
       setPhase('work');
-      setSecondsLeft(cycle.work * 60);
+      setSecondsLeft(work * 60);
       setRunning(false);
       elapsedRef.current = 0;
       if (initialTaskId) setSelectedId(initialTaskId); // фокус на конкретной задаче (из списка задач)
@@ -338,7 +381,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     }, 1000);
     return () => { if (tickRef.current) window.clearInterval(tickRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, phase, cycleIdx]);
+  }, [running, phase, cycleIdx, timerIdx, pomodoro]);
 
   useEffect(() => {
     setGlobal({ running, phase, secondsLeft, taskTitle: currentTask?.title ?? 'Focus' });
@@ -374,22 +417,40 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     elapsedRef.current = 0;
   };
   // Конец фазы: работа → отдых; отдых → следующая задача + новый помидор. Таймер продолжает идти.
+  // В режиме простого таймера отдыха нет — сессия просто завершается.
   const onPhaseEnd = () => {
     if (phase === 'work') {
-      if (entryRef.current) { finishTimeEntry(entryRef.current, cycle.work * 60); entryRef.current = null; }
-      if (!blockNotifs) void notify('Focus Mode', { body: `Помидор ${cycle.work} мин завершён — отдых ${cycle.rest} мин` });
+      if (entryRef.current) { finishTimeEntry(entryRef.current, work * 60); entryRef.current = null; }
+      if (!pomodoro) {
+        if (!blockNotifs) void notify('Focus Mode', { body: `Сессия ${work} мин завершена` });
+        setRunning(false);
+        setZen(false);
+        setSecondsLeft(work * 60);
+        return;
+      }
+      if (!blockNotifs) void notify('Focus Mode', { body: `Помидор ${work} мин завершён — отдых ${rest} мин` });
       setPhase('rest');
-      setSecondsLeft(cycle.rest * 60);
+      setSecondsLeft(rest * 60);
     } else {
       const next = nextTaskAfter(selectedId);
       setSelectedId(next);
       setPhase('work');
-      setSecondsLeft(cycle.work * 60);
+      setSecondsLeft(work * 60);
       const e = startTimeEntry(next ?? null, 'pomodoro');
       entryRef.current = e.id;
       elapsedRef.current = 0;
       if (!blockNotifs) void notify('Focus Mode', { body: next ? 'Новый помидор — следующая задача' : 'Новый помидор' });
     }
+  };
+
+  // 🍅: помодоро с отдыхом ↔ простой таймер
+  const toggleMode = () => {
+    if (running) return;
+    const next = !pomodoro;
+    setPomodoro(next);
+    try { localStorage.setItem(MODE_KEY, next ? 'pomodoro' : 'timer'); } catch {}
+    setPhase('work');
+    setSecondsLeft((next ? CYCLES[cycleIdx].work : TIMERS[timerIdx]) * 60);
   };
 
   /* ===== Микшер ===== */
@@ -578,8 +639,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[300px_1fr_330px] gap-6 px-6 py-8 max-w-[1520px] mx-auto items-start min-h-[calc(100vh-84px)]">
         {/* ЛЕВО */}
         <div className={`order-2 lg:order-1 flex flex-col gap-4 lg:min-h-[70vh] transition-[opacity,transform] duration-500 ease-out ${zen ? 'opacity-0 -translate-x-6 pointer-events-none' : ''}`}>
-          <div className={`${glass} p-5`}>
-            <div className="text-sm font-semibold mb-4">Цели фокус-сессии</div>
+          <Panel title="Цели фокус-сессии" collapsed={!!collapsed['goals']} onToggle={() => togglePanel('goals')}>
             {sessionTasks.length === 0 && <div className="text-sm text-white/40 mb-2">Добавь первую задачу ниже</div>}
             <ul className="space-y-2">
               {sessionTasks.map((t) => (
@@ -623,19 +683,17 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
               </div>
               <div className="text-xl font-bold tabular-nums mt-2">{sessionPct}%</div>
             </div>
-          </div>
+          </Panel>
 
-          <div className={`${glass} p-6 flex-1 flex flex-col items-center justify-center text-center`}>
-            <p className="text-sm text-white/60 leading-relaxed max-w-[220px]">«{quote.text}»</p>
-            <p className="text-xs text-white/30 mt-3">— {quote.author}</p>
-          </div>
+          <Panel title="Цитата дня" collapsed={!!collapsed['quote']} onToggle={() => togglePanel('quote')}>
+            <div className="flex flex-col items-center justify-center text-center py-3">
+              <p className="text-sm text-white/60 leading-relaxed max-w-[220px]">«{quote.text}»</p>
+              <p className="text-xs text-white/30 mt-3">— {quote.author}</p>
+            </div>
+          </Panel>
 
-          <div className={`${glass} overflow-hidden`}>
-            <button onClick={() => setStatsOpen((v) => !v)} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-white/70 hover:text-white transition-colors">
-              <BarChart3 className="h-4 w-4" /> Статистика фокуса
-            </button>
-            {statsOpen && (
-              <div className="px-4 pb-4 grid grid-cols-2 gap-3 text-sm">
+          <Panel title="Статистика фокуса" icon={BarChart3} collapsed={collapsed['stats'] ?? true} onToggle={() => togglePanel('stats', true)}>
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-white/35">Фокус сегодня</div>
                   <div className="font-bold tabular-nums mt-0.5">{Math.floor(focusToday / 60) ? `${Math.floor(focusToday / 60)} ч ` : ''}{focusToday % 60} мин</div>
@@ -649,8 +707,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                   <div className="font-bold tabular-nums mt-0.5 flex items-center gap-1">{focusStreak} дн <Flame className="h-3.5 w-3.5 text-orange-400" /></div>
                 </div>
               </div>
-            )}
-          </div>
+          </Panel>
         </div>
 
         {/* ЦЕНТР — в зене центрируется по вертикали, круг растёт от размера экрана */}
@@ -724,7 +781,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                     <Pause className="h-4 w-4" /> Пауза
                   </button>
                 )}
-                <button onClick={() => { stop(); setPhase('work'); setSecondsLeft(cycle.work * 60); }} className="h-10 w-10 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-colors" title="Сброс таймера">
+                <button onClick={() => { stop(); setPhase('work'); setSecondsLeft(work * 60); }} className="h-10 w-10 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-colors" title="Сброс таймера">
                   <Square className="h-4 w-4" />
                 </button>
               </div>
@@ -732,21 +789,42 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
           </div>
 
           <div className="text-center min-h-[64px]">
-            <div className="text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Текущая задача</div>
-            {currentTask ? (
-              <div className="flex items-center justify-center gap-2 max-w-md">
-                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[currentTask.priority] ?? '#64748b' }} title={`Приоритет ${currentTask.priority}`} />
-                <span className="text-xl font-semibold leading-snug">{currentTask.title}</span>
-              </div>
+            {phase === 'rest' ? (
+              /* Перерыв: вместо задачи — надпись «Отдых» */
+              <>
+                <div className="text-[11px] uppercase tracking-widest text-sky-300/60 mb-1.5">Перерыв</div>
+                <div className="flex items-center justify-center gap-2.5 max-w-md mx-auto">
+                  <Coffee className="h-5 w-5 text-sky-300 shrink-0" />
+                  <span className="text-xl font-semibold leading-snug text-sky-100">Отдых {rest} мин — отойди от экрана</span>
+                </div>
+              </>
             ) : (
-              <div className="text-sm text-white/35">Свободный фокус — выбери задачу слева или просто работай</div>
+              <>
+                <div className="text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Текущая задача</div>
+                {currentTask ? (
+                  <div className="flex items-center justify-center gap-2 max-w-md">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[currentTask.priority] ?? '#64748b' }} title={`Приоритет ${currentTask.priority}`} />
+                    <span className="text-xl font-semibold leading-snug">{currentTask.title}</span>
+                  </div>
+                ) : (
+                  <div className="text-sm text-white/35">Свободный фокус — выбери задачу слева или просто работай</div>
+                )}
+              </>
             )}
           </div>
 
           {/* Панель управления — тоже сворачивается в зене */}
           <div className={`flex items-center gap-1.5 ${glass} p-2 flex-wrap justify-center transition-opacity duration-500 ${zen ? 'opacity-0 pointer-events-none' : ''}`}>
-            <span className="text-xs text-white/45 pl-1 pr-0.5 select-none" title="Помидоро: работа / отдых (мин)">🍅</span>
-            {CYCLES.map((c, i) => (
+            {/* 🍅 — переключатель типа сессий: помодоро (работа+отдых) ↔ простой таймер */}
+            <button
+              onClick={toggleMode}
+              disabled={running}
+              title={pomodoro ? 'Помодоро: работа + отдых. Клик — простой таймер без перерывов' : 'Простой таймер. Клик — помодоро с перерывами'}
+              className={`h-10 w-10 rounded-full text-base select-none transition-all disabled:opacity-40 ${
+                pomodoro ? 'ring-1 ring-red-300/70 bg-white/10' : 'opacity-60 grayscale hover:opacity-100 hover:grayscale-0 hover:bg-white/10'
+              }`}
+            >🍅</button>
+            {pomodoro ? CYCLES.map((c, i) => (
               <button
                 key={c.work}
                 onClick={() => { setCycleIdx(i); setPhase('work'); if (!running) setSecondsLeft(c.work * 60); }}
@@ -756,6 +834,16 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                   cycleIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'
                 }`}
               >{c.work}</button>
+            )) : TIMERS.map((m, i) => (
+              <button
+                key={m}
+                onClick={() => { setTimerIdx(i); setPhase('work'); if (!running) setSecondsLeft(m * 60); }}
+                disabled={running}
+                title={`Таймер ${m} мин без перерывов`}
+                className={`h-10 w-10 rounded-full text-sm font-semibold transition-all disabled:opacity-40 ${
+                  timerIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'
+                }`}
+              >{m}</button>
             ))}
             <span className="h-6 w-px bg-white/10" />
             <button onClick={toggleSoundPause} disabled={!anySound && !ytActive} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30" title={soundPaused ? 'Продолжить звук' : 'Пауза звука'}>
@@ -801,17 +889,16 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
             </div>
           )}
 
-          <div className={`text-xs text-white/35 transition-opacity duration-500 ${zen ? 'opacity-0 pointer-events-none' : ''}`}>Помидор {cycle.work}/{cycle.rest} мин · {phase === 'rest' ? 'перерыв' : 'работа'} · Пробел — старт/пауза</div>
+          <div className={`text-xs text-white/35 transition-opacity duration-500 ${zen ? 'opacity-0 pointer-events-none' : ''}`}>
+            {pomodoro ? `Помидор ${work}/${rest} мин · ${phase === 'rest' ? 'перерыв' : 'работа'}` : `Таймер ${work} мин без перерывов`} · Пробел — старт/пауза
+          </div>
         </div>
 
 
         {/* ПРАВО */}
         <div className={`space-y-4 order-3 transition-[opacity,transform] duration-500 ease-out ${zen ? 'opacity-0 translate-x-6 pointer-events-none' : ''}`}>
           {/* Отвлечения */}
-          <div className={`${glass} p-5`}>
-            <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-              <Lock className="h-4 w-4 text-emerald-300" /> Отвлечения заблокированы
-            </div>
+          <Panel title="Отвлечения заблокированы" icon={Lock} collapsed={!!collapsed['blockers']} onToggle={() => togglePanel('blockers')}>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <BellOff className="h-4 w-4 text-white/40 shrink-0" />
@@ -825,11 +912,10 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
               </div>
             </div>
             <p className="text-[11px] text-white/25 mt-3 leading-relaxed">Браузер не может блокировать другие приложения — включи «Не беспокоить» в системе для полного эффекта.</p>
-          </div>
+          </Panel>
 
           {/* Микшер звуков */}
-          <div className={`${glass} p-5`}>
-            <div className="text-sm font-semibold mb-3">Звуковой микшер</div>
+          <Panel title="Звуковой микшер" icon={Volume2} collapsed={!!collapsed['mixer']} onToggle={() => togglePanel('mixer')}>
             <div className="flex flex-wrap gap-1.5 mb-4">
               {MIX_PRESETS.map((p) => (
                 <button key={p.label} onClick={() => applyMixPreset(p.mix)} className="rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 px-3 py-1 text-xs text-white/70 hover:text-white transition-colors active:scale-[0.97]">
@@ -872,14 +958,11 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                 className="w-full accent-white"
               />
             </div>
-          </div>
+          </Panel>
 
           {/* YouTube — открыт по умолчанию */}
           {(ytOpen || ytActive) && (
-            <div className={`${glass} p-5`}>
-              <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-                <Youtube className="h-4 w-4 text-red-300" /> Focus-видео
-              </div>
+            <Panel title="Focus-видео" icon={Youtube} collapsed={!!collapsed['youtube']} onToggle={() => togglePanel('youtube')}>
               {ytActive && (
                 <>
                   <div className="rounded-lg overflow-hidden mb-2 aspect-video bg-black">
@@ -933,7 +1016,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-            </div>
+            </Panel>
           )}
         </div>
       </div>

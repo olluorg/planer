@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTheme, isDarkMode } from '@/lib/theme';
+import { GoogleIcon, openGoogleSearch } from '@/components/ui/google-icon';
 
 export const CommandPalette: React.FC<{
   open: boolean;
@@ -17,18 +18,28 @@ export const CommandPalette: React.FC<{
   onAddProgress: () => void;
   onFocusMode?: () => void;
   onShortcuts?: () => void;
-}> = ({ open, onOpenChange, onAddTask, onAddHabit, onAddGoal, onAddProgress, onFocusMode, onShortcuts }) => {
+  /** Стартовый запрос: топбар-поиск открывает палитру уже с введённым текстом. */
+  initialQuery?: string;
+}> = ({ open, onOpenChange, onAddTask, onAddHabit, onAddGoal, onAddProgress, onFocusMode, onShortcuts, initialQuery }) => {
   const nav = useNavigate();
   const { goals, tasks, habits } = useStore();
   const { theme, toggle } = useTheme();
   const [q, setQ] = useState('');
 
   useEffect(() => {
-    if (open) setQ('');
+    if (open) setQ(initialQuery ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const close = () => onOpenChange(false);
   const go = (path: string) => { nav(path); close(); };
+
+  // Поиск запроса в Google: наружу уходит только текст запроса
+  const googleSearch = () => {
+    if (!q.trim()) return;
+    openGoogleSearch(q);
+    close();
+  };
 
   return (
     <Command.Dialog
@@ -46,6 +57,15 @@ export const CommandPalette: React.FC<{
           placeholder="Поиск команд, целей, задач..."
           className="flex-1 h-11 bg-transparent outline-none text-sm placeholder:text-text-dim"
         />
+        {/* Значок Google: отправить запрос во внешний поиск вместо поиска по приложению */}
+        <button
+          onClick={googleSearch}
+          disabled={!q.trim()}
+          className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-all hover:bg-bg-hover disabled:opacity-30 disabled:cursor-default"
+          title={q.trim() ? `Искать «${q.trim()}» в Google` : 'Искать в Google (введи запрос)'}
+        >
+          <GoogleIcon className="h-4 w-4" />
+        </button>
         <kbd className="text-[10px] text-text-dim border border-border px-1.5 py-0.5">esc</kbd>
       </div>
       <Command.List className="max-h-[60vh] overflow-auto p-2">

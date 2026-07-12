@@ -91,15 +91,16 @@
     --text-dim:      rgba(226, 233, 246, 0.45);
   }
 
-  /* Glass-light — стеклянная светлая: те же обои, но панели светло-матовые, текст тёмный.
-     Идёт БЕЗ .dark, поэтому переопределяем то, что задал .glass (тёмные карты + светлый текст). */
+  /* Glass-light — стеклянная светлая: не «морозное стекло» Apple, а минималистичная
+     светлая тема, ставшая прозрачной: лёгкие полупрозрачные белые панели, тонкие
+     границы, мягкий blur. Идёт БЕЗ .dark, поэтому переопределяем то, что задал .glass. */
   .glass-light {
-    --bg-card:       rgba(255, 255, 255, 0.58);
-    --bg-elevated:   rgba(255, 255, 255, 0.68);
-    --bg-soft:       rgba(15, 18, 30, 0.05);
-    --bg-hover:      rgba(15, 18, 30, 0.09);
-    --border:        rgba(15, 18, 30, 0.12);
-    --border-soft:   rgba(15, 18, 30, 0.07);
+    --bg-card:       rgba(255, 255, 255, 0.30);
+    --bg-elevated:   rgba(255, 255, 255, 0.48);
+    --bg-soft:       rgba(255, 255, 255, 0.22);
+    --bg-hover:      rgba(255, 255, 255, 0.38);
+    --border:        rgba(255, 255, 255, 0.55);
+    --border-soft:   rgba(255, 255, 255, 0.35);
     --text:          #16181f;
     --text-muted:    rgba(22, 24, 31, 0.66);
     --text-dim:      rgba(22, 24, 31, 0.42);
@@ -139,9 +140,9 @@
     z-index: -1;
     background: rgba(5, 5, 12, 0.55);
   }
-  /* Светлая стеклянная тема осветляет обои, чтобы светлые панели читались */
+  /* Светлая стеклянная тема лишь слегка вуалирует обои: панели прозрачные, обои видны */
   .glass-light body { background: #e9ecf2; }
-  .glass-light body::after { background: rgba(240, 243, 248, 0.55); }
+  .glass-light body::after { background: rgba(244, 246, 250, 0.28); }
   /* Панели становятся стеклянными: blur на всём, что использует карточные фоны */
   .glass [class*="bg-bg-card"],
   .glass .card {
@@ -151,6 +152,14 @@
   .glass aside, .glass header {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+  }
+  /* Glass-light: настоящее стекло — blur + saturate, но панели прозрачнее, чем в тёмном glass */
+  .glass-light [class*="bg-bg-card"],
+  .glass-light .card,
+  .glass-light aside,
+  .glass-light header {
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
   }
 
   /* Card hover по Motion System: subtle lift + shadow + border glow.
@@ -166,6 +175,30 @@
       transform: translateY(-1px);
       border-color: rgba(99, 102, 241, 0.25);
     }
+  }
+
+  /* Нативные поля времени/даты — под дизайн-систему: моноширинные цифры,
+     приглушённая иконка пикера, палитра выпадашки по color-scheme темы */
+  input[type="time"],
+  input[type="date"] {
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.45;
+    cursor: pointer;
+    transition: opacity 150ms ease;
+  }
+  input[type="time"]::-webkit-calendar-picker-indicator:hover,
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.85;
+  }
+  input[type="time"]::-webkit-datetime-edit-hour-field:focus,
+  input[type="time"]::-webkit-datetime-edit-minute-field:focus {
+    background: var(--accent-glow);
+    color: var(--text);
+    border-radius: 4px;
   }
 
   *::-webkit-scrollbar { width: 4px; height: 4px; }

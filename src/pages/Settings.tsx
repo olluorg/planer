@@ -21,6 +21,7 @@ import { parseIcs } from "@/lib/ics";
 import { SyncSettings } from "@/components/SyncSettings";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
+import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, PLUGINS_EVENT } from "@/lib/plugins";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
 import { Input } from "@/components/ui/input";
 import { nanoid } from "nanoid";
@@ -277,6 +278,11 @@ export const SettingsPage = () => {
       </Card>
 
       <Card>
+        <CardTitle>Плагины — свои виджеты</CardTitle>
+        <PluginsSettings />
+      </Card>
+
+      <Card>
         <CardTitle>Синхронизация устройств</CardTitle>
         <SyncSettings />
       </Card>
@@ -511,6 +517,74 @@ export const SettingsPage = () => {
           <li>Работает офлайн</li>
         </ul>
       </Card>
+    </div>
+  );
+};
+
+/* Плагины: декларативные JSON-виджеты (уровень A по docs/PLUGINS_SPEC.md).
+   Без исполняемого кода: только данные из белого списка коллекций + готовые примитивы. */
+const PluginsSettings: React.FC = () => {
+  const [plugins, setPlugins] = useState(getInstalledPlugins());
+  useEffect(() => {
+    const sync = () => setPlugins(getInstalledPlugins());
+    window.addEventListener(PLUGINS_EVENT, sync);
+    return () => window.removeEventListener(PLUGINS_EVENT, sync);
+  }, []);
+
+  const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const p = installPlugin(JSON.parse(await file.text()));
+      toast.success(`Плагин «${p.name}» установлен`, "Добавь его на дашборд через редактор раскладки → «+»");
+    } catch (err: any) {
+      toast.error("Плагин не установлен", String(err?.message ?? err));
+    }
+  };
+
+  return (
+    <div>
+      <div className="text-sm text-text-muted mb-3">
+        Кастомные виджеты — файлы <code className="text-xs">.thedad-widget.json</code>: данные из твоего стора
+        (read-only) + готовый вид (число, список, график, кольцо, таблица). Без исполняемого кода —
+        импортированный виджет не может читать AI-ключ или отправлять данные в сеть.
+        Примеры — в <code className="text-xs">docs/plugins</code> репозитория.
+      </div>
+      {plugins.length > 0 && (
+        <ul className="space-y-2 mb-3">
+          {plugins.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 rounded-lg border border-border-soft px-3 py-2">
+              <Puzzle className="h-4 w-4 text-accent shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{p.name}</div>
+                <div className="text-[11px] text-text-muted truncate">
+                  {p.id}{p.author ? ` · ${p.author}` : ""} · {p.source.collection} → {p.render.type}
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => exportPlugin(p)} title="Выгрузить .json для шаринга">
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost" size="sm"
+                onClick={() => { removePlugin(p.id); toast.success(`Плагин «${p.name}» удалён`); }}
+                title="Удалить плагин"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {plugins.length === 0 && (
+        <div className="text-xs text-text-dim mb-3">Пока ничего не установлено.</div>
+      )}
+      <label className="inline-flex">
+        <span className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-bg-soft hover:bg-bg-hover text-sm cursor-pointer transition-colors">
+          <Upload className="h-4 w-4" /> Импортировать .json
+        </span>
+        <input type="file" accept=".json,application/json" className="hidden" onChange={onImport} />
+      </label>
     </div>
   );
 };

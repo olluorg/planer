@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import {
   Plus, ChevronRight, Sun, Moon, Lock, Unlock, RotateCcw, Trash2,
   CheckSquare, Repeat, NotebookPen, Dumbbell, Timer, Target, Maximize2,
-  Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning,
+  Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning, Medal,
 } from 'lucide-react';
 import { getWeather, type Weather } from '@/lib/weather';
 import { useStore } from '@/lib/store';
@@ -52,6 +52,11 @@ import { computeStreak, levelFromXp, xpToday, xpTotal } from '@/lib/gamification
 import { Mascot } from '@/components/Mascot';
 import { PRESETS } from '@/lib/dashboardPresets';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { WIDGET_CATALOG, type WidgetMeta } from '@/lib/widgetCatalog';
+import { getInstalledPlugins, PLUGINS_EVENT, type PluginWidgetDef } from '@/lib/plugins';
+import { WidgetPicker } from '@/components/dashboard/WidgetPicker';
+import { PluginWidget, PLUGIN_ICONS } from '@/components/dashboard/PluginWidget';
+import { Puzzle } from 'lucide-react';
 import { TodayFocus } from '@/components/dashboard/TodayFocus';
 import { DayBrief } from '@/components/dashboard/DayBrief';
 import { TodayPlanList } from '@/components/dashboard/TodayPlanList';
@@ -351,14 +356,68 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
 
   const resetLayout = () => { setLayout(DEFAULT_LAYOUT); setHidden(DEFAULT_HIDDEN); };
   const hideWidget = (id: string) => setHidden((h) => [...new Set([...h, id])]);
-  const showAll = () => setHidden([]);
 
-  const visibleLayout = layout.filter((l) => !hidden.includes(l.i));
+  // Жёсткий минимум размеров: ниже виджет не ужать (и сохранённые раскладки подтягиваем к полу).
+  const MIN_W = 3, MIN_H = 3;
+  const minsFor = (id: string) => {
+    const meta = WIDGET_CATALOG.find((m) => m.id === id);
+    return { minW: Math.max(meta?.minW ?? MIN_W, MIN_W), minH: Math.max(meta?.minH ?? MIN_H, MIN_H) };
+  };
+  const visibleLayout = layout
+    .filter((l) => !hidden.includes(l.i))
+    .map((l) => {
+      const { minW, minH } = minsFor(l.i);
+      return { ...l, minW, minH, w: Math.max(l.w, minW), h: Math.max(l.h, minH) };
+    });
+
+  /* === Добавление виджетов: плитка «+» в конце сетки → окно выбора === */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [plugins, setPlugins] = useState<PluginWidgetDef[]>(getInstalledPlugins);
+  useEffect(() => {
+    const sync = () => setPlugins(getInstalledPlugins());
+    window.addEventListener(PLUGINS_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener(PLUGINS_EVENT, sync); window.removeEventListener('storage', sync); };
+  }, []);
+  // Удалённый плагин убираем и из раскладки
+  useEffect(() => {
+    const ids = new Set(plugins.map((p) => `plugin:${p.id}`));
+    if (layout.some((l) => l.i.startsWith('plugin:') && !ids.has(l.i))) {
+      setLayout(layout.filter((l) => !l.i.startsWith('plugin:') || ids.has(l.i)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plugins]);
+
+  const pluginMetas: WidgetMeta[] = plugins.map((p) => ({
+    id: `plugin:${p.id}`,
+    label: p.name,
+    description: `Плагин${p.author ? ` · ${p.author}` : ''}`,
+    category: 'plugins',
+    icon: PLUGIN_ICONS[p.icon ?? ''] ?? Puzzle,
+    w: p.defaultSize?.w ?? 4,
+    h: p.defaultSize?.h ?? 5,
+    minW: 2,
+    minH: 3,
+  }));
+
+  const visibleIds = new Set(visibleLayout.map((l) => l.i));
+  const availableWidgets = [...WIDGET_CATALOG, ...pluginMetas].filter((m) => !visibleIds.has(m.id));
+
+  const addWidget = (meta: WidgetMeta) => {
+    setHidden((h) => h.filter((x) => x !== meta.id));
+    setLayout((l) => {
+      if (l.some((it) => it.i === meta.id)) return l;
+      const bottom = l.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+      return [...l, { i: meta.id, x: 0, y: bottom, w: meta.w, h: meta.h, minW: meta.minW, minH: meta.minH }];
+    });
+  };
 
   const quote = quoteOfDay();
 
   // Each widget is a function returning JSX. The grid item wraps it with the card frame.
-  const widgets: Record<string, () => React.ReactNode> = {
+  // Фабрика: параметр editing затеняет внешний стейт, чтобы те же виджеты рендерились
+  // «начисто» (editing=false) как живые превью в окне выбора виджетов.
+  const buildWidgets = (editing: boolean): Record<string, () => React.ReactNode> => ({
     // === Основные виджеты (по макету) — рендерят собственную карточку ===
     'today-focus': () => (
       <Cell editing={editing} onHide={() => hideWidget('today-focus')}>
@@ -523,7 +582,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
         const done = blockTasks.filter((t) => t.status === 'done').length;
         const ratio = blockTasks.length ? Math.round((done / blockTasks.length) * 100) : 0;
         return (
-          <WidgetCard editing={editing} onHide={() => hideWidget(`block-${b.key}`)} primary>
+          <WidgetCard editing={editing} onHide={() => hideWidget(`block-${b.key}`)}>
             <div className="flex flex-col h-full">
               {/* Block header */}
               <div className="flex items-center justify-between mb-3 shrink-0">
@@ -565,9 +624,9 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
               </div>
 
               {/* Footer progress */}
-              <div className="shrink-0 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="shrink-0 mt-3 pt-3" style={{ borderTop: '1px solid var(--border-soft)' }}>
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-1 bg-white/5 overflow-hidden" style={{ borderRadius: '2px' }}>
+                  <div className="flex-1 h-1 bg-bg-soft overflow-hidden" style={{ borderRadius: '2px' }}>
                     <div
                       className="h-full progress-bar"
                       style={{
@@ -657,82 +716,46 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
               etaHint = { text: 'мало данных для прогноза', tone: 'neutral' };
             }
             return (
+              /* Карточка цели в новой дизайн-системе: спокойная поверхность, тонкая
+                 граница, hover-lift из CSS — без тяжёлых теней и JS-ховеров */
               <button
                 key={g.id}
                 onClick={() => !editing && nav('/goals')}
-                className="shrink-0 text-left relative overflow-hidden hover-lift"
-                style={{
-                  width: '240px',
-                  height: '200px',
-                  borderRadius: '14px',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                  transition: 'transform 280ms cubic-bezier(0.4,0,0.2,1), box-shadow 280ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = 'scale(1.03) translateY(-3px)';
-                  (e.currentTarget as HTMLElement).style.boxShadow = `0 20px 50px rgba(0,0,0,0.7), 0 0 0 1px ${colorHex}40`;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = 'scale(1) translateY(0)';
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
-                }}
+                className="shrink-0 w-[230px] text-left rounded-xl border border-border-soft bg-bg-soft/60 overflow-hidden hover-lift flex flex-col"
               >
-                {/* Background */}
-                <div className="absolute inset-0">
+                {/* Обложка или монограмма */}
+                <div className="relative h-20 shrink-0 overflow-hidden">
                   {g.cover ? (
-                    <img src={g.cover} alt="" className="w-full h-full object-cover" />
+                    <img src={g.cover} alt="" className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     <div
-                      className="w-full h-full flex items-center justify-center text-5xl font-black"
-                      style={{
-                        background: `linear-gradient(135deg, ${colorHex}22 0%, ${colorHex}08 100%)`,
-                        color: `${colorHex}40`,
-                      }}
+                      className="w-full h-full flex items-center justify-center text-4xl font-black"
+                      style={{ background: `linear-gradient(135deg, ${colorHex}1f 0%, ${colorHex}08 100%)`, color: `${colorHex}55` }}
                     >
                       {g.title.slice(0, 1).toUpperCase()}
                     </div>
                   )}
-                </div>
-                {/* Dark gradient overlay */}
-                <div
-                  className="absolute inset-0"
-                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.15) 100%)' }}
-                />
-                {/* Content */}
-                <div className="absolute inset-0 flex flex-col justify-end p-4">
                   {monthLabel && (
-                    <div className="text-[9px] uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    <span className="absolute top-1.5 left-1.5 rounded-full bg-black/40 backdrop-blur px-2 py-0.5 text-[9px] uppercase tracking-wider font-semibold text-white capitalize">
                       {monthLabel}
-                    </div>
-                  )}
-                  <div className="text-sm font-semibold text-white mb-1 truncate leading-tight">{g.title}</div>
-                  <div className="text-2xl font-bold tabular-nums mb-3" style={{ color: colorHex }}>
-                    {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
-                    <span className="text-xs font-normal ml-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                      / {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}
                     </span>
+                  )}
+                </div>
+                {/* Контент */}
+                <div className="flex-1 flex flex-col p-3">
+                  <div className="text-sm font-semibold text-text truncate leading-tight">{g.title}</div>
+                  <div className="text-xl font-bold tabular-nums mt-1" style={{ color: colorHex }}>
+                    {fmtNum(g.current_value, 1)}{g.unit ? ` ${g.unit}` : ''}
+                    <span className="text-xs font-normal text-text-dim ml-1">/ {fmtNum(g.target_value, 0)}{g.unit ? ` ${g.unit}` : ''}</span>
                   </div>
-                  {/* Progress bar */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1 overflow-hidden" style={{ borderRadius: '1px', background: 'rgba(255,255,255,0.12)' }}>
-                      <div
-                        className="h-full progress-bar"
-                        style={{
-                          width: `${r}%`,
-                          background: colorHex,
-                          boxShadow: `0 0 8px ${colorHex}80`,
-                        }}
-                      />
+                  <div className="flex items-center gap-2 mt-auto pt-2">
+                    <div className="flex-1 h-1 rounded-full bg-bg-hover overflow-hidden">
+                      <div className="h-full rounded-full progress-bar" style={{ width: `${r}%`, background: colorHex }} />
                     </div>
-                    <span className="text-xs font-bold tabular-nums" style={{ color: colorHex }}>{r}%</span>
+                    <span className="text-xs font-semibold tabular-nums" style={{ color: colorHex }}>{r}%</span>
                   </div>
                   {etaHint && (
-                    <div
-                      className="text-[10px] mt-2 tabular-nums"
-                      style={{
-                        color: etaHint.tone === 'good' ? '#84CC16' : etaHint.tone === 'bad' ? '#ef4444' : 'rgba(255,255,255,0.5)',
-                      }}
-                    >
+                    <div className={`text-[10px] mt-1.5 tabular-nums ${etaHint.tone === 'good' ? 'text-accent' : etaHint.tone === 'bad' ? 'text-danger' : 'text-text-dim'}`}>
                       {etaHint.tone === 'good' ? '↗ ' : etaHint.tone === 'bad' ? '↘ ' : '→ '}{etaHint.text}
                     </div>
                   )}
@@ -919,30 +942,31 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
         localStorage.setItem(cacheKey, letter.key);
         markShown();
       }
-      if (!letter) {
-        return (
-          <WidgetCard editing={editing} onHide={() => hideWidget('letter')}>
-            <CardTitle>Письмо от маскота</CardTitle>
-            <div className="flex items-center gap-3">
-              <Mascot streak={streak} size={48} />
-              <p className="text-sm text-text-muted">Сегодня всё идёт ровно. Продолжай в том же духе.</p>
-            </div>
-          </WidgetCard>
-        );
-      }
-      const out = letter.render(ctx);
-      const toneClass = out.tone === 'urgent' ? 'border-l-4 border-l-danger pl-3'
-                     : out.tone === 'celebrate' ? 'border-l-4 border-l-accent pl-3'
-                     : out.tone === 'warm' ? 'border-l-4 border-l-info pl-3'
-                     : 'border-l-4 border-l-border pl-3';
+      // Редизайн: спокойный «конверт» на мягкой подложке, тон письма — точка-индикатор
+      const out = letter?.render(ctx);
+      const tone = out?.tone ?? 'neutral';
+      const toneDot = tone === 'urgent' ? 'var(--danger, #ef4444)'
+                    : tone === 'celebrate' ? 'var(--accent)'
+                    : tone === 'warm' ? '#38bdf8'
+                    : 'var(--text-dim)';
+      const toneLabel = tone === 'urgent' ? 'важно' : tone === 'celebrate' ? 'праздник' : tone === 'warm' ? 'поддержка' : 'на сегодня';
       return (
-        <WidgetCard editing={editing} onHide={() => hideWidget('letter')}>
-          <CardTitle>Письмо от маскота</CardTitle>
-          <div className={`flex gap-3 ${toneClass}`}>
-            <div className="shrink-0"><Mascot streak={streak} size={56} /></div>
-            <div>
-              <div className="text-sm font-semibold">{out.title}</div>
-              <p className="text-xs text-text-muted leading-relaxed mt-1">{out.body}</p>
+        <WidgetCard title="Письмо от маскота" editing={editing} onHide={() => hideWidget('letter')}>
+          <div className="h-full rounded-xl bg-bg-soft/60 border border-border-soft p-3 flex gap-3 items-start">
+            <div className="shrink-0 h-14 w-14 rounded-xl bg-bg-card border border-border-soft flex items-center justify-center overflow-hidden">
+              <Mascot streak={streak} size={44} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: toneDot }} />
+                <span className="text-[10px] uppercase tracking-wider text-text-dim">{toneLabel}</span>
+              </div>
+              <div className="text-sm font-semibold text-text mt-1 leading-snug">
+                {out?.title ?? 'Всё идёт ровно'}
+              </div>
+              <p className="text-xs text-text-muted leading-relaxed mt-1">
+                {out?.body ?? 'Сегодня без замечаний. Продолжай в том же духе — серия работает на тебя.'}
+              </p>
             </div>
           </div>
         </WidgetCard>
@@ -965,39 +989,37 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       const pct = next ? Math.round((within / span) * 100) : 100;
       const history = buildHistory(xpLog, 8);
       return (
-        <WidgetCard editing={editing} onHide={() => hideWidget('leagues')}>
+        // Редизайн: плашка лиги на мягкой подложке цвета лиги, скруглённая история недель
+        <WidgetCard title="Лига недели" editing={editing} onHide={() => hideWidget('leagues')}>
           <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle className="mb-0">Лига недели</CardTitle>
-              <span className="text-[11px] text-text-muted">XP за неделю определяет лигу</span>
-            </div>
             <div className="flex items-center gap-4 mb-3">
               <div
-                className="px-3 py-2 text-sm font-bold border"
-                style={{ borderColor: cur.color, color: cur.color }}
+                className="rounded-xl px-3.5 py-2 text-sm font-bold shrink-0 flex items-center gap-1.5"
+                style={{ background: `${cur.color}1c`, color: cur.color }}
               >
-                {cur.label}
+                <Medal className="h-4 w-4" /> {cur.label}
               </div>
-              <div className="flex-1">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-text-muted">{weekXp} XP за неделю</span>
-                  {next ? <span className="text-text-muted">до {next.label}: {next.minXp - weekXp} XP</span>
-                        : <span className="text-accent">высшая лига</span>}
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between text-xs mb-1.5 gap-2">
+                  <span className="text-text-muted tabular-nums truncate">{weekXp} XP за неделю</span>
+                  {next ? <span className="text-text-dim tabular-nums shrink-0">до {next.label}: {next.minXp - weekXp} XP</span>
+                        : <span className="text-accent shrink-0">высшая лига</span>}
                 </div>
                 <Progress value={pct} barColor={cur.color} />
               </div>
             </div>
-            <div className="flex gap-1 mt-auto">
+            <div className="flex gap-1.5 mt-auto items-end">
               {history.map((h, i) => (
-                <div key={i} className="flex-1 text-center" title={`${h.weekStart} · ${h.xp} XP`}>
+                <div key={i} className="flex-1 text-center min-w-0" title={`${h.weekStart} · ${h.xp} XP · ${h.league.label}`}>
                   <div
-                    className="h-8 mx-0.5"
+                    className="rounded-md transition-[height]"
                     style={{
+                      height: `${12 + Math.min(1, h.xp / 2000) * 20}px`,
                       background: h.league.color,
-                      opacity: 0.2 + Math.min(1, h.xp / 2000) * 0.8,
+                      opacity: 0.35 + Math.min(1, h.xp / 2000) * 0.65,
                     }}
                   />
-                  <div className="text-[9px] text-text-dim mt-1">{h.weekStart.slice(5)}</div>
+                  <div className="text-[9px] text-text-dim mt-1 tabular-nums truncate">{h.weekStart.slice(5)}</div>
                 </div>
               ))}
             </div>
@@ -1165,6 +1187,17 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
         </div>
       </WidgetCard>
     ),
+  });
+
+  const widgets = buildWidgets(editing);
+  // Превью для окна выбора: без редакторской хромки и с отключёнными кликами
+  const previewWidgets = buildWidgets(false);
+  const renderWidgetPreview = (id: string): React.ReactNode => {
+    if (id.startsWith('plugin:')) {
+      const p = plugins.find((x) => `plugin:${x.id}` === id);
+      return p ? <PluginWidget def={p} /> : null;
+    }
+    return previewWidgets[id]?.();
   };
 
   // Пустой старт — иллюстрированный экран «с чего начать» вместо пустой drag-сетки
@@ -1222,9 +1255,6 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                       {PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  {hidden.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={showAll}>Показать скрытые ({hidden.length})</Button>
-                  )}
                   <Button variant="ghost" size="sm" onClick={resetLayout}>
                     <RotateCcw className="h-3.5 w-3.5" /> Сбросить
                   </Button>
@@ -1267,12 +1297,19 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
           >
             {visibleLayout.map((l) => (
               <div key={l.i} className="bento-item group/bento relative">
-                {widgets[l.i]?.()}
+                {l.i.startsWith('plugin:') ? (
+                  <Cell editing={editing} onHide={() => hideWidget(l.i)}>
+                    {(() => {
+                      const p = plugins.find((x) => `plugin:${x.id}` === l.i);
+                      return p ? <PluginWidget def={p} /> : null;
+                    })()}
+                  </Cell>
+                ) : widgets[l.i]?.()}
                 {!editing && WIDGET_PAGE[l.i] && (
                   <button
                     onClick={() => openPage(WIDGET_PAGE[l.i])}
-                    className="absolute top-2 right-2 z-20 h-7 w-7 rounded-lg bg-bg-soft/85 backdrop-blur text-text-muted hover:text-text hover:bg-bg-hover flex items-center justify-center opacity-0 group-hover/bento:opacity-100 transition-opacity"
-                    title="Открыть страницу"
+                    className="absolute bottom-2 right-2 z-20 h-7 w-7 rounded-lg bg-bg-soft/85 backdrop-blur text-text-muted hover:text-text hover:bg-bg-hover flex items-center justify-center opacity-0 group-hover/bento:opacity-100 transition-opacity"
+                    title="Развернуть в страницу"
                   >
                     <Maximize2 className="h-3.5 w-3.5" />
                   </button>
@@ -1281,10 +1318,33 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             ))}
           </Responsive>
           )}
+
+          {/* Плитка «+» в конце сетки: квадратный виджет-призрак, как обычная ячейка */}
+          {editing && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="mt-[10px] w-full sm:w-[240px] h-[240px] rounded-xl border-2 border-dashed border-accent/35 hover:border-accent/70 bg-accent/[0.04] hover:bg-accent/10 flex flex-col items-center justify-center gap-2 text-text-muted hover:text-accent transition-colors"
+              title="Добавить виджет"
+            >
+              <Plus className="h-12 w-12" strokeWidth={1.25} />
+              <span className="text-sm font-medium">Добавить виджет</span>
+              {availableWidgets.length > 0 && (
+                <span className="text-xs text-text-dim">{availableWidgets.length} доступно</span>
+              )}
+            </button>
+          )}
             </div>
           </div>
         </div>
       </div>
+
+      <WidgetPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        available={availableWidgets}
+        onAdd={addWidget}
+        renderPreview={renderWidgetPreview}
+      />
 
       <QuickAddDialog
         open={quickTab !== null}
@@ -1299,24 +1359,21 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
 const WidgetCard: React.FC<{
   title?: string;
   editing: boolean;
-  primary?: boolean;
   onHide?: () => void;
   onClick?: () => void;
   children: React.ReactNode;
-}> = ({ title, editing, primary, onHide, onClick, children }) => (
+}> = ({ title, editing, onHide, onClick, children }) => (
+  // bg-bg-card классом (не inline) — чтобы glass-темы навешивали backdrop-blur.
+  // Фон у всех виджетов одинаковый: без акцентных карточек.
   <div
-    className={`relative h-full flex flex-col overflow-hidden rounded-xl transition-all duration-200 ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
+    className={`relative h-full flex flex-col overflow-hidden rounded-xl transition-all duration-200 ${editing ? '' : 'bg-bg-card'} ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
     style={editing ? {
       border: '1px dashed var(--accent)',
       background: 'var(--accent-glow)',
       padding: '16px',
     } : {
-      background: primary ? 'var(--accent)' : 'var(--bg-card)',
-      color: primary ? '#fff' : undefined,
       border: '1px solid var(--border-soft)',
-      boxShadow: primary
-        ? '0 12px 28px rgba(99,102,241,0.28)'
-        : '0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.05)',
+      boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.05)',
       padding: '16px',
     }}
     onClick={onClick}

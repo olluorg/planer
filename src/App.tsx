@@ -53,6 +53,7 @@ export default function App() {
   const [date, setDate] = useState(new Date());
   const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
   const [focusOpen, setFocusOpen] = useState(false);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [expandPage, setExpandPage] = useState<string | null>(null);
@@ -88,6 +89,8 @@ export default function App() {
       void init();
     })();
     applyAccent(getAccent());
+    // Предустановленные виджеты-плагины (например, «Правильное питание на месяц»)
+    void import('./lib/plugins').then((m) => m.ensureDefaultPlugins());
   }, [init]);
 
   useEffect(() => {
@@ -210,7 +213,7 @@ export default function App() {
           onFocusMode={() => setFocusOpen(true)}
           onInsights={() => setInsightsOpen((v) => !v)}
           onBell={() => setInboxOpen((v) => !v)}
-          onPalette={() => setPaletteOpen(true)}
+          onPalette={(query) => { setPaletteQuery(query ?? ''); setPaletteOpen(true); }}
           bellCount={inboxUnread || bellCount}
         />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
@@ -245,7 +248,8 @@ export default function App() {
       />
       <CommandPalette
         open={paletteOpen}
-        onOpenChange={setPaletteOpen}
+        onOpenChange={(v) => { setPaletteOpen(v); if (!v) setPaletteQuery(''); }}
+        initialQuery={paletteQuery}
         onAddTask={() => setQuickTab('task')}
         onAddHabit={() => setQuickTab('habit')}
         onAddGoal={() => setQuickTab('goal')}

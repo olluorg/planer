@@ -1,0 +1,19 @@
+{
+  "schema": "thedad.widget/v1",
+  "id": "tasks-done-week",
+  "name": "Закрытые задачи за неделю",
+  "author": "THEDAD examples",
+  "icon": "check",
+  "defaultSize": { "w": 4, "h": 5 },
+  "source": {
+    "collection": "tasks",
+    "range": "last-7-days",
+    "groupBy": "date",
+    "where": { "status": "done" }
+  },
+  "render": {
+    "type": "bar",
+    "value": "count",
+    "label": "{{date}}"
+  }
+}

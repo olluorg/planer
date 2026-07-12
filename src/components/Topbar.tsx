@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, Settings, Trophy, LayoutTemplate, History, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { useTheme, isDarkMode } from '@/lib/theme';
 import { Logo } from './ui/logo';
 import { getUserName } from '@/lib/onboarding';
+import { GoogleIcon, openGoogleSearch } from './ui/google-icon';
 
 interface Props {
   onAdd?: () => void;
   onBell?: () => void;
   onFocusMode?: () => void;
   onInsights?: () => void;
-  onPalette?: () => void;
+  /** Открыть палитру команд, опционально с уже введённым запросом. */
+  onPalette?: (query?: string) => void;
   bellCount?: number;
 }
 
@@ -71,30 +74,70 @@ const AppMenu: React.FC = () => {
 
 export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onInsights, onPalette, bellCount = 0 }) => {
   const { theme, toggle } = useTheme();
+  const nav = useNavigate();
+  const [searchQ, setSearchQ] = useState('');
+  // Клик по логотипу/названию — на главную; заодно закрываем раскрытый виджет-страницу
+  const goHome = () => {
+    window.dispatchEvent(new CustomEvent('thedad:expand', { detail: { page: null } }));
+    nav('/');
+  };
 
   return (
-    <header className="shrink-0 border-b border-border-soft">
+    // z-40: в glass-темах backdrop-filter делает header отдельным stacking context,
+    // без z-index меню аватара рисовалось ПОД виджетами сетки (у них transform)
+    <header className="relative z-40 shrink-0 border-b border-border-soft">
       <div className="flex items-center h-16 px-4 sm:px-6 gap-2 sm:gap-3">
-        {/* Бренд + единственная точка входа в Фокус — сверху слева */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Бренд — клик ведёт на главную + единственная точка входа в Фокус */}
+        <button onClick={goHome} className="flex items-center gap-2 shrink-0 rounded-lg px-1 -mx-1 hover:bg-bg-soft transition-colors" title="На главную">
           <Logo size={30} className="shrink-0" />
           <span className="hidden md:block text-[15px] font-bold text-text">THEDAD</span>
-        </div>
+        </button>
         <Button variant="soft" size="sm" onClick={onFocusMode} className="shrink-0 gap-1.5" title="Focus Mode (Ctrl+Shift+F)">
           <Crosshair className="h-4 w-4" /> <span className="hidden sm:inline">Фокус</span>
         </Button>
 
-        {/* Search / command */}
-        <button
-          onClick={onPalette}
-          className="flex-1 min-w-0 flex items-center gap-2.5 h-10 rounded-xl bg-bg-soft border border-border-soft px-3.5 text-text-muted hover:border-border transition-colors"
-        >
+        {/* Search: настоящее поле ввода. Enter — поиск по приложению (палитра),
+            значок Google — тот же запрос во внешний поиск */}
+        <div className="flex-1 min-w-0 flex items-center gap-2.5 h-10 rounded-xl bg-bg-soft border border-border-soft px-3.5 text-text-muted focus-within:border-border transition-colors">
           <Search className="h-4 w-4 shrink-0" />
-          <span className="text-sm truncate">Поиск или команда…</span>
-          <kbd className="ml-auto hidden sm:flex items-center gap-0.5 text-[10px] text-text-dim border border-border-soft rounded-md px-1.5 py-0.5">
-            Ctrl K
-          </kbd>
-        </button>
+          <input
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { onPalette?.(searchQ); setSearchQ(''); }
+              if (e.key === 'Escape') setSearchQ('');
+            }}
+            placeholder="Поиск или команда…"
+            className="flex-1 min-w-0 bg-transparent outline-none text-sm text-text placeholder:text-text-muted"
+          />
+          {searchQ.trim() && (
+            <>
+              <button
+                onClick={() => { onPalette?.(searchQ); setSearchQ(''); }}
+                className="hidden sm:block text-[11px] text-text-dim hover:text-text shrink-0 transition-colors"
+                title="Искать в приложении (Enter)"
+              >
+                Enter — в приложении
+              </button>
+              <button
+                onClick={() => { openGoogleSearch(searchQ); setSearchQ(''); }}
+                className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 hover:bg-bg-hover transition-colors"
+                title={`Искать «${searchQ.trim()}» в Google`}
+              >
+                <GoogleIcon className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          {!searchQ.trim() && (
+            <button
+              onClick={() => onPalette?.()}
+              className="ml-auto hidden sm:flex items-center gap-0.5 text-[10px] text-text-dim border border-border-soft rounded-md px-1.5 py-0.5 hover:text-text transition-colors shrink-0"
+              title="Палитра команд"
+            >
+              Ctrl K
+            </button>
+          )}
+        </div>
 
         {/* Action icons */}
         <div className="flex items-center gap-0.5 shrink-0">

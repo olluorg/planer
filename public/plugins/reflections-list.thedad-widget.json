@@ -1,0 +1,16 @@
+{
+  "schema": "thedad.widget/v1",
+  "id": "reflections-list",
+  "name": "Рефлексии за неделю",
+  "author": "THEDAD examples",
+  "icon": "brain",
+  "defaultSize": { "w": 4, "h": 5 },
+  "source": {
+    "collection": "reflections",
+    "range": "last-7-days"
+  },
+  "render": {
+    "type": "list",
+    "label": "{{date}} · настроение {{mood}}"
+  }
+}
