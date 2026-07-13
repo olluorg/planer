@@ -22,6 +22,7 @@ import { SyncSettings } from "@/components/SyncSettings";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, PLUGINS_EVENT } from "@/lib/plugins";
+import { preloadImages } from "@/lib/preload";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
 import { Input } from "@/components/ui/input";
 import { nanoid } from "nanoid";
@@ -593,6 +594,8 @@ const PluginsSettings: React.FC = () => {
 const GlassWallpaperPicker: React.FC = () => {
   const [current, setCurrent] = useState(getAppWallpaper());
   const [custom, setCustom] = useState<string[]>(getCustomWallpapers());
+  // прогреваем кеш всех обоев, чтобы превью и смена фона не «проявлялись»
+  useEffect(() => { preloadImages([...custom, ...APP_WALLPAPERS]); }, [custom]);
   const pick = (src: string) => { applyAppWallpaper(src); setCurrent(src); };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

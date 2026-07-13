@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3, Calendar as CalendarIcon, HeartPulse, NotebookPen, Maximize2 } from 'lucide-react';
+import { Target, Bell, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Zap, BarChart3, Calendar as CalendarIcon, HeartPulse, NotebookPen, Maximize2, Flame, Dumbbell, Activity } from 'lucide-react';
 import { CATEGORIES, setOnboardingDone, setUserName, setUserCategories } from '@/lib/onboarding';
 import { applyTheme, useTheme } from '@/lib/theme';
 import { Logo } from '@/components/ui/logo';
 import { useStore } from '@/lib/store';
 import { requestPermission, setHeartbeatEnabled } from '@/lib/notifications';
+import { setSex, setAge, setHeight, setProfileWeight, type Sex } from '@/lib/profile';
 
 interface Props {
   open: boolean;
   onClose: () => void;
 }
 
-type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'cycle' | 'widgets' | 'notifications' | 'done';
+type StepId = 'welcome' | 'theme' | 'name' | 'categories' | 'cycle' | 'widgets' | 'health' | 'notifications' | 'done';
 
 export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const addGoal = useStore((s) => s.addGoal);
@@ -22,13 +23,26 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // Профиль для точного расчёта калорий (BMR с первого дня)
+  const [sex, setSexState] = useState<Sex | null>(null);
+  const [age, setAgeState] = useState('');
+  const [height, setHeightState] = useState('');
+  const [weight, setWeightState] = useState('');
 
   if (!open) return null;
 
-  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'cycle', 'widgets', 'notifications', 'done'];
+  const steps: StepId[] = ['welcome', 'theme', 'name', 'categories', 'cycle', 'widgets', 'health', 'notifications', 'done'];
   const stepIdx = steps.indexOf(step);
 
+  const saveProfile = () => {
+    if (sex) setSex(sex);
+    const a = Number(age); if (a > 0) setAge(a);
+    const h = Number(height); if (h > 0) setHeight(h);
+    const w = Number(weight); if (w > 0) setProfileWeight(w);
+  };
+
   const next = () => {
+    if (step === 'health') saveProfile();
     const i = steps.indexOf(step);
     if (i < steps.length - 1) setStep(steps[i + 1]);
   };
@@ -280,6 +294,51 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
                 </div>
               </div>
               <p className="text-[11px] text-text-dim mt-5">Состав дашборда меняется в редакторе раскладки — плитка «+» добавляет новые виджеты.</p>
+            </div>
+          )}
+
+          {step === 'health' && (
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-1">
+                <Flame className="h-5 w-5 text-accent" />
+                <h2 className="text-2xl font-bold text-text">Здоровье и калории</h2>
+              </div>
+              <p className="text-text-muted mt-1 text-sm">
+                Виджеты <b className="text-text">Калории</b>, <b className="text-text">Зарядка</b> и <b className="text-text">Активность</b> считают
+                баланс дня и связывают его с целями. Заполни профиль — тогда расчёт будет точным с первого дня (можно пропустить).
+              </p>
+
+              <div className="grid grid-cols-3 gap-2 mt-5 mb-5 text-center text-[11px]">
+                {[
+                  { icon: Flame, label: 'Калории: съедено vs сожжено' },
+                  { icon: Dumbbell, label: 'Зарядка: 7 минут в день' },
+                  { icon: Activity, label: 'Активность: шаги + тренировки' },
+                ].map((f) => (
+                  <div key={f.label} className="rounded-xl border border-border-soft p-3">
+                    <div className="h-8 w-8 mx-auto mb-1.5 rounded-lg bg-accent/12 text-accent flex items-center justify-center"><f.icon className="h-4 w-4" /></div>
+                    <div className="text-text-muted leading-snug">{f.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2.5 max-w-sm mx-auto w-full">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex rounded-lg border border-border overflow-hidden">
+                    {(['male', 'female'] as Sex[]).map((s) => (
+                      <button key={s} type="button" onClick={() => setSexState(s)}
+                        className={`flex-1 h-10 text-sm transition-colors ${sex === s ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-soft'}`}>
+                        {s === 'male' ? 'Мужчина' : 'Женщина'}
+                      </button>
+                    ))}
+                  </div>
+                  <Input value={age} onChange={(e) => setAgeState(e.target.value)} placeholder="Возраст" inputMode="numeric" className="h-10" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input value={height} onChange={(e) => setHeightState(e.target.value)} placeholder="Рост, см" inputMode="numeric" className="h-10" />
+                  <Input value={weight} onChange={(e) => setWeightState(e.target.value)} placeholder="Вес, кг" inputMode="numeric" className="h-10" />
+                </div>
+              </div>
+              <p className="text-[11px] text-text-dim mt-4 text-center">Данные хранятся только на устройстве и нужны для формулы базового метаболизма (BMR).</p>
             </div>
           )}
 

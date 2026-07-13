@@ -70,6 +70,8 @@ import { QuickCapture } from '@/components/dashboard/QuickCapture';
 import { HealthWidget } from '@/components/dashboard/HealthWidget';
 import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
 import { WorkoutWidget } from '@/components/dashboard/WorkoutWidget';
+import { CaloriesWidget } from '@/components/dashboard/CaloriesWidget';
+import { ActivityWidget } from '@/components/dashboard/ActivityWidget';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
@@ -101,6 +103,8 @@ const DEFAULT_LAYOUT: Layout[] = [
   { i: 'health',         x: 8, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
   { i: 'calendar',       x: 0, y: 22, w: 4, h: 7, minW: 3, minH: 6 },
   { i: 'workout',        x: 4, y: 22, w: 4, h: 6, minW: 3, minH: 5 },
+  { i: 'calories',       x: 8, y: 22, w: 4, h: 6, minW: 3, minH: 5 },
+  { i: 'activity',       x: 8, y: 28, w: 4, h: 6, minW: 3, minH: 5 },
   // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
   { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
   { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
@@ -495,6 +499,16 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     'workout': () => (
       <Cell editing={editing} onHide={() => hideWidget('workout')}>
         <WorkoutWidget />
+      </Cell>
+    ),
+    'calories': () => (
+      <Cell editing={editing} onHide={() => hideWidget('calories')}>
+        <CaloriesWidget />
+      </Cell>
+    ),
+    'activity': () => (
+      <Cell editing={editing} onHide={() => hideWidget('activity')}>
+        <ActivityWidget />
       </Cell>
     ),
 

@@ -1,5 +1,12 @@
 # Архитектура THEDAD
 
+Связанные документы:
+- [DATA_FLOW.md](./DATA_FLOW.md) — как синхронизируются виджеты здоровья/питания/активности
+  (шина событий + канонический `healthLogs` + `useHealthSync`).
+- [ECOSYSTEM.md](./ECOSYSTEM.md) — дорожная карта: мобильное приложение, HealthKit/Health
+  Connect, сервисы еды, носимые.
+- [PLUGINS_SPEC.md](./PLUGINS_SPEC.md) — расширения-виджеты. [plugins/GUIDE.md](./plugins/GUIDE.md) — гайд для пользователей.
+
 ## Принципы
 
 - **Local-first**: всё хранится на устройстве, нет серверной части в ядре.

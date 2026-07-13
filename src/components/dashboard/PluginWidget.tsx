@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Puzzle, Flame, Star, Heart, Dumbbell, Book, CheckCircle2, ListTodo, Activity,
   Target, CalendarDays, Repeat, Timer, Trophy, Sparkles, Moon, Sun, Droplets, Brain,
+  SlidersHorizontal,
 } from 'lucide-react';
+import { MealPlanner } from '@/components/MealPlanner';
+import { isEaten, toggleEaten, NUTRITION_EVENT } from '@/lib/nutrition';
+import { isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
@@ -26,8 +30,24 @@ const RANGE_LABEL: Record<string, string> = {
   'today': 'сегодня', 'last-7-days': '7 дней', 'last-30-days': '30 дней', 'last-90-days': '90 дней', 'all': 'всё время',
 };
 
+/** Эмодзи-заглушка для карточки без фото: по типу блюда, затем по приёму пищи. */
+function foodEmoji(kind: string, meal: string): string {
+  const k = kind.toLowerCase();
+  if (k.includes('напит')) return '🥤';
+  if (k.includes('десерт')) return '🍰';
+  if (k.includes('снек') || k.includes('перекус')) return '🥜';
+  if (k.includes('салат')) return '🥗';
+  if (k.includes('гарнир')) return '🍚';
+  const m = meal.toLowerCase();
+  if (m.includes('завтрак')) return '🍳';
+  if (m.includes('обед')) return '🍲';
+  if (m.includes('ужин')) return '🍽';
+  return '🍴';
+}
+
 /** Карточка контентного плагина: лицевая сторона — картинка + краткое описание,
- *  по клику «переворачивается» в текст (например, рецепт). */
+ *  по клику «переворачивается» в текст (например, рецепт). Для дневного меню
+ *  показывает ккал и отметку «съел» — итог дня уходит в статистику здоровья. */
 const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, row }) => {
   const [flipped, setFlipped] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
@@ -36,43 +56,79 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
   const badge = r.badge ? renderTemplate(r.badge, row.raw) : '';
   const text = r.text ? renderTemplate(r.text, row.raw) : '';
   const detail = r.detail ? renderTemplate(r.detail, row.raw) : '';
+  const kind = typeof row.raw.kind === 'string' ? row.raw.kind : '';
+  const kcal = Number(row.raw.kcal) || 0;
   const imgRaw = r.image ? row.raw[r.image] : null;
   // Только локальные пути — внешние URL отсекает ещё валидация импорта.
   // "//host" — protocol-relative, тоже внешний: отклоняем и здесь (defense in depth).
   const img = typeof imgRaw === 'string' && imgRaw.startsWith('/') && !imgRaw.startsWith('//') ? imgRaw : null;
 
+  // «съел»: только для дневного меню (dayField) — ключ стабилен в рамках плана
+  const today = isoDate(new Date());
+  const eatKey = `${badge}¦${title}`;
+  const trackable = !!r.dayField && !!def.source.static;
+  const [eaten, setEaten] = useState(() => trackable && isEaten(today, eatKey));
+  useEffect(() => {
+    if (!trackable) return;
+    const sync = () => setEaten(isEaten(today, eatKey));
+    window.addEventListener(NUTRITION_EVENT, sync);
+    return () => window.removeEventListener(NUTRITION_EVENT, sync);
+  }, [trackable, today, eatKey]);
+
+  const onToggleEaten = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // toggleEaten шлёт NUTRITION_EVENT → useHealthSync сводит итог дня в healthLogs
+    toggleEaten(today, { key: eatKey, title, kcal, meal: badge });
+  };
+
   return (
     <button
       onClick={() => detail && setFlipped((v) => !v)}
-      className="group/card relative flex flex-col text-left rounded-xl border border-border-soft overflow-hidden bg-bg-soft/60 hover:border-accent/40 transition-colors min-h-[150px]"
+      className={`group/card relative flex flex-col text-left rounded-xl border overflow-hidden bg-bg-soft/60 hover:border-accent/40 transition-colors min-h-[150px] ${eaten ? 'border-accent/50' : 'border-border-soft'}`}
       title={detail ? (flipped ? 'Назад к фото' : 'Показать рецепт') : undefined}
     >
       {flipped ? (
         /* Обратная сторона: только текст */
         <div className="flex-1 p-3 overflow-auto">
-          {badge && <div className="text-[10px] uppercase tracking-wider text-accent font-semibold mb-1">{badge}</div>}
+          {badge && <div className="text-[10px] uppercase tracking-wider text-accent font-semibold mb-1">{badge}{kind ? ` · ${kind}` : ''}</div>}
           <div className="text-sm font-semibold text-text mb-1.5">{title}</div>
           <p className="text-xs text-text-muted leading-relaxed whitespace-pre-line">{detail}</p>
         </div>
       ) : (
         <>
-          {/* Картинка или заглушка */}
-          <div className="relative h-20 shrink-0 bg-gradient-to-br from-accent/15 to-accent/5">
+          {/* Картинка или осмысленная заглушка (эмодзи по типу блюда) */}
+          <div className={`relative h-20 shrink-0 bg-gradient-to-br from-accent/15 to-accent/5 ${eaten ? 'opacity-60' : ''}`}>
             {img && !imgFailed ? (
               <img src={img} alt="" loading="lazy" className="h-full w-full object-cover" onError={() => setImgFailed(true)} />
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-2xl opacity-60">🍽</div>
+              <div className="h-full w-full flex items-center justify-center text-3xl opacity-70">{foodEmoji(kind, badge)}</div>
             )}
             {badge && (
-              <span className="absolute top-1.5 left-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white">{badge}</span>
+              <span className="absolute top-1.5 left-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white">{badge}{kind && kind !== 'Основное' ? ` · ${kind}` : ''}</span>
+            )}
+            {kcal > 0 && (
+              <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white tabular-nums">{kcal} ккал</span>
             )}
           </div>
           <div className="flex-1 p-2.5">
-            <div className="text-[13px] font-semibold text-text leading-snug">{title}</div>
-            {text && <p className="text-[11px] text-text-muted leading-snug mt-1 line-clamp-3">{text}</p>}
+            <div className={`text-[13px] font-semibold leading-snug ${eaten ? 'text-text-muted line-through' : 'text-text'}`}>{title}</div>
+            {text && <p className="text-[11px] text-text-muted leading-snug mt-1 line-clamp-2">{text}</p>}
           </div>
           {detail && <div className="px-2.5 pb-2 text-[10px] text-text-dim opacity-0 group-hover/card:opacity-100 transition-opacity">Рецепт — по клику</div>}
         </>
+      )}
+      {/* Отметка «съел» — считается в калории дня */}
+      {trackable && (
+        <span
+          onClick={onToggleEaten}
+          role="button"
+          className={`absolute top-1.5 right-1.5 h-6 w-6 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
+            eaten ? 'bg-accent border-accent text-white' : 'bg-black/30 border-white/40 text-white/60 hover:text-white'
+          }`}
+          title={eaten ? 'Убрать из съеденного' : 'Съел — учесть калории'}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        </span>
       )}
     </button>
   );
@@ -94,6 +150,9 @@ export const PluginWidget: React.FC<{ def: PluginWidgetDef }> = ({ def }) => {
   const total = totalValue(def, rows);
   const Icon = PLUGIN_ICONS[def.icon ?? ''] ?? Puzzle;
   const r = def.render;
+  // Планер рациона доступен контентным «дневным» плагинам (карточки + static + dayField)
+  const plannable = r.type === 'cards' && !!def.source.static && !!r.dayField;
+  const [plannerOpen, setPlannerOpen] = useState(false);
 
   // Подпись в шапке: для данных из стора — период, для контентных — «День N»
   const headerHint = def.source.static
@@ -208,12 +267,25 @@ export const PluginWidget: React.FC<{ def: PluginWidgetDef }> = ({ def }) => {
     <div className="h-full rounded-xl bg-bg-card border border-border-soft shadow-card p-4 flex flex-col overflow-hidden">
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <Icon className="h-4 w-4 text-accent shrink-0" />
-        <span className="text-sm font-semibold text-text truncate flex-1">{def.name}</span>
-        <span className="text-[10px] text-text-dim" title={`Плагин${def.author ? ` · ${def.author}` : ''}`}>
+        {plannable ? (
+          /* Клик по заголовку — полноценное окно конструктора рациона */
+          <button
+            onClick={() => setPlannerOpen(true)}
+            className="min-w-0 flex-1 flex items-center gap-1.5 text-left group/hdr"
+            title="Открыть конструктор рациона"
+          >
+            <span className="text-sm font-semibold text-text truncate group-hover/hdr:text-accent transition-colors">{def.name}</span>
+            <SlidersHorizontal className="h-3.5 w-3.5 text-text-dim group-hover/hdr:text-accent transition-colors shrink-0" />
+          </button>
+        ) : (
+          <span className="text-sm font-semibold text-text truncate flex-1">{def.name}</span>
+        )}
+        <span className="text-[10px] text-text-dim shrink-0" title={`Плагин${def.author ? ` · ${def.author}` : ''}`}>
           {headerHint}
         </span>
       </div>
       {body()}
+      {plannable && <MealPlanner def={def} open={plannerOpen} onClose={() => setPlannerOpen(false)} />}
     </div>
   );
 };

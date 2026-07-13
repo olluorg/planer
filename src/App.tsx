@@ -20,6 +20,7 @@ import { ACHIEVEMENTS } from './lib/gamification';
 import { applyAccent, getAccent } from './lib/theme';
 import { useNavigate } from 'react-router-dom';
 import { loadReminders, scheduleHeartbeat } from './lib/notifications';
+import { useHealthSync } from './lib/healthSync';
 
 const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
 const TasksPage = lazy(() => import('./pages/Tasks').then((m) => ({ default: m.TasksPage })));
@@ -62,6 +63,9 @@ export default function App() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
+
+  // Единая точка синхронизации: питание/зарядка/активность → healthLogs → цели
+  useHealthSync();
 
   const nav = useNavigate();
   const location = useLocation();

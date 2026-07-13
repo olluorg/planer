@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { preloadImages } from './preload';
 
 // Две оси: стиль (minimalism | glass) и режим (light | dark).
 // 'glass' = стеклянная тёмная (историческое значение, не мигрируем), 'glass-light' = стеклянная светлая.
@@ -32,7 +33,11 @@ export function applyTheme(t: Theme) {
   root.classList.toggle('dark', isDarkMode(t));            // glass-dark тоже тёмный
   root.classList.toggle('glass', isGlass(t));
   root.classList.toggle('glass-light', t === 'glass-light'); // светлые панели поверх обоев
-  if (isGlass(t)) applyAppWallpaper(getAppWallpaper());
+  if (isGlass(t)) {
+    applyAppWallpaper(getAppWallpaper());
+    // прогреваем кеш всех обоев — смена фона в пикере станет мгновенной, без «проявления»
+    preloadImages([...getCustomWallpapers(), ...APP_WALLPAPERS]);
+  }
   window.dispatchEvent(new CustomEvent(EVENT, { detail: t }));
 }
 

@@ -224,8 +224,8 @@ export function removePlugin(id: string) {
 
 /** Предустановленные плагины: ставятся один раз при первом запуске из статики приложения
  *  (same-origin, не сеть). Флаг не даёт переустановить то, что пользователь удалил сам. */
-// v2: обновлённое меню питания (день от первого запуска, картинки *-0N)
-const DEFAULTS_KEY = 'plugins.defaults.v2';
+// v3: питание с типами блюд (kind), калориями и библиотекой напитков/десертов/снеков
+const DEFAULTS_KEY = 'plugins.defaults.v3';
 const DEFAULT_PLUGIN_FILES = ['/plugins/nutrition-month.thedad-widget.json'];
 
 export async function ensureDefaultPlugins(): Promise<void> {

@@ -4,6 +4,7 @@ import { usePomodoroState, fmtSec } from '@/lib/pomodoroState';
 import { isoDate } from '@/lib/utils';
 import { compressImage } from '@/lib/imageCompress';
 import { getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from '@/lib/theme';
+import { preloadImages } from '@/lib/preload';
 import { notify } from '@/lib/notifications';
 import { QUOTES, quoteOfDay } from '@/lib/quotes';
 import {
@@ -328,6 +329,9 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     window.addEventListener('resize', calc);
     return () => window.removeEventListener('resize', calc);
   }, []);
+
+  // Прогреваем кеш обоев при входе в фокус — переключение фона без «проявления» картинки
+  useEffect(() => { if (open) preloadImages([...customWp, ...WALLPAPERS]); }, [open, customWp]);
 
   const quote = useMemo(() => (open ? QUOTES[Math.floor(Math.random() * QUOTES.length)] : quoteOfDay()), [open]);
 

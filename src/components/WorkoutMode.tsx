@@ -4,6 +4,7 @@ import { X, Pause, Play, SkipForward, Check, Dumbbell } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import { fmtSec } from '@/lib/pomodoroState';
+import { logWorkout } from '@/lib/activity';
 
 /* ==================== База упражнений ====================
  * Картинки: public/workout/ex-01.jpg … ex-30.jpg (квадратные, обрезаются в круг).
@@ -136,6 +137,9 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
     setFinished(true);
     if (entryRef.current) { finishTimeEntry(entryRef.current, elapsedRef.current); entryRef.current = null; }
     try { localStorage.setItem(WORKOUT_DONE_KEY, isoDate(new Date())); } catch {}
+    // минуты зарядки → лог активности; событие поднимет useHealthSync,
+    // который сведёт зарядку в healthLogs('workout') → виджеты и цели
+    logWorkout(isoDate(new Date()), elapsedRef.current);
     window.dispatchEvent(new CustomEvent('thedad:workout-done'));
     beep(880); setTimeout(() => beep(1175), 180); setTimeout(() => beep(1568), 360);
   };
@@ -196,9 +200,14 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const C = 2 * Math.PI * R;
   const started = running || elapsedRef.current > 0;
 
-  // portal: у ячеек сетки transform, из-за него fixed-оверлей внутри виджета ломается
+  // portal: у ячеек сетки transform, из-за него fixed-оверлей внутри виджета ломается.
+  // Фон полностью непрозрачный (как у Focus Mode): /97 не входит в шкалу opacity Tailwind
+  // и класс молча не генерился — оверлей был прозрачным.
   return createPortal(
-    <div className="fixed inset-0 z-[210] text-white select-none bg-[#0b0a14]/97 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-[210] text-white select-none flex flex-col items-center justify-center p-4 bg-[#0b0a14]"
+      style={{ backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(52,211,153,0.10), transparent), radial-gradient(ellipse 60% 50% at 50% 110%, rgba(99,102,241,0.10), transparent)' }}
+    >
       {/* Выход */}
       <button onClick={onClose} className="absolute top-5 left-6 flex items-center gap-2 text-white/60 hover:text-white transition-colors">
         <span className={`h-9 w-9 ${glass} !rounded-full flex items-center justify-center`}><X className="h-4 w-4" /></span>
