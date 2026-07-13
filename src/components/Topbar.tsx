@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, Settings, Trophy, LayoutTemplate, History, ChevronDown } from 'lucide-react';
+import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, Settings, Trophy, LayoutTemplate, History, ChevronDown, Download, Share } from 'lucide-react';
 import { Button } from './ui/button';
 import { useTheme, isDarkMode } from '@/lib/theme';
 import { Logo } from './ui/logo';
 import { getUserName } from '@/lib/onboarding';
 import { GoogleIcon, openGoogleSearch } from './ui/google-icon';
+import { usePwaInstall, promptInstall } from '@/lib/pwa';
+import { toast } from '@/lib/toast';
 
 interface Props {
   onAdd?: () => void;
@@ -31,6 +33,7 @@ const openPage = (page: string) => window.dispatchEvent(new CustomEvent('thedad:
 const AppMenu: React.FC = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { canInstall, iosHint, standalone } = usePwaInstall();
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -66,6 +69,30 @@ const AppMenu: React.FC = () => {
               <span>{it.label}</span>
             </button>
           ))}
+
+          {/* Установка приложения на устройство (PWA), пока не установлено */}
+          {!standalone && (canInstall || iosHint) && (
+            <>
+              <div className="my-1 border-t border-border-soft" />
+              {canInstall ? (
+                <button
+                  onClick={async () => { setOpen(false); if (!(await promptInstall())) toast.info('Установку можно запустить позже из этого меню'); }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-accent hover:bg-accent/10 transition-colors"
+                >
+                  <Download className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  <span>Установить приложение</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setOpen(false); toast.info('Установка на iPhone', 'Нажми «Поделиться» → «На экран Домой»'); }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-accent hover:bg-accent/10 transition-colors"
+                >
+                  <Share className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  <span>Добавить на экран «Домой»</span>
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

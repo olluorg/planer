@@ -2,7 +2,7 @@
 // so the app boots offline. Dynamic data lives in IndexedDB and is independent of the cache.
 
 const CACHE = 'thedad-shell-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest'];
+const SHELL = ['/', '/index.html', '/site.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
