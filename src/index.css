@@ -140,6 +140,9 @@
     z-index: -1;
     background: rgba(5, 5, 12, 0.55);
   }
+  /* Живые обои активны → прячем статичный фон-картинку и вуаль (у живого слоя своя вуаль) */
+  .live-wp body::before, .live-wp body::after { display: none !important; }
+
   /* Светлая стеклянная тема лишь слегка вуалирует обои: панели прозрачные, обои видны */
   .glass-light body { background: #e9ecf2; }
   .glass-light body::after { background: rgba(244, 246, 250, 0.28); }
@@ -161,6 +164,12 @@
     backdrop-filter: blur(16px) saturate(150%);
     -webkit-backdrop-filter: blur(16px) saturate(150%);
   }
+
+  /* Модалки (палитра команд, диалоги) лежат ПОВЕРХ затемнения. Полупрозрачная карточка
+     стеклянных тем на чёрной подложке мутнеет, и текст становится нечитаемым — поэтому
+     внутри модалок даём плотную поверхность (blur при этом сохраняется). */
+  .glass .modal-surface { background: rgba(16, 18, 30, 0.94); }
+  .glass-light .modal-surface { background: rgba(255, 255, 255, 0.95); }
 
   /* Card hover по Motion System: subtle lift + shadow + border glow.
      shadow-card — маркер любой карточки (и <Card>, и ручной разметки). */
@@ -399,6 +408,15 @@
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 12px var(--accent-glow-sm); }
   50%       { box-shadow: 0 0 24px var(--accent-glow); }
+}
+@keyframes celebrate-pop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes celebrate-ring {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
 }
 
 /* === react-grid-layout === */

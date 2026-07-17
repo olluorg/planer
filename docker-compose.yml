@@ -1,0 +1,54 @@
+# THEDAD self-host: приложение + локальный AI (Ollama + Gemma) одной командой.
+#
+#   docker compose up -d
+#
+# → приложение:  http://localhost:8080
+# → AI-сервер:   http://localhost:11434  (модель скачивается сама при первом старте)
+#
+# В приложении: Настройки → AI-коуч → провайдер «Ollama (локально)» — endpoint и модель
+# уже подставлены, ключ не нужен. Модель меняется переменной OLLAMA_MODEL (по умолчанию gemma3:4b).
+#
+# Всё работает офлайн после первого скачивания модели. Данные приложения хранятся
+# в браузере (IndexedDB), поэтому у контейнера приложения нет томов — обновление безопасно.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      # Браузер обращается к Ollama напрямую (fetch со страницы) — нужен CORS
+      - OLLAMA_ORIGINS=*
+    restart: unless-stopped
+    # Есть NVIDIA GPU + nvidia-container-toolkit? Раскомментируй для ускорения:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Одноразовый init: тянет модель в общий том и завершается
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: >
+      sh -c "sleep 3 && ollama pull ${OLLAMA_MODEL:-gemma3:4b}"
+    restart: "no"
+
+volumes:
+  ollama-models:

@@ -8,6 +8,7 @@ import { Logo } from '@/components/ui/logo';
 import { useStore } from '@/lib/store';
 import { requestPermission, setHeartbeatEnabled } from '@/lib/notifications';
 import { setSex, setAge, setHeight, setProfileWeight, type Sex } from '@/lib/profile';
+import { ChromeAiSetupModal } from '@/components/ChromeAiSetupModal';
 
 interface Props {
   open: boolean;
@@ -23,6 +24,7 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [aiHelpOpen, setAiHelpOpen] = useState(false);
   // Профиль для точного расчёта калорий (BMR с первого дня)
   const [sex, setSexState] = useState<Sex | null>(null);
   const [age, setAgeState] = useState('');
@@ -369,6 +371,18 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
               <p className="text-text-muted mt-3 max-w-md">
                 Начните с быстрого добавления (Ctrl+K) или нажмите «Focus Mode» в шапке, когда нужно сосредоточиться.
               </p>
+              {/* Бесплатный AI: работает только в Chrome — сразу говорим об этом и даём инструкцию */}
+              <div className="mt-6 w-full max-w-md rounded-xl border border-border-soft bg-bg-soft/60 p-3.5 text-left">
+                <div className="text-[13px] font-medium text-text">🤖 Бесплатный AI-помощник — только в Chrome</div>
+                <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
+                  Gemini Nano работает прямо в браузере: офлайн и без ключей. В других браузерах можно
+                  подключить свой ключ OpenAI / Claude / Gemini в Настройках.
+                </p>
+                <Button size="sm" variant="soft" className="mt-2.5" onClick={() => setAiHelpOpen(true)}>
+                  Как включить AI в Chrome
+                </Button>
+              </div>
+              <ChromeAiSetupModal open={aiHelpOpen} onOpenChange={setAiHelpOpen} />
             </div>
           )}
         </div>

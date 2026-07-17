@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { computeInsights } from '@/lib/insights';
 import { getUserName } from '@/lib/onboarding';
-import { askAI, hasAiKey } from '@/lib/ai';
+import { askAny, resolveProvider, type ProviderKind } from '@/lib/aiProvider';
 import { isoDate } from '@/lib/utils';
-import { Bot, SendHorizontal, TriangleAlert, TrendingUp, Sparkles, Info, Loader2 } from 'lucide-react';
+import { Bot, SendHorizontal, TriangleAlert, TrendingUp, Sparkles, Info, Loader2, Cpu, Wand2 } from 'lucide-react';
 
 const TONE_ICON: Record<string, React.ElementType> = {
   warning: TriangleAlert, positive: TrendingUp, info: Sparkles, neutral: Info,
@@ -31,7 +31,10 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
   const [q, setQ] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const online = hasAiKey();
+  // Провайдер: встроенный AI Chrome → свой ключ → недоступен
+  const [provider, setProvider] = useState<ProviderKind>('none');
+  useEffect(() => { void resolveProvider().then(setProvider); }, []);
+  const online = provider !== 'none';
 
   const recs = useMemo(
     () => computeInsights({ today: date, tasks, habits, habitLogs, reflections, timeEntries, goals, progress }).slice(0, 3),
@@ -56,7 +59,7 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
     setLoading(true);
     setAnswer(null);
     try {
-      const reply = await askAI([
+      const reply = await askAny([
         { role: 'system', content: `Ты — краткий продуктивный AI-коуч в планере THEDAD. Отвечай по-русски, конкретно, без воды. Контекст:\n${buildContext()}` },
         { role: 'user', content: prompt },
       ]);
@@ -71,16 +74,18 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
   const ask = () => { if (q.trim()) { run(q.trim()); setQ(''); } };
 
   return (
-    <div className="rounded-xl bg-bg-card border border-border shadow-card p-4 flex flex-col gap-3">
+    // h-full + overflow-hidden — как у остальных виджетов: панель обязана жить внутри ячейки сетки,
+    // иначе растёт по контенту и ломает раскладку
+    <div className="h-full rounded-xl bg-bg-card border border-border shadow-card p-4 flex flex-col gap-3 overflow-hidden">
       {/* Шапка */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div>
           <div className="flex items-center gap-1.5 text-label text-text">
             <Bot className="h-4 w-4 text-accent" /> AI-коуч
           </div>
           <div className="flex items-center gap-1.5 mt-1 text-[11px] text-text-muted">
             <span className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-success' : 'bg-text-dim'}`} />
-            {online ? 'Онлайн' : 'Офлайн'}
+            {provider === 'chrome' ? <><Cpu className="h-3 w-3" /> Встроенный AI</> : provider === 'key' ? 'Онлайн · свой ключ' : 'Офлайн'}
           </div>
         </div>
         <button
@@ -93,15 +98,15 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
       </div>
 
       {/* Приветственный пузырь */}
-      <div className="rounded-xl bg-accent text-white p-3.5 text-[13px] leading-relaxed">
+      <div className="shrink-0 rounded-xl bg-accent text-white p-3.5 text-[13px] leading-relaxed">
         {greeting()}, {getUserName()}.{' '}
         {online
           ? 'Вот на чём сегодня стоит сфокусироваться, чтобы продвинуться сильнее всего.'
-          : 'Пока я офлайн — показываю локальные наблюдения. Подключи API-ключ, и я смогу планировать день за тебя.'}
+          : 'Пока я офлайн — показываю локальные наблюдения. Включи встроенный AI Chrome или добавь API-ключ, и я смогу планировать день за тебя.'}
       </div>
 
-      {/* Рекомендации */}
-      <div className="space-y-2">
+      {/* Рекомендации — забирают остаток высоты и скроллятся, чтобы панель не распирала ячейку */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
         {recs.length === 0 && (
           <div className="text-xs text-text-muted px-1">Поработай несколько дней — появятся рекомендации.</div>
         )}
@@ -129,7 +134,7 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
 
       {/* Ответ модели */}
       {(loading || answer) && (
-        <div className="rounded-xl bg-bg-soft p-3 text-[13px] text-text leading-relaxed whitespace-pre-wrap">
+        <div className="shrink-0 max-h-40 overflow-y-auto rounded-xl bg-bg-soft p-3 text-[13px] text-text leading-relaxed whitespace-pre-wrap">
           {loading ? (
             <span className="flex items-center gap-2 text-text-muted"><Loader2 className="h-4 w-4 animate-spin" /> Думаю…</span>
           ) : answer}
@@ -137,10 +142,17 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
       )}
 
       {/* Действия */}
-      <div className="rounded-xl bg-bg-soft p-3">
+      <div className="shrink-0 rounded-xl bg-bg-soft p-3">
         <div className="text-[13px] text-text mb-2.5">
           {online ? 'Оптимизировать твоё расписание на сегодня?' : 'Включить коуча?'}
         </div>
+        {/* Генерация плана из описания — цель + задачи + привычки */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('thedad:ai-generate'))}
+          className="w-full h-9 mb-2 rounded-lg bg-accent text-white text-xs font-semibold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+        >
+          <Wand2 className="h-3.5 w-3.5" /> Составить план из описания
+        </button>
         <div className="flex gap-2">
           {online ? (
             <>
@@ -171,7 +183,7 @@ export const CoachPanel: React.FC<{ date: Date }> = ({ date }) => {
       </div>
 
       {/* Поле вопроса */}
-      <div className={`flex items-center gap-2 rounded-xl border border-border-soft bg-bg-soft px-3 h-11 ${online ? '' : 'opacity-60'}`}>
+      <div className={`shrink-0 flex items-center gap-2 rounded-xl border border-border-soft bg-bg-soft px-3 h-11 ${online ? '' : 'opacity-60'}`}>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}

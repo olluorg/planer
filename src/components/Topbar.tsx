@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Bell, Sun, Moon, Crosshair, Lightbulb, Settings, Trophy, LayoutTemplate, History, ChevronDown, Download, Share } from 'lucide-react';
+import { Search, Plus, Bell, Sun, Moon, Crosshair, Settings, Trophy, LayoutTemplate, History, ChevronDown, Download, Share } from 'lucide-react';
 import { Button } from './ui/button';
 import { useTheme, isDarkMode } from '@/lib/theme';
 import { Logo } from './ui/logo';
@@ -99,7 +99,7 @@ const AppMenu: React.FC = () => {
   );
 };
 
-export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onInsights, onPalette, bellCount = 0 }) => {
+export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onPalette, bellCount = 0 }) => {
   const { theme, toggle } = useTheme();
   const nav = useNavigate();
   const [searchQ, setSearchQ] = useState('');
@@ -169,8 +169,7 @@ export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onInsights
         {/* Action icons */}
         <div className="flex items-center gap-0.5 shrink-0">
           <Button variant="ghost" size="icon" onClick={onAdd} title="Добавить"><Plus /></Button>
-          <Button variant="ghost" size="icon" onClick={onInsights} title="Инсайты (Ctrl+I)" className="hidden sm:inline-flex"><Lightbulb /></Button>
-          <Button variant="ghost" size="icon" onClick={onBell} title="Уведомления" className="relative">
+          <Button variant="ghost" size="icon" onClick={onBell} title="Уведомления и инсайты" className="relative">
             <Bell />
             {bellCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-danger ring-2 ring-bg" />}
           </Button>

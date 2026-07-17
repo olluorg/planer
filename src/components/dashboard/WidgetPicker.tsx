@@ -105,10 +105,15 @@ export const WidgetPicker: React.FC<Props> = ({ open, onClose, available, onAdd,
             {list.map((m) => {
               const preview = renderPreview?.(m.id);
               return (
-                <button
+                // div (не button): в превью попадают интерактивные элементы (чекбоксы = button),
+                // а button-в-button — невалидная вложенность DOM
+                <div
                   key={m.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onAdd(m)}
-                  className="group flex flex-col gap-2.5 rounded-xl border border-border-soft bg-bg-soft/50 hover:border-accent/40 hover:bg-accent/5 p-3 text-left transition-colors"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAdd(m); } }}
+                  className="group flex flex-col gap-2.5 rounded-xl border border-border-soft bg-bg-soft/50 hover:border-accent/40 hover:bg-accent/5 p-3 text-left transition-colors cursor-pointer"
                 >
                   {/* Полноценное превью виджета с реальными данными, как в галереях iOS/Android */}
                   {preview && <Preview>{preview}</Preview>}
@@ -124,7 +129,7 @@ export const WidgetPicker: React.FC<Props> = ({ open, onClose, available, onAdd,
                       <Plus className="h-4 w-4" />
                     </span>
                   </span>
-                </button>
+                </div>
               );
             })}
 

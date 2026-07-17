@@ -1,15 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "Planer",
-  "short_name": "Planer",
-  "version": "1.0.0",
-  "description": "Личный планировщик задач с напоминаниями по временным блокам",
+  "name": "THEDAD — планер целей",
+  "short_name": "THEDAD",
+  "version": "2.0.0",
+  "description": "Local-first планер: цели, задачи, привычки, здоровье и AI-помощник. Открывается вместо новой вкладки.",
   "permissions": ["alarms", "notifications", "storage", "tabs"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.open-meteo.com/*",
+    "http://localhost:11434/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Открыть Planer",
+    "default_title": "Открыть THEDAD",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

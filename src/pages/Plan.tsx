@@ -150,7 +150,8 @@ const TimelineGrid: React.FC<{ date: Date; d: string; tasks: any[]; onToggle: (i
                 task={t}
                 onToggle={onToggle}
                 top={(offsetMin / 60) * ROW_H}
-                height={Math.max(22, ((t.estimate_min ?? 30) / 60) * ROW_H)}
+                // минимум — чтобы поместились и время, и название задачи (раньше 22px их резало)
+                height={Math.max(46, ((t.estimate_min ?? 30) / 60) * ROW_H)}
                 color={BLOCK_COLORS[t.time_block ?? blockForHour(hh)]}
               />
             );
@@ -199,7 +200,7 @@ const TimelineEvent: React.FC<{ task: any; onToggle: (id: string) => void; top: 
           <div className="text-[10px] font-semibold tabular-nums" style={{ color }}>
             {task.start_time}{task.estimate_min ? ` · ${task.estimate_min}м` : ''}
           </div>
-          <div className={`text-xs leading-snug truncate ${done ? 'line-through text-text-muted' : 'text-text'}`}>{task.title}</div>
+          <div className={`text-xs leading-snug line-clamp-2 ${done ? 'line-through text-text-muted' : 'text-text'}`}>{task.title}</div>
         </div>
       </div>
     </div>

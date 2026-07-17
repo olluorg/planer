@@ -439,9 +439,10 @@ export const AnalyticsPage = () => {
           <Card>
             <CardTitle>Привычки за неделю</CardTitle>
             <ECharts height={260} option={{
-              grid: { left: 100, right: 20, top: 10, bottom: 24 },
+              grid: { left: 140, right: 20, top: 10, bottom: 24 },
               xAxis: { type: 'value', max: 7, axisLabel: { color: cc.axis }, splitLine: { lineStyle: { color: cc.splitLine } } },
-              yAxis: { type: 'category', data: habitsBar.map((h) => h.title), axisLabel: { color: cc.axis }, axisLine: { lineStyle: { color: cc.axisLine } } },
+              // длинные названия привычек не режем жёстко: даём ширину и аккуратное многоточие
+              yAxis: { type: 'category', data: habitsBar.map((h) => h.title), axisLabel: { color: cc.axis, width: 128, overflow: 'truncate', ellipsis: '…' }, axisLine: { lineStyle: { color: cc.axisLine } } },
               series: [{
                 type: 'bar', barWidth: 14,
                 data: habitsBar.map((h) => ({ value: h.done, itemStyle: { color: '#6366f1', borderRadius: [0, 4, 4, 0] } })),

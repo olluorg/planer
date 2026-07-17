@@ -177,7 +177,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
           {/* Кольцо и сводка */}
           <div className="flex items-center gap-6">
             <Ring value={goal ? Math.min(100, (eaten / goal) * 100) : 0} size={130} stroke={12} trackColor="var(--border-soft)"
-              color={eaten > goal ? '#ef4444' : 'var(--accent)'}>
+              glow={false} color={eaten > goal ? '#ef4444' : 'var(--accent)'}>
               <div className="text-center leading-tight">
                 <div className="text-xl font-bold tabular-nums">{fmtNum(eaten, 0)}</div>
                 <div className="text-[10px] text-text-muted">из {fmtNum(goal, 0)}</div>
@@ -481,7 +481,7 @@ export const CaloriesWidget: React.FC = () => {
       </div>
 
       <div className="flex-1 flex items-center justify-center py-1">
-        <Ring value={pct} size={116} stroke={11} trackColor="var(--border-soft)" color={eaten > goal ? '#ef4444' : 'var(--accent)'}>
+        <Ring value={pct} size={116} stroke={11} trackColor="var(--border-soft)" glow={false} color={eaten > goal ? '#ef4444' : 'var(--accent)'}>
           <div className="text-center leading-tight">
             <div className="text-lg font-bold tabular-nums">{fmtNum(eaten, 0)}</div>
             <div className="text-[9px] text-text-muted">из {fmtNum(goal, 0)} ккал</div>

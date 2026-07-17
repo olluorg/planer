@@ -48,15 +48,15 @@ export const WorkoutWidget: React.FC = () => {
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 py-2">
-        {/* Стопка круглых превью упражнений */}
-        <div className="flex -space-x-3">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center gap-3 py-2">
+        {/* Стопка круглых превью упражнений — прячется, если по высоте тесно */}
+        <div className="flex -space-x-3 shrink-0">
           {EXERCISES.slice(0, 5).map((e) => <RoundPreview key={e.img} img={e.img} />)}
           <div className="h-11 w-11 rounded-full bg-bg-soft border border-border-soft flex items-center justify-center text-[10px] font-semibold text-text-muted shrink-0">
             +{EXERCISES.length - 5}
           </div>
         </div>
-        <div className="text-xs text-text-muted text-center leading-relaxed">
+        <div className="text-xs text-text-muted text-center leading-relaxed shrink-0">
           7 упражнений × 1 минута.<br />
           <span className="inline-flex items-center gap-1 text-text-dim"><Shuffle className="h-3 w-3" /> каждый запуск — новый набор из {EXERCISES.length}</span>
         </div>

@@ -12,7 +12,6 @@ import { FocusMode } from './components/FocusMode';
 import { Onboarding } from './components/Onboarding';
 import { isOnboardingDone } from './lib/onboarding';
 import { InboxPopover } from './components/InboxPopover';
-import { InsightsPanel } from './components/InsightsPanel';
 import { Toaster } from './components/Toaster';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { useInbox } from './lib/inbox';
@@ -21,6 +20,10 @@ import { applyAccent, getAccent } from './lib/theme';
 import { useNavigate } from 'react-router-dom';
 import { loadReminders, scheduleHeartbeat } from './lib/notifications';
 import { useHealthSync } from './lib/healthSync';
+import { AppLiveWallpaper } from './components/AppLiveWallpaper';
+import { Celebration } from './components/Celebration';
+import { MiniPlayer } from './components/MiniPlayer';
+import { AiGenerateModal } from './components/AiGenerateModal';
 
 const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
 const TasksPage = lazy(() => import('./pages/Tasks').then((m) => ({ default: m.TasksPage })));
@@ -60,8 +63,10 @@ export default function App() {
   const [expandPage, setExpandPage] = useState<string | null>(null);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
-  const [insightsOpen, setInsightsOpen] = useState(false);
+  // Вкладка панели уведомлений: колокол → уведомления, Ctrl+I / лампочка → инсайты
+  const [inboxTab, setInboxTab] = useState<'inbox' | 'insights'>('inbox');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [aiGenOpen, setAiGenOpen] = useState(false);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
 
   // Единая точка синхронизации: питание/зарядка/активность → healthLogs → цели
@@ -134,7 +139,8 @@ export default function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
         e.preventDefault();
-        setInsightsOpen((v) => !v);
+        setInboxTab('insights');
+        setInboxOpen((v) => !v);
       }
       // Одиночные клавиши без модификаторов и не в поле ввода
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -161,15 +167,22 @@ export default function App() {
       const page = (e as CustomEvent<{ page?: string }>).detail?.page ?? null;
       setExpandPage(page);
     };
+    // Праздничный отклик (конфетти) — зарядка/еда/достижения дают всплеск, как в Duolingo
+    const onCelebrate = () => setConfettiTrigger((v) => v + 1);
+    const onAiGenerate = () => setAiGenOpen(true);
     window.addEventListener('keydown', onKey);
     window.addEventListener('thedad:quick-capture', onQuick);
     window.addEventListener('thedad:focus-mode', onFocus);
     window.addEventListener('thedad:expand', onExpand);
+    window.addEventListener('thedad:celebrate', onCelebrate);
+    window.addEventListener('thedad:ai-generate', onAiGenerate);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('thedad:quick-capture', onQuick);
       window.removeEventListener('thedad:focus-mode', onFocus);
       window.removeEventListener('thedad:expand', onExpand);
+      window.removeEventListener('thedad:celebrate', onCelebrate);
+      window.removeEventListener('thedad:ai-generate', onAiGenerate);
     };
   }, []);
 
@@ -215,8 +228,8 @@ export default function App() {
         <Topbar
           onAdd={() => setQuickTab('task')}
           onFocusMode={() => setFocusOpen(true)}
-          onInsights={() => setInsightsOpen((v) => !v)}
-          onBell={() => setInboxOpen((v) => !v)}
+          onInsights={() => { setInboxTab('insights'); setInboxOpen(true); }}
+          onBell={() => { setInboxTab('inbox'); setInboxOpen((v) => !v); }}
           onPalette={(query) => { setPaletteQuery(query ?? ''); setPaletteOpen(true); }}
           bellCount={inboxUnread || bellCount}
         />
@@ -279,9 +292,12 @@ export default function App() {
       </WidgetExpandModal>
       <FocusMode open={focusOpen} initialTaskId={focusTaskId} onClose={() => { setFocusOpen(false); setFocusTaskId(null); }} />
       <Onboarding open={onboardOpen} onClose={() => setOnboardOpen(false)} />
-      <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} />
-      <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+      <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} initialTab={inboxTab} />
       <Confetti trigger={confettiTrigger} />
+      <Celebration />
+      <AppLiveWallpaper suspended={focusOpen} />
+      <MiniPlayer />
+      <AiGenerateModal open={aiGenOpen} onOpenChange={setAiGenOpen} />
       <ShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <Toaster />
     </div>

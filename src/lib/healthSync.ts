@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useStore } from './store';
 import { isoDate } from './utils';
 import { getEaten, eatenKcal, NUTRITION_EVENT } from './nutrition';
@@ -21,34 +21,30 @@ import { workoutSeconds, ACTIVITY_EVENT } from './activity';
  */
 export function useHealthSync() {
   const ready = useStore((s) => s.ready);
-  const upsertHealthLog = useStore((s) => s.upsertHealthLog);
-  // последние записанные значения, чтобы не дёргать стор (и reload) вхолостую
-  const last = useRef<{ calories?: number; workout?: number }>({});
 
   useEffect(() => {
     // Пишем в healthLogs только когда SQLite инициализирована — иначе exec() упадёт
     if (!ready) return;
     let timer = 0;
     const run = () => {
+      // Сравниваем с ФАКТИЧЕСКИМ значением в healthLogs (а не с ref) — иначе при
+      // уменьшении значения (сняли отметку/сброс зарядки) кеш рассинхронизируется.
+      const st = useStore.getState();
       const today = isoDate(new Date());
+      const valueOf = (metric: string) => st.healthLogs.find((l) => l.date === today && l.metric === metric)?.value;
 
       // Калории: как только за день появилась хоть одна отметка «съел», метрику
       // ведём мы (включая обнуление). Пустой день не трогаем — вдруг залогировано вручную.
-      const owned = getEaten(today).length > 0 || last.current.calories !== undefined;
+      const curCal = valueOf('calories');
+      const owned = getEaten(today).length > 0 || curCal !== undefined;
       if (owned) {
         const cals = eatenKcal(today);
-        if (last.current.calories !== cals) {
-          last.current.calories = cals;
-          upsertHealthLog(today, 'calories', cals);
-        }
+        if (curCal !== cals) st.upsertHealthLog(today, 'calories', cals);
       }
 
-      // Зарядка: только накапливается (минуты), 0 не пишем.
+      // Зарядка: минуты за сегодня; пишем всегда, когда отличается от лога.
       const wMin = Math.round(workoutSeconds(today) / 60);
-      if (wMin > 0 && last.current.workout !== wMin) {
-        last.current.workout = wMin;
-        upsertHealthLog(today, 'workout', wMin);
-      }
+      if (wMin > 0 && valueOf('workout') !== wMin) st.upsertHealthLog(today, 'workout', wMin);
     };
     const schedule = () => { window.clearTimeout(timer); timer = window.setTimeout(run, 300); };
 
@@ -63,5 +59,5 @@ export function useHealthSync() {
       window.removeEventListener(ACTIVITY_EVENT, schedule);
       window.removeEventListener('thedad:workout-done', schedule);
     };
-  }, [upsertHealthLog]);
+  }, [ready]);
 }

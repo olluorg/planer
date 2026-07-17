@@ -5,7 +5,9 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { MealPlanner } from '@/components/MealPlanner';
+import { RecipeModal } from '@/components/dashboard/RecipeModal';
 import { isEaten, toggleEaten, NUTRITION_EVENT } from '@/lib/nutrition';
+import { toast } from '@/lib/toast';
 import { isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useTheme } from '@/lib/theme';
@@ -45,12 +47,11 @@ function foodEmoji(kind: string, meal: string): string {
   return '🍴';
 }
 
-/** Карточка контентного плагина: лицевая сторона — картинка + краткое описание,
- *  по клику «переворачивается» в текст (например, рецепт). Для дневного меню
- *  показывает ккал и отметку «съел» — итог дня уходит в статистику здоровья. */
+/** Карточка контентного плагина: картинка + краткое описание. Клик открывает
+ *  полноценную страницу рецепта (RecipeModal). Для дневного меню — ккал и отметка «съел». */
 const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, row }) => {
-  const [flipped, setFlipped] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  const [recipeOpen, setRecipeOpen] = useState(false);
   const r = def.render;
   const title = row.label;
   const badge = r.badge ? renderTemplate(r.badge, row.raw) : '';
@@ -59,9 +60,9 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
   const kind = typeof row.raw.kind === 'string' ? row.raw.kind : '';
   const kcal = Number(row.raw.kcal) || 0;
   const imgRaw = r.image ? row.raw[r.image] : null;
-  // Только локальные пути — внешние URL отсекает ещё валидация импорта.
-  // "//host" — protocol-relative, тоже внешний: отклоняем и здесь (defense in depth).
   const img = typeof imgRaw === 'string' && imgRaw.startsWith('/') && !imgRaw.startsWith('//') ? imgRaw : null;
+  // Есть что показывать в развороте (рецепт/описание) — карточка кликабельна
+  const openable = !!detail || !!text;
 
   // «съел»: только для дневного меню (dayField) — ключ стабилен в рамках плана
   const today = isoDate(new Date());
@@ -77,60 +78,53 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
 
   const onToggleEaten = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // toggleEaten шлёт NUTRITION_EVENT → useHealthSync сводит итог дня в healthLogs
     toggleEaten(today, { key: eatKey, title, kcal, meal: badge });
+    if (!eaten) toast.success(`Учтено: ${title}`, kcal ? `+${kcal} ккал` : undefined);
   };
 
   return (
-    <button
-      onClick={() => detail && setFlipped((v) => !v)}
-      className={`group/card relative flex flex-col text-left rounded-xl border overflow-hidden bg-bg-soft/60 hover:border-accent/40 transition-colors min-h-[150px] ${eaten ? 'border-accent/50' : 'border-border-soft'}`}
-      title={detail ? (flipped ? 'Назад к фото' : 'Показать рецепт') : undefined}
-    >
-      {flipped ? (
-        /* Обратная сторона: только текст */
-        <div className="flex-1 p-3 overflow-auto">
-          {badge && <div className="text-[10px] uppercase tracking-wider text-accent font-semibold mb-1">{badge}{kind ? ` · ${kind}` : ''}</div>}
-          <div className="text-sm font-semibold text-text mb-1.5">{title}</div>
-          <p className="text-xs text-text-muted leading-relaxed whitespace-pre-line">{detail}</p>
+    <>
+      <button
+        onClick={() => openable && setRecipeOpen(true)}
+        className={`group/card relative flex flex-col text-left rounded-xl border overflow-hidden bg-bg-soft/60 hover:border-accent/40 transition-colors h-full min-h-[150px] ${eaten ? 'border-accent/50' : 'border-border-soft'}`}
+        title={openable ? 'Открыть рецепт' : undefined}
+      >
+        {/* Картинка/заглушка растёт по высоте карточки — заполняем пустоту в высоком виджете */}
+        <div className={`relative flex-1 min-h-[80px] bg-gradient-to-br from-accent/15 to-accent/5 ${eaten ? 'opacity-60' : ''}`}>
+          {img && !imgFailed ? (
+            <img src={img} alt="" loading="lazy" className="h-full w-full object-cover" onError={() => setImgFailed(true)} />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center text-3xl opacity-70">{foodEmoji(kind, badge)}</div>
+          )}
+          {badge && (
+            <span className="absolute top-1.5 left-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white">{badge}{kind && kind !== 'Основное' ? ` · ${kind}` : ''}</span>
+          )}
+          {kcal > 0 && (
+            <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white tabular-nums">{kcal} ккал</span>
+          )}
         </div>
-      ) : (
-        <>
-          {/* Картинка или осмысленная заглушка (эмодзи по типу блюда) */}
-          <div className={`relative h-20 shrink-0 bg-gradient-to-br from-accent/15 to-accent/5 ${eaten ? 'opacity-60' : ''}`}>
-            {img && !imgFailed ? (
-              <img src={img} alt="" loading="lazy" className="h-full w-full object-cover" onError={() => setImgFailed(true)} />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-3xl opacity-70">{foodEmoji(kind, badge)}</div>
-            )}
-            {badge && (
-              <span className="absolute top-1.5 left-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white">{badge}{kind && kind !== 'Основное' ? ` · ${kind}` : ''}</span>
-            )}
-            {kcal > 0 && (
-              <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white tabular-nums">{kcal} ккал</span>
-            )}
-          </div>
-          <div className="flex-1 p-2.5">
-            <div className={`text-[13px] font-semibold leading-snug ${eaten ? 'text-text-muted line-through' : 'text-text'}`}>{title}</div>
-            {text && <p className="text-[11px] text-text-muted leading-snug mt-1 line-clamp-2">{text}</p>}
-          </div>
-          {detail && <div className="px-2.5 pb-2 text-[10px] text-text-dim opacity-0 group-hover/card:opacity-100 transition-opacity">Рецепт — по клику</div>}
-        </>
-      )}
-      {/* Отметка «съел» — считается в калории дня */}
-      {trackable && (
-        <span
-          onClick={onToggleEaten}
-          role="button"
-          className={`absolute top-1.5 right-1.5 h-6 w-6 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
-            eaten ? 'bg-accent border-accent text-white' : 'bg-black/30 border-white/40 text-white/60 hover:text-white'
-          }`}
-          title={eaten ? 'Убрать из съеденного' : 'Съел — учесть калории'}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" />
-        </span>
-      )}
-    </button>
+        <div className="shrink-0 p-2.5">
+          <div className={`text-[13px] font-semibold leading-snug ${eaten ? 'text-text-muted line-through' : 'text-text'}`}>{title}</div>
+          {text && <p className="text-[11px] text-text-muted leading-snug mt-1 line-clamp-2">{text}</p>}
+        </div>
+        {openable && <div className="px-2.5 pb-2 text-[10px] text-text-dim opacity-0 group-hover/card:opacity-100 transition-opacity">Рецепт — по клику</div>}
+
+        {/* Отметка «съел» — считается в калории дня */}
+        {trackable && (
+          <span
+            onClick={onToggleEaten}
+            role="button"
+            className={`absolute top-1.5 right-1.5 h-6 w-6 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
+              eaten ? 'bg-accent border-accent text-white' : 'bg-black/30 border-white/40 text-white/60 hover:text-white'
+            }`}
+            title={eaten ? 'Убрать из съеденного' : 'Съел — учесть калории'}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </button>
+      {recipeOpen && <RecipeModal def={def} row={row} onClose={() => setRecipeOpen(false)} />}
+    </>
   );
 };
 
@@ -227,11 +221,14 @@ export const PluginWidget: React.FC<{ def: PluginWidgetDef }> = ({ def }) => {
           </div>
         );
       case 'cards': {
+        const list = rows.slice(0, 12);
+        // Дневное меню (обычно 3 карточки) растягиваем на всю высоту — без пустот
+        const fill = list.length > 0 && list.length <= 3;
         return (
-          <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {rows.length === 0 && <div className="text-xs text-text-dim col-span-full">Нет карточек</div>}
-              {rows.slice(0, 12).map((row, i) => <ContentCard key={i} def={def} row={row} />)}
+          <div className="flex-1 min-h-0 overflow-auto">
+            <div className={`grid gap-2 ${fill ? 'grid-cols-1 sm:grid-cols-3 h-full auto-rows-fr' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+              {list.length === 0 && <div className="text-xs text-text-dim col-span-full">Нет карточек</div>}
+              {list.map((row, i) => <ContentCard key={i} def={def} row={row} />)}
             </div>
           </div>
         );

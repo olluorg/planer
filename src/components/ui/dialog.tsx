@@ -16,7 +16,7 @@ export const DialogContent = React.forwardRef<
     <RD.Content
       ref={ref}
       className={cn(
-        'fixed z-50 bg-bg-card border border-border-soft shadow-card p-6',
+        'modal-surface fixed z-50 bg-bg-card border border-border-soft shadow-card p-6',
         // вход/выход по data-state — Radix ждёт окончания анимации при закрытии
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 data-[state=closed]:duration-200 ease-emphasized',
         // mobile: bottom sheet

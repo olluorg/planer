@@ -67,6 +67,10 @@ export interface PluginRender {
   badge?: string;
   /** Имя числового поля «день»: виджет показывает карточки текущего дня месяца (циклично). */
   dayField?: string;
+  /** Имя поля с галереей: значение — локальные пути через запятую ("/food/a.jpg,/food/b.jpg"). */
+  gallery?: string;
+  /** Имя поля с YouTube-видео рецепта (id или ссылка). Только YouTube, без произвольных iframe. */
+  video?: string;
 }
 
 export interface PluginWidgetDef {
@@ -155,7 +159,7 @@ export function validatePlugin(raw: unknown): { ok: true; plugin: PluginWidgetDe
     for (const key of ['text', 'detail', 'badge'] as const) {
       if (r[key] != null && (typeof r[key] !== 'string' || (r[key] as string).length > 200)) errors.push(`render.${key} — строка-шаблон до 200 символов`);
     }
-    for (const key of ['image', 'dayField'] as const) {
+    for (const key of ['image', 'dayField', 'gallery', 'video'] as const) {
       if (r[key] != null && (typeof r[key] !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(r[key] as string))) errors.push(`render.${key} — имя поля`);
     }
     if (r?.type === 'cards' && !r.label) errors.push('render.label обязателен для type "cards"');
@@ -187,6 +191,8 @@ export function validatePlugin(raw: unknown): { ok: true; plugin: PluginWidgetDe
       ...(r!.image ? { image: r!.image } : {}),
       ...(r!.badge ? { badge: r!.badge } : {}),
       ...(r!.dayField ? { dayField: r!.dayField } : {}),
+      ...(r!.gallery ? { gallery: r!.gallery } : {}),
+      ...(r!.video ? { video: r!.video } : {}),
     },
   };
   return { ok: true, plugin };
@@ -224,8 +230,8 @@ export function removePlugin(id: string) {
 
 /** Предустановленные плагины: ставятся один раз при первом запуске из статики приложения
  *  (same-origin, не сеть). Флаг не даёт переустановить то, что пользователь удалил сам. */
-// v3: питание с типами блюд (kind), калориями и библиотекой напитков/десертов/снеков
-const DEFAULTS_KEY = 'plugins.defaults.v3';
+// v4: простые дешёвые рецепты по шагам + галерея/видео (страница рецепта)
+const DEFAULTS_KEY = 'plugins.defaults.v4';
 const DEFAULT_PLUGIN_FILES = ['/plugins/nutrition-month.thedad-widget.json'];
 
 export async function ensureDefaultPlugins(): Promise<void> {

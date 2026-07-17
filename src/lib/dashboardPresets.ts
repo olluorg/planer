@@ -8,6 +8,60 @@ export interface Preset {
   hidden: string[];
 }
 
+// Раскладка по макету: жёсткие min/max держат пропорции карточек.
+// Живёт здесь (а не в Dashboard.tsx), чтобы screens.ts мог её использовать без циклического импорта.
+export const DEFAULT_LAYOUT: Layout[] = [
+  // Ряд 1: фокус дня + сводка (правее — фиксированный рейл с AI-коучем)
+  { i: 'today-focus',    x: 0, y: 0,  w: 7, h: 5, minW: 4, minH: 4, maxH: 7 },
+  { i: 'day-brief',      x: 7, y: 0,  w: 5, h: 5, minW: 3, minH: 4, maxH: 7 },
+  // Ряд 2: план · привычки · постоянство
+  { i: 'today-plan',     x: 0, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'habit-dots',     x: 4, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'consistency',    x: 8, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
+  // Ряд 3: графики
+  { i: 'time-alloc',     x: 0, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'week-progress',  x: 4, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'goals-progress', x: 8, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  // В рейле по умолчанию, но доступны и как виджеты сетки
+  { i: 'upcoming',       x: 0, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'quick-capture',  x: 4, y: 16, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
+  { i: 'health',         x: 8, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
+  { i: 'calendar',       x: 0, y: 22, w: 4, h: 7, minW: 3, minH: 6 },
+  { i: 'workout',        x: 4, y: 22, w: 4, h: 6, minW: 3, minH: 6 },
+  { i: 'calories',       x: 8, y: 22, w: 4, h: 6, minW: 3, minH: 5 },
+  { i: 'activity',       x: 8, y: 28, w: 4, h: 6, minW: 3, minH: 5 },
+  // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
+  { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
+  { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'block-day',     x: 3,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'block-evening', x: 6,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'block-night',   x: 9,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
+  { i: 'notes',         x: 0,  y: 29, w: 4,  h: 5, minW: 3, minH: 4 },
+  { i: 'plan-future',   x: 0,  y: 34, w: 12, h: 5, minW: 6, minH: 5, maxH: 6 },
+  { i: 'focus',         x: 0,  y: 39, w: 6,  h: 4, minW: 4, minH: 4 },
+  { i: 'quests',        x: 6,  y: 39, w: 3,  h: 4, minW: 3, minH: 4 },
+  { i: 'weekly-challenge', x: 9, y: 39, w: 3, h: 4, minW: 3, minH: 4 },
+  { i: 'letter',        x: 0,  y: 43, w: 6,  h: 4, minW: 4, minH: 3 },
+  { i: 'quick-add',     x: 6,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'reflection',    x: 9,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'kpi-grid',      x: 0,  y: 47, w: 6,  h: 4, minW: 4, minH: 4 },
+  { i: 'reminders',     x: 6,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'coach',         x: 9,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
+  { i: 'leagues',       x: 0,  y: 51, w: 12, h: 4, minW: 6, minH: 4 },
+  // AI-помощник: видим по умолчанию — иначе про генерацию плана можно узнать только из Ctrl+K
+  { i: 'ai-coach',      x: 0,  y: 55, w: 4,  h: 12, minW: 4, minH: 10 },
+];
+
+// Скрыты по умолчанию — включаются через «Показать скрытые» в редакторе
+export const DEFAULT_HIDDEN = [
+  'goals-week', 'block-morning', 'block-day', 'block-evening', 'block-night',
+  'notes', 'plan-future', 'focus', 'quests', 'weekly-challenge', 'letter',
+  'quick-add', 'kpi-grid', 'reminders', 'leagues', 'coach',
+];
+
+/** Все известные виджеты сетки — нужно для «пустого» экрана (всё скрыто). */
+export const ALL_WIDGET_IDS = DEFAULT_LAYOUT.map((l) => l.i);
+
 const ALL: Layout[] = [
   { i: 'goals-week',    x: 0,  y: 0,  w: 9, h: 5 },
   { i: 'progress-ring', x: 9,  y: 0,  w: 3, h: 5 },

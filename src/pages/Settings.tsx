@@ -4,7 +4,7 @@ import { resetDB, persist, DB_KEY } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme, isGlass } from "@/lib/theme";
 import {
-  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X, CalendarDays,
+  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X, CalendarDays, Cpu,
 } from "lucide-react";
 import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
@@ -16,13 +16,18 @@ import { toast } from "@/lib/toast";
 import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper, getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from "@/lib/theme";
 import { getIconStyle, setIconStyle, type IconStyle } from "@/lib/iconStyle";
 import { compressImage } from "@/lib/imageCompress";
-import { getAiConfig, setAiConfig, askAI } from "@/lib/ai";
+import { getAiConfig, setAiConfig, askAI, AI_PROVIDERS, type AiConfig } from "@/lib/ai";
 import { parseIcs } from "@/lib/ics";
 import { SyncSettings } from "@/components/SyncSettings";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, PLUGINS_EVENT } from "@/lib/plugins";
 import { preloadImages } from "@/lib/preload";
+import { getLiveWallpaper, setYouTubeWallpaper, setVideoWallpaper, clearLiveWallpaper, LIVEWP_EVENT } from "@/lib/liveWallpaper";
+import { chromeAiPresent, chromeAvailability, chromePreferred, setChromePreferred, downloadChromeModel, type Availability } from "@/lib/aiProvider";
+import { ChromeAiSetupModal } from "@/components/ChromeAiSetupModal";
+import { parseYouTubeId } from "@/components/LiveWallpaper";
+import { Clapperboard } from "lucide-react";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
 import { Input } from "@/components/ui/input";
 import { nanoid } from "nanoid";
@@ -226,9 +231,11 @@ export const SettingsPage = () => {
   };
 
   return (
-    <div className="p-4 max-w-2xl space-y-4">
-      <h1 className="text-h1">Настройки</h1>
+    <div className="page py-6">
+      <h1 className="text-h1 mb-5">Настройки</h1>
 
+      {/* Разделы-«карточки» раскладываются в колонки по ширине экрана (masonry) */}
+      <div className="columns-1 lg:columns-2 2xl:columns-3 gap-4 [&>*]:break-inside-avoid [&>*]:mb-4">
       <Card>
         <CardTitle>Внешний вид</CardTitle>
         <div className="flex gap-2">
@@ -518,6 +525,7 @@ export const SettingsPage = () => {
           <li>Работает офлайн</li>
         </ul>
       </Card>
+      </div>
     </div>
   );
 };
@@ -647,6 +655,130 @@ const GlassWallpaperPicker: React.FC = () => {
           <input type="file" accept="image/*" className="hidden" onChange={onFile} />
         </label>
       </div>
+      <LiveWallpaperControls />
+    </div>
+  );
+};
+
+/* Живые обои: видеофайл (mp4/webm) или YouTube-ссылка как анимированный фон */
+const LiveWallpaperControls: React.FC = () => {
+  const [wp, setWp] = useState(getLiveWallpaper());
+  const [link, setLink] = useState("");
+  useEffect(() => {
+    const sync = () => setWp(getLiveWallpaper());
+    window.addEventListener(LIVEWP_EVENT, sync);
+    return () => window.removeEventListener(LIVEWP_EVENT, sync);
+  }, []);
+
+  const onVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 60 * 1024 * 1024) { toast.error("Видео больше 60 МБ", "Возьми короткий зацикленный ролик"); return; }
+    try { await setVideoWallpaper(file); toast.success("Живые обои установлены"); }
+    catch (err: any) { toast.error("Не удалось сохранить видео", String(err?.message ?? err)); }
+  };
+  const onLink = () => {
+    const id = parseYouTubeId(link.trim());
+    if (!id) { toast.error("Не похоже на ссылку YouTube"); return; }
+    setYouTubeWallpaper(id);
+    setLink("");
+    toast.success("YouTube-обои установлены");
+  };
+
+  return (
+    <div className="mt-4 rounded-xl border border-border-soft p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <Clapperboard className="h-4 w-4 text-accent" />
+        <div className="text-[13px] font-medium text-text">Живые обои</div>
+        {wp && <span className="text-[10px] text-accent">активны · {wp.kind === "youtube" ? "YouTube" : "видео"}</span>}
+      </div>
+      <div className="text-[11px] text-text-muted mb-2.5">
+        Видеофайл (mp4/webm, как в Lively Wallpaper) или ссылка YouTube. Показываются в glass-теме, без звука, зациклено.
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        <label className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-bg-soft hover:bg-bg-hover text-sm cursor-pointer transition-colors">
+          <Upload className="h-4 w-4" /> Видеофайл
+          <input type="file" accept="video/mp4,video/webm,video/*" className="hidden" onChange={onVideo} />
+        </label>
+        <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка YouTube…" className="h-9 flex-1 min-w-[160px]"
+          onKeyDown={(e) => e.key === "Enter" && onLink()} />
+        <Button size="sm" variant="soft" onClick={onLink}>Задать</Button>
+        {wp && <Button size="sm" variant="ghost" onClick={() => { void clearLiveWallpaper(); }}>Убрать</Button>}
+      </div>
+    </div>
+  );
+};
+
+/* Встроенный в Chrome ИИ (Prompt API, Gemini Nano): работает локально и бесплатно.
+   Приоритетный провайдер; свой ключ остаётся фолбэком. */
+const BuiltInAiControls: React.FC = () => {
+  const [avail, setAvail] = useState<Availability | null>(null);
+  const [on, setOn] = useState(chromePreferred());
+  const [pct, setPct] = useState<number | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const present = chromeAiPresent();
+  useEffect(() => { void chromeAvailability().then(setAvail); }, []);
+
+  // Скачивание модели обязано идти из обработчика клика — иначе Chrome требует «user gesture»
+  const download = async () => {
+    setPct(0);
+    try {
+      await downloadChromeModel(setPct);
+      setAvail(await chromeAvailability());
+      toast.success('Модель встроенного AI готова');
+    } catch (e: any) {
+      toast.error('Не удалось скачать модель', String(e?.message ?? e));
+    } finally {
+      setPct(null);
+    }
+  };
+
+  const status = !present
+    ? { text: 'Не поддерживается этим браузером', cls: 'text-text-dim' }
+    : avail === 'available' ? { text: 'Готов к работе', cls: 'text-success' }
+    : avail === 'downloadable' ? { text: 'Модель не скачана — нажми «Скачать модель»', cls: 'text-text-muted' }
+    : avail === 'downloading' ? { text: 'Модель скачивается…', cls: 'text-text-muted' }
+    : { text: 'Недоступен — включи в chrome://flags', cls: 'text-text-dim' };
+
+  return (
+    <div className="rounded-xl border border-border-soft p-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Cpu className="h-4 w-4 text-accent" />
+        <div className="text-[13px] font-medium text-text flex-1">Встроенный AI Chrome</div>
+        <button
+          onClick={() => { const v = !on; setOn(v); setChromePreferred(v); }}
+          disabled={!present}
+          role="switch"
+          aria-checked={on && present}
+          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-40 ${on && present ? 'bg-success' : 'bg-border'}`}
+        >
+          <span className={`absolute top-0.5 left-0 h-4 w-4 rounded-full bg-white shadow transition-transform ${on && present ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+      <div className={`text-[11px] ${status.cls}`}>{status.text}</div>
+      {pct !== null && (
+        <div className="mt-2">
+          <div className="h-1.5 rounded-full bg-bg-soft overflow-hidden">
+            <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="text-[11px] text-text-muted mt-1 tabular-nums">Скачивание модели · {pct}%</div>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 mt-2">
+        {present && on && (avail === 'downloadable' || avail === 'downloading') && pct === null && (
+          <Button size="sm" variant="soft" onClick={download}>Скачать модель (~1–2 ГБ, один раз)</Button>
+        )}
+        {avail !== 'available' && (
+          <Button size="sm" variant="ghost" onClick={() => setHelpOpen(true)}>Как включить? Инструкция</Button>
+        )}
+      </div>
+      <div className="text-[11px] text-text-dim mt-1.5 leading-relaxed">
+        Работает <b className="text-text-muted">только в Chrome</b> (Gemini Nano прямо в браузере: бесплатно,
+        офлайн, данные никуда не уходят). В других браузерах — Safari, Firefox, на телефоне — добавь ниже
+        свой ключ OpenAI, Claude, Gemini или локальную Ollama.
+      </div>
+      <ChromeAiSetupModal open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 };
@@ -656,11 +788,14 @@ const AiSettings: React.FC = () => {
   const [cfg, setCfg] = useState(getAiConfig());
   const [show, setShow] = useState(false);
   const [testing, setTesting] = useState(false);
-  const save = (patch: Partial<typeof cfg>) => {
-    const next = { ...cfg, ...patch };
-    setCfg(next);
-    setAiConfig(next);
+  // Патч уходит в стор (он же подставляет дефолты провайдера), стейт перечитываем разрешённым
+  const save = (patch: Partial<AiConfig>) => {
+    setAiConfig(patch);
+    setCfg(getAiConfig());
   };
+  const meta = AI_PROVIDERS.find((p) => p.id === cfg.provider) ?? AI_PROVIDERS[0];
+  const keyless = cfg.provider === 'ollama'; // локальная модель, авторизация не нужна
+  const keyPlaceholder = keyless ? 'не нужен' : cfg.provider === 'anthropic' ? 'sk-ant-…' : cfg.provider === 'gemini' ? 'AIza…' : 'sk-…';
   const test = async () => {
     setTesting(true);
     try {
@@ -674,16 +809,34 @@ const AiSettings: React.FC = () => {
   };
   return (
     <div className="space-y-3">
+      <BuiltInAiControls />
       <div className="text-sm text-text-muted">
-        Подключи свой ключ (OpenAI-совместимый) — коуч на дашборде начнёт отвечать и планировать день.
+        Запасной вариант — свой ключ. Используется, если встроенный AI недоступен (не Chrome) или выключен.
         Ключ и запросы остаются на твоём устройстве, ничего не проходит через наши серверы.
+      </div>
+      {/* Провайдер: у OpenAI / Claude / Gemini разные адреса и формат запроса */}
+      <div>
+        <div className="text-[11px] text-text-muted mb-1">Провайдер</div>
+        <div className="flex flex-wrap gap-1.5">
+          {AI_PROVIDERS.map((p) => (
+            <Button
+              key={p.id}
+              size="sm"
+              variant={cfg.provider === p.id ? 'default' : 'soft'}
+              onClick={() => save({ provider: p.id, endpoint: undefined, model: undefined })}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        <div className="text-[11px] text-text-dim mt-1.5">{AI_PROVIDERS.find((p) => p.id === cfg.provider)?.hint}</div>
       </div>
       <div>
         <div className="text-[11px] text-text-muted mb-1">API-ключ</div>
         <div className="flex gap-2">
           <Input
             type={show ? 'text' : 'password'}
-            placeholder="sk-…"
+            placeholder={keyPlaceholder}
             value={cfg.key}
             onChange={(e) => save({ key: e.target.value })}
             className="flex-1"
@@ -694,19 +847,20 @@ const AiSettings: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <div className="text-[11px] text-text-muted mb-1">Endpoint</div>
-          <Input placeholder="https://api.openai.com/v1/chat/completions" value={cfg.endpoint} onChange={(e) => save({ endpoint: e.target.value })} />
+          <Input placeholder={meta.endpoint || 'https://…'} value={cfg.endpoint} onChange={(e) => save({ endpoint: e.target.value })} />
         </div>
         <div>
           <div className="text-[11px] text-text-muted mb-1">Модель</div>
-          <Input placeholder="gpt-4o-mini" value={cfg.model} onChange={(e) => save({ model: e.target.value })} />
+          <Input placeholder={meta.model || 'название модели'} value={cfg.model} onChange={(e) => save({ model: e.target.value })} />
         </div>
       </div>
       <div className="flex gap-2">
-        <Button size="sm" onClick={test} disabled={!cfg.key || testing}>{testing ? 'Проверка…' : 'Проверить ключ'}</Button>
+        <Button size="sm" onClick={test} disabled={(!cfg.key && !keyless) || testing}>{testing ? 'Проверка…' : keyless ? 'Проверить подключение' : 'Проверить ключ'}</Button>
         {cfg.key && <Button variant="soft" size="sm" onClick={() => save({ key: '' })}>Отключить</Button>}
       </div>
       <div className="text-[11px] text-text-dim">
-        Совместимо с OpenAI, OpenRouter, локальными LLM. Для Anthropic укажи прокси с OpenAI-форматом.
+        OpenAI, Claude и Gemini поддержаны напрямую — прокси не нужен. Вариант «Свой» подойдёт для
+        OpenRouter и локальных моделей с OpenAI-совместимым API.
       </div>
     </div>
   );

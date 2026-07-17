@@ -24,9 +24,20 @@ const PRIORITY_COLUMNS = [
   { id: 3, label: 'Низкий',  color: '#737373' },
 ] as const;
 
+// Канбан-доска по стадиям рабочего процесса
+const STAGE_COLUMNS = [
+  { id: 'todo',  label: 'To do',    color: '#64748b' },
+  { id: 'doing', label: 'В работе', color: '#3b82f6' },
+  { id: 'done',  label: 'Готово',   color: '#22c55e' },
+] as const;
+
+// Колонка задачи на доске: выполненные всегда в «Готово», иначе — по stage (legacy null → todo)
+const stageOf = (t: Task): 'todo' | 'doing' | 'done' =>
+  t.status === 'done' ? 'done' : t.stage === 'doing' ? 'doing' : 'todo';
+
 export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
-  const { tasks, goals, addTask, updateTask, toggleTask, removeTask } = useStore();
-  const [view, setView] = useState<'list' | 'kanban'>('list');
+  const { tasks, goals, addTask, updateTask, toggleTask, removeTask, moveTaskStage } = useStore();
+  const [view, setView] = useState<'list' | 'board' | 'kanban'>('list');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [filter, setFilter] = useState<'today' | 'all' | 'open' | 'done'>('today');
@@ -168,6 +179,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
           <Tabs value={view} onValueChange={(v) => setView(v as any)}>
             <TabsList>
               <TabsTrigger value="list">Список</TabsTrigger>
+              <TabsTrigger value="board">Доска</TabsTrigger>
               <TabsTrigger value="kanban">Приоритет</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -275,6 +287,62 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             );
           })()}
         </div>
+      ) : view === 'board' ? (
+        <DndContext
+          sensors={sensors}
+          onDragStart={(e) => setDraggingId(String(e.active.id))}
+          onDragCancel={() => setDraggingId(null)}
+          onDragEnd={(e: DragEndEvent) => {
+            setDraggingId(null);
+            if (!e.over) return;
+            const taskId = String(e.active.id);
+            const stage = String(e.over.id).replace('stage-', '');
+            if (['todo', 'doing', 'done'].includes(stage)) moveTaskStage(taskId, stage as any);
+          }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {STAGE_COLUMNS.map((col) => {
+              const items = filtered.filter((t) => !t.parent_id && stageOf(t) === col.id);
+              return (
+                <PriorityColumn key={col.id} id={`stage-${col.id}`} label={col.label} color={col.color} count={items.length}>
+                  {items.length === 0 && <div className="text-xs text-text-dim p-3">Перетащи задачу сюда</div>}
+                  {items.map((t) => {
+                    const goal = goals.find((g) => g.id === t.goal_id);
+                    return (
+                      <DraggableCard key={t.id} task={t} title={t.title}>
+                        <div className="flex items-start gap-2">
+                          <span onClick={(ev) => ev.stopPropagation()}>
+                            <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium leading-snug ${t.status === 'done' ? 'line-through text-text-muted' : ''}`}>
+                              {t.title}
+                            </div>
+                            <div className="text-[11px] text-text-muted mt-0.5 flex flex-wrap gap-2">
+                              {t.start_time && <span className="tabular-nums">{t.start_time}</span>}
+                              {t.time_block && !t.start_time && <span>{t.time_block}</span>}
+                              {goal && <Badge tone="accent">{goal.title}</Badge>}
+                            </div>
+                          </div>
+                        </div>
+                      </DraggableCard>
+                    );
+                  })}
+                </PriorityColumn>
+              );
+            })}
+          </div>
+          <DragOverlay>
+            {draggingId ? (() => {
+              const t = tasks.find((x) => x.id === draggingId);
+              return t ? (
+                <div className="border border-border bg-bg-card p-2 text-sm shadow-2xl max-w-[260px]">
+                  {t.title}
+                </div>
+              ) : null;
+            })() : null}
+          </DragOverlay>
+        </DndContext>
       ) : (
         <DndContext
           sensors={sensors}

@@ -22,6 +22,25 @@ export const HistoryPage = () => {
     return id;
   };
 
+  const STAGE_LABEL: Record<string, string> = { todo: 'To do', doing: 'В работе', done: 'Готово' };
+
+  // Человекочитаемое описание события задачи + акцент (цвет)
+  const taskEvent = (c: typeof changeLog[number]): { title: string; phrase: string; tone: 'accent' | 'good' | 'muted' | 'danger' } => {
+    if (c.field === 'deleted') return { title: c.old_value ?? c.entity_id, phrase: 'удалена', tone: 'danger' };
+    const title = titleFor('task', c.entity_id);
+    if (c.field === 'created') return { title, phrase: 'создана', tone: 'accent' };
+    if (c.field === 'status') return c.new_value === 'done'
+      ? { title, phrase: 'выполнена', tone: 'good' }
+      : { title, phrase: 'возобновлена', tone: 'muted' };
+    if (c.field === 'stage') return {
+      title,
+      phrase: `${STAGE_LABEL[c.old_value ?? ''] ?? c.old_value ?? '—'} → ${STAGE_LABEL[c.new_value ?? ''] ?? c.new_value ?? '—'}`,
+      tone: 'accent',
+    };
+    return { title, phrase: c.field, tone: 'muted' };
+  };
+  const TONE_CLASS = { accent: 'text-accent', good: 'text-success', muted: 'text-text-muted', danger: 'text-danger' } as const;
+
   return (
     <div className="p-4 space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
@@ -52,13 +71,23 @@ export const HistoryPage = () => {
           {filtered.map((c) => (
             <div key={c.id} className="p-3 flex items-start gap-3 text-sm">
               <Badge tone="soft">{c.entity}</Badge>
-              <div className="flex-1 min-w-0">
-                <div className="truncate"><b>{titleFor(c.entity, c.entity_id)}</b> · поле <code>{c.field}</code></div>
-                <div className="text-[11px] text-text-muted truncate">
-                  {c.old_value !== null && <>было: <span className="text-text">{c.old_value}</span> → </>}
-                  стало: <span className="text-accent">{c.new_value ?? '—'}</span>
+              {c.entity === 'task' ? (() => {
+                const ev = taskEvent(c);
+                return (
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate"><b>{ev.title}</b></div>
+                    <div className={`text-[11px] ${TONE_CLASS[ev.tone]} truncate`}>{ev.phrase}</div>
+                  </div>
+                );
+              })() : (
+                <div className="flex-1 min-w-0">
+                  <div className="truncate"><b>{titleFor(c.entity, c.entity_id)}</b> · поле <code>{c.field}</code></div>
+                  <div className="text-[11px] text-text-muted truncate">
+                    {c.old_value !== null && <>было: <span className="text-text">{c.old_value}</span> → </>}
+                    стало: <span className="text-accent">{c.new_value ?? '—'}</span>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="text-[11px] text-text-muted">{format(new Date(c.ts), 'd MMM HH:mm', { locale: ru })}</div>
             </div>
           ))}

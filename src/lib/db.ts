@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   time_block TEXT,
   priority INTEGER DEFAULT 2,
   status TEXT NOT NULL DEFAULT 'active',
+  stage TEXT DEFAULT 'todo',
   completed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -165,6 +166,11 @@ function migrate(d: Database) {
   if (!columnExists(d, 'tasks', 'start_time')) d.exec(`ALTER TABLE tasks ADD COLUMN start_time TEXT`);
   if (!columnExists(d, 'goals', 'health_metric')) d.exec(`ALTER TABLE goals ADD COLUMN health_metric TEXT`);
   if (!columnExists(d, 'tasks', 'recurrence')) d.exec(`ALTER TABLE tasks ADD COLUMN recurrence TEXT`);
+  if (!columnExists(d, 'tasks', 'stage')) {
+    d.exec(`ALTER TABLE tasks ADD COLUMN stage TEXT DEFAULT 'todo'`);
+    // выполненные задачи сразу попадают в колонку «Готово»
+    d.exec(`UPDATE tasks SET stage = 'done' WHERE status = 'done'`);
+  }
   d.exec(POST_MIGRATE_INDEXES);
 }
 

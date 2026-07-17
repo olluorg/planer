@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import { addDays, startOfWeek, format } from 'date-fns';
@@ -22,7 +21,6 @@ function levelColor(ratio: number): string {
 }
 
 export const WeeklyConsistency: React.FC = () => {
-  const nav = useNavigate();
   const { tasks } = useStore();
   const todayIso = isoDate(new Date());
 
@@ -76,9 +74,8 @@ export const WeeklyConsistency: React.FC = () => {
 
   return (
     <div className="h-full rounded-xl bg-bg-card border border-border shadow-card p-5 flex flex-col" style={{ containerType: 'inline-size' }}>
-      <div className="flex items-center justify-between mb-1 shrink-0">
+      <div className="flex items-center mb-1 shrink-0">
         <h3 className="text-base font-semibold text-text">Постоянство</h3>
-        <button onClick={() => nav('/analytics')} className="hm-more text-xs text-accent hover:underline">Подробнее</button>
       </div>
       <div className="text-[11px] text-text-muted mb-4 shrink-0">{stats.activePct}% активных дней за {WEEKS} недель</div>
 

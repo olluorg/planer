@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
-import { addDays, startOfWeek } from 'date-fns';
+import { useMemo, useState } from 'react';
+import { addDays, startOfWeek, format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import { ECharts } from '@/components/charts/ECharts';
+import { Checkbox } from '@/components/ui/checkbox';
 
 // Распределение задач недели по тайм-блокам (реальные данные, цвета как в Плане/Календаре).
 const SEGMENTS = [
@@ -14,9 +16,10 @@ const SEGMENTS = [
 ] as const;
 
 export const TimeAllocation: React.FC<{ date: Date }> = ({ date }) => {
-  const { tasks } = useStore();
+  const { tasks, toggleTask } = useStore();
+  const [sel, setSel] = useState<string | null>(null);
 
-  const { data, total } = useMemo(() => {
+  const { data, total, weekTasks } = useMemo(() => {
     const ws = startOfWeek(date, { weekStartsOn: 1 });
     const days = new Set(Array.from({ length: 7 }, (_, i) => isoDate(addDays(ws, i))));
     const wk = tasks.filter((t) => days.has(t.date) && !t.parent_id);
@@ -26,10 +29,15 @@ export const TimeAllocation: React.FC<{ date: Date }> = ({ date }) => {
       counts[k] = (counts[k] ?? 0) + 1;
     });
     const data = SEGMENTS
-      .map((s) => ({ name: s.label, value: counts[s.key] ?? 0, itemStyle: { color: s.color } }))
+      .map((s) => ({ key: s.key, name: s.label, value: counts[s.key] ?? 0, itemStyle: { color: s.color } }))
       .filter((d) => d.value > 0);
-    return { data, total: wk.length };
+    return { data, total: wk.length, weekTasks: wk };
   }, [tasks, date]);
+
+  const selTasks = useMemo(
+    () => (sel ? weekTasks.filter((t) => ((t.time_block as string) ?? 'none') === sel).sort((a, b) => a.date.localeCompare(b.date)) : []),
+    [sel, weekTasks],
+  );
 
   const option = {
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
@@ -61,15 +69,34 @@ export const TimeAllocation: React.FC<{ date: Date }> = ({ date }) => {
               <div className="text-[11px] text-text-muted mt-0.5">задач</div>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 shrink-0">
+          <div className="mt-3 flex flex-wrap gap-1.5 shrink-0">
             {data.map((d) => (
-              <div key={d.name} className="flex items-center gap-1.5 text-xs text-text-muted">
+              <button
+                key={d.key}
+                onClick={() => setSel(sel === d.key ? null : d.key)}
+                className={`flex items-center gap-1.5 text-xs rounded-full border px-2.5 py-1 transition-colors ${
+                  sel === d.key ? 'border-accent bg-accent/10 text-text' : 'border-border-soft text-text-muted hover:border-border hover:text-text'
+                }`}
+              >
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.itemStyle.color }} />
                 <span>{d.name}</span>
                 <span className="tabular-nums text-text font-medium">{d.value}</span>
-              </div>
+              </button>
             ))}
           </div>
+
+          {/* Отдача по клику: задачи выбранного блока за неделю */}
+          {sel && (
+            <div className="mt-2.5 rounded-lg border border-border-soft bg-bg-soft/40 p-2 max-h-32 overflow-y-auto shrink-0 space-y-0.5 animate-[slide-up_140ms_ease-out]">
+              {selTasks.map((t) => (
+                <label key={t.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-bg-soft cursor-pointer">
+                  <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                  <span className="text-[10px] text-text-dim tabular-nums shrink-0 w-9">{format(new Date(`${t.date}T00:00:00`), 'EEE', { locale: ru })}</span>
+                  <span className={`text-xs flex-1 min-w-0 truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>{t.title}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

@@ -3,7 +3,7 @@ import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings,
-  Plus, Search, Moon, Sun, Download, Crosshair, Keyboard,
+  Plus, Search, Moon, Sun, Download, Crosshair, Keyboard, Wand2,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTheme, isDarkMode } from '@/lib/theme';
@@ -47,7 +47,7 @@ export const CommandPalette: React.FC<{
       onOpenChange={onOpenChange}
       label="Палитра команд"
       className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4 bg-black/50 backdrop-blur-sm animate-fade-in"
-      contentClassName="w-full max-w-xl rounded-xl overflow-hidden border border-border bg-bg-card shadow-2xl outline-none origin-top animate-scale-in"
+      contentClassName="modal-surface w-full max-w-xl rounded-xl overflow-hidden border border-border bg-bg-card shadow-2xl outline-none origin-top animate-scale-in"
     >
       <div className="flex items-center gap-2 border-b border-border px-3">
         <Search className="h-4 w-4 text-text-muted" />
@@ -76,6 +76,7 @@ export const CommandPalette: React.FC<{
           <Item icon={Plus} label="Новая привычка" shortcut="H" onSelect={() => { close(); onAddHabit(); }} />
           <Item icon={Plus} label="Новая цель" shortcut="G" onSelect={() => { close(); onAddGoal(); }} />
           <Item icon={Plus} label="Записать показатель" shortcut="P" onSelect={() => { close(); onAddProgress(); }} />
+          <Item icon={Wand2} label="Составить план с AI" onSelect={() => { close(); window.dispatchEvent(new CustomEvent('thedad:ai-generate')); }} />
           {onFocusMode && <Item icon={Crosshair} label="Focus Mode (Deep Work)" shortcut="⇧F" onSelect={() => { close(); onFocusMode(); }} />}
           {onShortcuts && <Item icon={Keyboard} label="Горячие клавиши" shortcut="?" onSelect={() => { close(); onShortcuts(); }} />}
           <Item icon={isDarkMode(theme) ? Sun : Moon} label={isDarkMode(theme) ? 'Светлый режим' : 'Тёмный режим'} onSelect={() => { toggle(); close(); }} />

@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Scale, Moon, Footprints, Droplet, Dumbbell, Zap, HeartPulse } from 'lucide-react';
 import { Ring } from '@/components/ui/ring';
 import { useStore } from '@/lib/store';
@@ -17,7 +16,6 @@ const METRICS: { key: HealthMetric; label: string; unit: string; icon: React.Ele
 
 export const HealthWidget: React.FC<{ date: Date }> = ({ date }) => {
   const { healthLogs } = useStore();
-  const nav = useNavigate();
   const d = isoDate(date);
 
   const valueOf = (metric: HealthMetric) => healthLogs.find((l) => l.date === d && l.metric === metric)?.value ?? null;
@@ -33,10 +31,9 @@ export const HealthWidget: React.FC<{ date: Date }> = ({ date }) => {
   const logged = METRICS.filter((m) => valueOf(m.key) != null);
 
   return (
-    <div className="h-full rounded-xl bg-bg-card border border-border shadow-card p-5 flex flex-col">
-      <div className="flex items-center justify-between mb-3 shrink-0">
+    <div className="h-full rounded-xl bg-bg-card border border-border shadow-card p-5 flex flex-col overflow-hidden">
+      <div className="flex items-center mb-3 shrink-0">
         <h3 className="text-base font-semibold text-text flex items-center gap-2"><HeartPulse className="h-4 w-4 text-accent" /> Здоровье</h3>
-        <button onClick={() => nav('/health')} className="text-xs text-accent hover:underline">Открыть</button>
       </div>
       <div className="flex items-center gap-4 shrink-0">
         <Ring value={score ?? 0} size={72} stroke={8} color={score == null ? 'var(--border)' : score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'} glow={false} trackColor="var(--border)">
@@ -46,7 +43,7 @@ export const HealthWidget: React.FC<{ date: Date }> = ({ date }) => {
           {score == null ? 'Залогируй метрики на странице «Здоровье»' : score >= 70 ? 'Отличный день для тела' : score >= 40 ? 'Норм, есть что добрать' : 'Тело просит внимания'}
         </div>
       </div>
-      <div className="mt-4 pt-3 border-t border-border-soft grid grid-cols-2 gap-x-4 gap-y-2 flex-1 content-start">
+      <div className="mt-4 pt-3 border-t border-border-soft grid grid-cols-2 gap-x-4 gap-y-2 flex-1 min-h-0 overflow-y-auto content-start">
         {logged.length === 0 && <div className="col-span-2 text-caption text-text-muted">Сегодня ещё нет записей</div>}
         {logged.map((m) => {
           const v = valueOf(m.key)!;

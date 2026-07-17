@@ -11,8 +11,11 @@ import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
   CheckCircle2, Flame, Waves, CloudRain, Wind, TreePine, Image as ImageIcon,
   Lock, BellOff, Maximize, BarChart3, Upload, CloudLightning, FlameKindling, MoonStar,
-  ChevronDown, Coffee,
+  ChevronDown, Coffee, Clapperboard,
 } from 'lucide-react';
+import { YouTubeBg } from '@/components/LiveWallpaper';
+import { useSoundscape, LAYERS, MIX_PRESETS, type LayerKey } from '@/lib/soundscape';
+import { useYtPlayer, ytThumb } from '@/lib/ytPlayer';
 
 // Помидоро-циклы: работа + отдых (мин). Когда цикл завершается — переходим к новой задаче.
 const CYCLES = [
@@ -28,192 +31,6 @@ const MODE_KEY = 'focus.mode.v1';
 
 const PRIORITY_COLOR: Record<number, string> = { 1: '#ef4444', 2: '#f59e0b', 3: '#64748b' };
 
-/* ==================== Звуковой микшер (WebAudio, всё генеративное) ==================== */
-
-type LayerKey = 'rain' | 'ocean' | 'white' | 'forest' | 'thunder' | 'wind' | 'fire' | 'night';
-
-const LAYERS: { key: LayerKey; label: string; icon: React.ElementType }[] = [
-  { key: 'rain', label: 'Дождь', icon: CloudRain },
-  { key: 'ocean', label: 'Океан', icon: Waves },
-  { key: 'thunder', label: 'Гром', icon: CloudLightning },
-  { key: 'wind', label: 'Ветер', icon: Wind },
-  { key: 'fire', label: 'Костёр', icon: FlameKindling },
-  { key: 'forest', label: 'Ручей', icon: TreePine },
-  { key: 'night', label: 'Сверчки', icon: MoonStar },
-  { key: 'white', label: 'Белый шум', icon: Volume2 },
-];
-
-/* Пресеты миксов — как в lofi-приложениях */
-const MIX_PRESETS: { label: string; mix: Partial<Record<LayerKey, number>> }[] = [
-  { label: 'Шторм', mix: { thunder: 0.8, wind: 0.55, rain: 0.7, ocean: 0.35 } },
-  { label: 'Лес ночью', mix: { forest: 0.6, night: 0.5, wind: 0.25 } },
-  { label: 'У камина', mix: { fire: 0.85, rain: 0.3, wind: 0.15 } },
-  { label: 'Дождь у окна', mix: { rain: 0.8, thunder: 0.25 } },
-];
-
-function noiseBuffer(ctx: AudioContext, kind: 'white' | 'brown' | 'crackle'): AudioBuffer {
-  const size = 2 * ctx.sampleRate;
-  const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  let last = 0;
-  if (kind === 'crackle') {
-    // редкие щелчки с экспоненциальным хвостом — треск костра
-    let env = 0;
-    for (let i = 0; i < size; i++) {
-      if (Math.random() < 0.0012) env = Math.random() * 0.9 + 0.1;
-      env *= 0.986;
-      data[i] = (Math.random() * 2 - 1) * env;
-    }
-    return buffer;
-  }
-  for (let i = 0; i < size; i++) {
-    const white = Math.random() * 2 - 1;
-    if (kind === 'brown') {
-      data[i] = (last + 0.02 * white) / 1.02;
-      last = data[i];
-      data[i] *= 3.5;
-    } else {
-      data[i] = white;
-    }
-  }
-  return buffer;
-}
-
-/** Запускает слой; выход подключается к переданному gain (громкость слоя). Возвращает stop(). */
-function startLayer(ctx: AudioContext, key: LayerKey, out: GainNode): () => void {
-  const cleanups: (() => void)[] = [];
-  const mkSrc = (kind: 'white' | 'brown' | 'crackle') => {
-    const s = ctx.createBufferSource();
-    s.buffer = noiseBuffer(ctx, kind);
-    s.loop = true;
-    cleanups.push(() => { try { s.stop(); } catch {} s.disconnect(); });
-    return s;
-  };
-  const mkNode = <T extends AudioNode>(n: T): T => { cleanups.push(() => { try { n.disconnect(); (n as any).stop?.(); } catch {} }); return n; };
-
-  switch (key) {
-    case 'rain': {
-      const src = mkSrc('white');
-      const lp = mkNode(ctx.createBiquadFilter()); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.6;
-      src.connect(lp).connect(out); src.start();
-      break;
-    }
-    case 'ocean': {
-      const src = mkSrc('brown');
-      const g = mkNode(ctx.createGain()); g.gain.value = 0.7;
-      const lfo = mkNode(ctx.createOscillator()); lfo.frequency.value = 0.07;
-      const lg = mkNode(ctx.createGain()); lg.gain.value = 0.3;
-      lfo.connect(lg).connect(g.gain); lfo.start();
-      src.connect(g).connect(out); src.start();
-      break;
-    }
-    case 'white': {
-      const src = mkSrc('white');
-      const hs = mkNode(ctx.createBiquadFilter()); hs.type = 'highshelf'; hs.frequency.value = 4000; hs.gain.value = -10;
-      src.connect(hs).connect(out); src.start();
-      break;
-    }
-    case 'forest': {
-      const src = mkSrc('white');
-      const bp = mkNode(ctx.createBiquadFilter()); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.4;
-      const lp = mkNode(ctx.createBiquadFilter()); lp.type = 'lowpass'; lp.frequency.value = 5000;
-      src.connect(bp); bp.connect(lp); lp.connect(out); src.start();
-      break;
-    }
-    case 'wind': {
-      const src = mkSrc('white');
-      const bp = mkNode(ctx.createBiquadFilter()); bp.type = 'bandpass'; bp.frequency.value = 480; bp.Q.value = 0.7;
-      const g = mkNode(ctx.createGain()); g.gain.value = 0.75;
-      // порывы: LFO на частоту фильтра и громкость
-      const lfoF = mkNode(ctx.createOscillator()); lfoF.frequency.value = 0.11;
-      const lfoFG = mkNode(ctx.createGain()); lfoFG.gain.value = 220;
-      lfoF.connect(lfoFG).connect(bp.frequency); lfoF.start();
-      const lfoA = mkNode(ctx.createOscillator()); lfoA.frequency.value = 0.05;
-      const lfoAG = mkNode(ctx.createGain()); lfoAG.gain.value = 0.25;
-      lfoA.connect(lfoAG).connect(g.gain); lfoA.start();
-      src.connect(bp).connect(g).connect(out); src.start();
-      break;
-    }
-    case 'fire': {
-      const src = mkSrc('crackle');
-      const lp = mkNode(ctx.createBiquadFilter()); lp.type = 'lowpass'; lp.frequency.value = 3200;
-      const base = mkSrc('brown');
-      const baseLp = mkNode(ctx.createBiquadFilter()); baseLp.type = 'lowpass'; baseLp.frequency.value = 220;
-      const baseG = mkNode(ctx.createGain()); baseG.gain.value = 0.25;
-      src.connect(lp).connect(out); src.start();
-      base.connect(baseLp).connect(baseG).connect(out); base.start();
-      break;
-    }
-    case 'thunder': {
-      // раскаты: brown → lowpass, громкость по конверту случайными интервалами
-      const src = mkSrc('brown');
-      const lp = mkNode(ctx.createBiquadFilter()); lp.type = 'lowpass'; lp.frequency.value = 140;
-      const g = mkNode(ctx.createGain()); g.gain.value = 0;
-      src.connect(lp).connect(g).connect(out); src.start();
-      let timer = 0;
-      const roll = () => {
-        const t = ctx.currentTime;
-        const peak = 0.6 + Math.random() * 0.6;
-        g.gain.cancelScheduledValues(t);
-        g.gain.setValueAtTime(g.gain.value, t);
-        g.gain.linearRampToValueAtTime(peak, t + 0.25 + Math.random() * 0.6);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 2.5 + Math.random() * 3);
-        timer = window.setTimeout(roll, 6000 + Math.random() * 14000);
-      };
-      timer = window.setTimeout(roll, 800 + Math.random() * 2000);
-      cleanups.push(() => window.clearTimeout(timer));
-      break;
-    }
-    case 'night': {
-      // сверчки: тон ~4.3кГц, стрекот AM 22Гц + фразы 1.1Гц
-      const osc = mkNode(ctx.createOscillator()); osc.type = 'sine'; osc.frequency.value = 4300;
-      const chirp = mkNode(ctx.createGain()); chirp.gain.value = 0;
-      const lfo1 = mkNode(ctx.createOscillator()); lfo1.type = 'square'; lfo1.frequency.value = 22;
-      const lfo1g = mkNode(ctx.createGain()); lfo1g.gain.value = 0.5;
-      lfo1.connect(lfo1g).connect(chirp.gain); lfo1.start();
-      const phrase = mkNode(ctx.createGain()); phrase.gain.value = 0;
-      const lfo2 = mkNode(ctx.createOscillator()); lfo2.type = 'square'; lfo2.frequency.value = 1.1;
-      const lfo2g = mkNode(ctx.createGain()); lfo2g.gain.value = 0.5;
-      lfo2.connect(lfo2g).connect(phrase.gain); lfo2.start();
-      const soft = mkNode(ctx.createGain()); soft.gain.value = 0.16;
-      osc.connect(chirp).connect(phrase).connect(soft).connect(out); osc.start();
-      break;
-    }
-  }
-  return () => cleanups.forEach((fn) => fn());
-}
-
-/* ==================== YouTube ==================== */
-
-interface YtItem { id: string; title: string }
-
-const YT_KEY = 'focus.youtube.v2';
-const YT_DEFAULTS: YtItem[] = [
-  { id: 'PB8ZrGinWi0', title: 'Focus music · 1' },
-  { id: 'X4VbdwhkE10', title: 'Focus music · 2' },
-  { id: 'qwosU7e9mqc', title: 'Focus music · 3' },
-  { id: 'LEEx_UkHmBU', title: 'Focus music · 4' },
-  { id: '68ahXMmMorg', title: 'Skyrim · Ambience' },
-  { id: 'YKJ-fkbMOOg', title: 'Focus music · 6' },
-];
-
-function loadYt(): YtItem[] {
-  try {
-    // v1 → v2 миграция: докидываем новые дефолты, свои треки сохраняем
-    const raw = localStorage.getItem(YT_KEY) ?? localStorage.getItem('focus.youtube.v1');
-    if (raw) {
-      const saved: YtItem[] = JSON.parse(raw);
-      const merged = [...saved, ...YT_DEFAULTS.filter((d) => !saved.some((s) => s.id === d.id))];
-      return merged;
-    }
-  } catch {}
-  return YT_DEFAULTS;
-}
-
-function parseYtId(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/);
-  return m ? m[1] : (/^[\w-]{11}$/.test(url.trim()) ? url.trim() : null);
-}
 
 /* ==================== Обои ==================== */
 
@@ -294,25 +111,31 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const elapsedRef = useRef(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tasksExpanded, setTasksExpanded] = useState(true); // задачи дня видны по умолчанию
   const [newTask, setNewTask] = useState('');
 
   // Микшер: громкость каждого слоя 0..1 (0 = выключен)
-  const [mix, setMix] = useState<Partial<Record<LayerKey, number>>>({});
-  const [soundPaused, setSoundPaused] = useState(false);
-  const [master, setMaster] = useState(0.6);
-  const ctxRef = useRef<AudioContext | null>(null);
-  const masterRef = useRef<GainNode | null>(null);
-  const layersRef = useRef<Map<LayerKey, { gain: GainNode; stop: () => void }>>(new Map());
+  // Глобальный звуковой движок — звук не прерывается при выходе из фокуса
+  const { mix, master, paused: soundPaused, setLayer, setMaster, applyPreset: applyMixPreset, stopAll: stopAllSound, togglePause: toggleSoundPause } = useSoundscape();
+  const anySound = Object.keys(mix).length > 0;
 
-  // YouTube — панель открыта по умолчанию
+  // YouTube — панель открыта по умолчанию. Сам плеер глобальный (MiniPlayer в App),
+  // поэтому музыка продолжает играть после выхода из фокуса.
   const [ytOpen, setYtOpen] = useState(true);
-  const [ytList, setYtList] = useState<YtItem[]>(loadYt);
-  const [ytActive, setYtActive] = useState<string | null>(null);
-  const [ytVolume, setYtVolume] = useState(70);
   const [ytUrl, setYtUrl] = useState('');
-  const ytFrameRef = useRef<HTMLIFrameElement>(null);
+  const {
+    list: ytList, activeId: ytActive, playing: ytPlaying, volume: ytVolume,
+    play: playYt, togglePlay: toggleYtPlay, next: nextYt, stop: stopYt,
+    setVolume: changeYtVolume, addByUrl: addYtUrl, remove: removeYt,
+  } = useYtPlayer();
 
   const [wallpaper, setWallpaper] = useState<string>(() => localStorage.getItem(WP_KEY) || WALLPAPERS[13]);
+  // Видео из плейлиста как фон фокуса (YouTube id), переживает перезаход
+  const [videoBg, setVideoBgState] = useState<string | null>(() => localStorage.getItem('focus.videobg.v1'));
+  const setVideoBg = (id: string | null) => {
+    setVideoBgState(id);
+    try { if (id) localStorage.setItem('focus.videobg.v1', id); else localStorage.removeItem('focus.videobg.v1'); } catch {}
+  };
   const [customWp, setCustomWp] = useState<string[]>(getCustomWallpapers);
   const [wpOpen, setWpOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -343,6 +166,19 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const doneCount = sessionTasks.filter((t) => t.status === 'done').length;
   const sessionPct = sessionTasks.length ? Math.round((doneCount / sessionTasks.length) * 100) : 0;
   const currentTask = selectedId ? sessionTasks.find((t) => t.id === selectedId) ?? null : null;
+  // Активная задача: выбранная вручную или первая невыполненная (по умолчанию)
+  const firstPending = sessionTasks.find((t) => t.status !== 'done') ?? null;
+  const activeTask = currentTask ?? firstPending;
+  const nextPending = sessionTasks.find((t) => t.status !== 'done' && t.id !== activeTask?.id) ?? null;
+
+  // Отметить задачу; если это была активная — переходим к следующей невыполненной
+  const checkTask = (id: string) => {
+    toggleTask(id);
+    if (id === activeTask?.id) {
+      const nxt = sessionTasks.find((t) => t.status !== 'done' && t.id !== id);
+      setSelectedId(nxt?.id ?? null);
+    }
+  };
 
   const focusToday = useMemo(() => Math.round(timeEntries
     .filter((e) => e.type === 'pomodoro' && isoDate(new Date(e.started_at)) === today)
@@ -367,8 +203,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
       if (initialTaskId) setSelectedId(initialTaskId); // фокус на конкретной задаче (из списка задач)
     } else {
       stop();
-      stopAllSound();
-      setYtActive(null);
+      // Музыку НЕ трогаем: плеер глобальный и продолжает играть вне фокуса
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -457,109 +292,19 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     setSecondsLeft((next ? CYCLES[cycleIdx].work : TIMERS[timerIdx]) * 60);
   };
 
-  /* ===== Микшер ===== */
-  const ensureCtx = () => {
-    if (!ctxRef.current) {
-      const Ctx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
-      ctxRef.current = new Ctx();
-      masterRef.current = ctxRef.current.createGain();
-      masterRef.current.gain.value = master * 0.2;
-      masterRef.current.connect(ctxRef.current.destination);
-    }
-    return { ctx: ctxRef.current!, masterG: masterRef.current! };
-  };
-
-  const setLayer = (key: LayerKey, vol: number) => {
-    const next = { ...mix, [key]: vol };
-    if (vol <= 0) delete next[key];
-    setMix(next);
-    try {
-      const { ctx, masterG } = ensureCtx();
-      void ctx.resume();
-      setSoundPaused(false);
-      const existing = layersRef.current.get(key);
-      if (vol <= 0) {
-        if (existing) { existing.stop(); existing.gain.disconnect(); layersRef.current.delete(key); }
-        return;
-      }
-      if (existing) {
-        existing.gain.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
-      } else {
-        const g = ctx.createGain();
-        g.gain.value = vol;
-        g.connect(masterG);
-        const stopFn = startLayer(ctx, key, g);
-        layersRef.current.set(key, { gain: g, stop: stopFn });
-      }
-    } catch {}
-  };
-
-  const applyMixPreset = (preset: Partial<Record<LayerKey, number>>) => {
-    // выключаем всё, что не в пресете, ставим уровни из пресета
-    LAYERS.forEach((l) => {
-      const v = preset[l.key] ?? 0;
-      if ((mix[l.key] ?? 0) !== v) setLayerRaw(l.key, v);
-    });
-    setMix({ ...preset });
-  };
-  // как setLayer, но без setMix (для пакетного применения пресета)
-  const setLayerRaw = (key: LayerKey, vol: number) => {
-    try {
-      const { ctx, masterG } = ensureCtx();
-      void ctx.resume();
-      setSoundPaused(false);
-      const existing = layersRef.current.get(key);
-      if (vol <= 0) {
-        if (existing) { existing.stop(); existing.gain.disconnect(); layersRef.current.delete(key); }
-        return;
-      }
-      if (existing) existing.gain.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
-      else {
-        const g = ctx.createGain();
-        g.gain.value = vol;
-        g.connect(masterG);
-        layersRef.current.set(key, { gain: g, stop: startLayer(ctx, key, g) });
-      }
-    } catch {}
-  };
-
-  const stopAllSound = () => {
-    layersRef.current.forEach((l) => { l.stop(); l.gain.disconnect(); });
-    layersRef.current.clear();
-    setMix({});
-    setSoundPaused(false);
-  };
-  const anySound = Object.keys(mix).length > 0;
-
-  const toggleSoundPause = () => {
-    const ctx = ctxRef.current;
-    if (!ctx || (!anySound && !ytActive)) return;
-    if (soundPaused) { void ctx.resume(); setSoundPaused(false); }
-    else { void ctx.suspend(); setSoundPaused(true); }
-  };
-  useEffect(() => { if (masterRef.current) masterRef.current.gain.value = master * 0.2; }, [master]);
 
   /* ===== YouTube ===== */
-  const saveYt = (list: YtItem[]) => { setYtList(list); localStorage.setItem(YT_KEY, JSON.stringify(list)); };
-  const addYt = () => {
-    const id = parseYtId(ytUrl);
-    if (!id) return;
-    saveYt([...ytList.filter((x) => x.id !== id), { id, title: `Мой трек · ${ytList.length + 1}` }]);
-    setYtUrl('');
-  };
-  const playYt = (id: string) => setYtActive(id);
-  const nextYt = () => {
-    if (!ytList.length) return;
-    const idx = ytActive ? ytList.findIndex((x) => x.id === ytActive) : -1;
-    setYtActive(ytList[(idx + 1) % ytList.length].id);
-  };
-  const ytCommand = (func: string, args: unknown[] = []) => {
-    ytFrameRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
-  };
-  const changeYtVolume = (v: number) => {
-    setYtVolume(v);
-    ytCommand('setVolume', [v]);
-    if (v === 0) ytCommand('mute'); else ytCommand('unMute');
+  const addYt = () => { if (addYtUrl(ytUrl)) setYtUrl(''); };
+  // «Весь звук»: пауза/продолжение разом для атмосферы и YouTube
+  const allPaused = (!anySound || soundPaused) && (!ytActive || !ytPlaying);
+  const pauseAllSound = () => {
+    if (allPaused) {
+      if (anySound && soundPaused) toggleSoundPause();
+      if (ytActive && !ytPlaying) toggleYtPlay();
+    } else {
+      if (anySound && !soundPaused) toggleSoundPause();
+      if (ytActive && ytPlaying) toggleYtPlay();
+    }
   };
 
   /* ===== Обои ===== */
@@ -597,7 +342,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     setNewTask('');
   };
 
-  const close = () => { stop(); stopAllSound(); onClose(); };
+  const close = () => { stop(); onClose(); };
 
   useEffect(() => {
     if (!open) return;
@@ -622,7 +367,9 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   return (
     <div className="fixed inset-0 z-[200] text-white select-none overflow-y-auto bg-[#0b0a14]">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${wallpaper})` }} />
+        {videoBg
+          ? <YouTubeBg id={videoBg} />
+          : <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${wallpaper})` }} />}
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute bottom-0 inset-x-0 h-1/3" style={{ background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.55))' }} />
       </div>
@@ -792,26 +539,55 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
             </div>
           </div>
 
-          <div className="text-center min-h-[64px]">
+          <div className="text-center min-h-[64px] w-full max-w-md mx-auto">
             {phase === 'rest' ? (
               /* Перерыв: вместо задачи — надпись «Отдых» */
               <>
                 <div className="text-[11px] uppercase tracking-widest text-sky-300/60 mb-1.5">Перерыв</div>
-                <div className="flex items-center justify-center gap-2.5 max-w-md mx-auto">
+                <div className="flex items-center justify-center gap-2.5">
                   <Coffee className="h-5 w-5 text-sky-300 shrink-0" />
                   <span className="text-xl font-semibold leading-snug text-sky-100">Отдых {rest} мин — отойди от экрана</span>
                 </div>
               </>
             ) : (
               <>
-                <div className="text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Текущая задача</div>
-                {currentTask ? (
-                  <div className="flex items-center justify-center gap-2 max-w-md">
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[currentTask.priority] ?? '#64748b' }} title={`Приоритет ${currentTask.priority}`} />
-                    <span className="text-xl font-semibold leading-snug">{currentTask.title}</span>
-                  </div>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-[11px] uppercase tracking-widest text-white/35">Задачи дня</span>
+                  {sessionTasks.length > 0 && <span className="text-[11px] text-white/40 tabular-nums">{doneCount}/{sessionTasks.length}</span>}
+                  {sessionTasks.length > 1 && (
+                    <button onClick={() => setTasksExpanded((v) => !v)} className="text-white/40 hover:text-white transition-colors" title={tasksExpanded ? 'Свернуть' : 'Показать все'}>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${tasksExpanded ? '' : '-rotate-90'}`} />
+                    </button>
+                  )}
+                </div>
+
+                {sessionTasks.length === 0 ? (
+                  <div className="text-sm text-white/35">Свободный фокус — добавь задачи слева или просто работай</div>
                 ) : (
-                  <div className="text-sm text-white/35">Свободный фокус — выбери задачу слева или просто работай</div>
+                  <div className="space-y-1.5">
+                    {/* Текущая (или все — если раскрыто) */}
+                    {(tasksExpanded ? sessionTasks : activeTask ? [activeTask] : []).map((t) => (
+                      <div
+                        key={t.id}
+                        className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${glass} ${activeTask?.id === t.id ? 'ring-1 ring-white/40' : ''}`}
+                      >
+                        <button
+                          onClick={() => checkTask(t.id)}
+                          className="h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all hover:scale-110"
+                          style={{ background: t.status === 'done' ? 'rgba(255,255,255,0.9)' : 'transparent', borderColor: t.status === 'done' ? 'transparent' : 'rgba(255,255,255,0.35)' }}
+                        >
+                          {t.status === 'done' && <CheckCircle2 className="h-4 w-4 text-black/70" />}
+                        </button>
+                        <button onClick={() => setSelectedId(t.id)} className="flex-1 min-w-0 flex items-center gap-2 text-left">
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[t.priority] ?? '#64748b' }} />
+                          <span className={`text-base font-semibold leading-snug truncate ${t.status === 'done' ? 'line-through text-white/40' : ''}`}>{t.title}</span>
+                        </button>
+                      </div>
+                    ))}
+                    {!tasksExpanded && nextPending && (
+                      <div className="text-[11px] text-white/35">дальше: {nextPending.title}</div>
+                    )}
+                  </div>
                 )}
               </>
             )}
@@ -850,10 +626,11 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
               >{m}</button>
             ))}
             <span className="h-6 w-px bg-white/10" />
-            <button onClick={toggleSoundPause} disabled={!anySound && !ytActive} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30" title={soundPaused ? 'Продолжить звук' : 'Пауза звука'}>
-              {soundPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            {/* Пауза/стоп — на весь звук сразу: и атмосфера, и YouTube */}
+            <button onClick={pauseAllSound} disabled={!anySound && !ytActive} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30" title={allPaused ? 'Продолжить звук' : 'Пауза звука'}>
+              {allPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             </button>
-            <button onClick={() => { stopAllSound(); setYtActive(null); }} disabled={!anySound && !ytActive} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30" title="Стоп звук">
+            <button onClick={() => { stopAllSound(); stopYt(); }} disabled={!anySound && !ytActive} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30" title="Стоп звук">
               <VolumeX className="h-4 w-4" />
             </button>
             <button onClick={nextYt} className="h-10 w-10 rounded-full flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-colors" title="Следующий трек">
@@ -967,18 +744,18 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
           {/* YouTube — открыт по умолчанию */}
           {(ytOpen || ytActive) && (
             <Panel title="Focus-видео" icon={Youtube} collapsed={!!collapsed['youtube']} onToggle={() => togglePanel('youtube')}>
+              {/* Сам плеер — глобальный мини-плеер (правый нижний угол): он переживает выход
+                  из фокуса. Здесь только выбор трека и громкость. */}
               {ytActive && (
                 <>
-                  <div className="rounded-lg overflow-hidden mb-2 aspect-video bg-black">
-                    <iframe
-                      ref={ytFrameRef}
-                      width="100%" height="100%"
-                      src={`https://www.youtube-nocookie.com/embed/${ytActive}?autoplay=1&rel=0&enablejsapi=1`}
-                      title="Focus video"
-                      frameBorder="0"
-                      allow="autoplay; encrypted-media; picture-in-picture"
-                      allowFullScreen
-                    />
+                  <div className="flex items-center gap-2 mb-3">
+                    <button onClick={toggleYtPlay} className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center shrink-0 transition-colors" title={ytPlaying ? 'Пауза' : 'Играть'}>
+                      {ytPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" fill="white" />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{ytList.find((x) => x.id === ytActive)?.title ?? 'YouTube'}</div>
+                      <div className="text-[11px] text-white/35">{ytPlaying ? 'играет' : 'на паузе'} · продолжится вне фокуса</div>
+                    </div>
                   </div>
                   {/* громкость видео */}
                   <div className="flex items-center gap-3 mb-3">
@@ -999,10 +776,17 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                       onClick={() => playYt(v.id)}
                       className={`flex-1 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${ytActive === v.id ? 'bg-white/10 text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'}`}
                     >
-                      <img src={`https://i.ytimg.com/vi/${v.id}/default.jpg`} alt="" className="h-8 w-12 rounded object-cover shrink-0" loading="lazy" />
+                      <img src={ytThumb(v.id)} alt="" className="h-8 w-12 rounded object-cover shrink-0" loading="lazy" />
                       <span className="truncate">{v.title}</span>
                     </button>
-                    <button onClick={() => saveYt(ytList.filter((x) => x.id !== v.id))} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity shrink-0">
+                    <button
+                      onClick={() => setVideoBg(videoBg === v.id ? null : v.id)}
+                      title={videoBg === v.id ? 'Убрать из фона' : 'Сделать фоном'}
+                      className={`shrink-0 transition-opacity ${videoBg === v.id ? 'text-emerald-300' : 'opacity-0 group-hover:opacity-100 text-white/30 hover:text-white'}`}
+                    >
+                      <Clapperboard className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => removeYt(v.id)} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </li>

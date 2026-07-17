@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Pause, Play, SkipForward, Check, Dumbbell } from 'lucide-react';
+import { X, Pause, Play, SkipForward, Check, Dumbbell, Flame, Flower2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import { fmtSec } from '@/lib/pomodoroState';
 import { logWorkout } from '@/lib/activity';
 
 /* ==================== База упражнений ====================
- * Картинки: public/workout/ex-01.jpg … ex-30.jpg (квадратные, обрезаются в круг).
- * Пока файла нет — показывается заглушка, зарядка работает и без картинок. */
+ * Три типа тренировки, все домашние и без снаряжения. Картинки:
+ *   зарядка   → public/workout/ex-NN.jpg
+ *   калистеника → public/workout/calisthenics-NN.jpg
+ *   йога      → public/workout/yoga-NN.jpg
+ * Пока файла нет — показывается заглушка, тренировка работает и без картинок. */
 export interface Exercise { name: string; hint: string; img: string }
+export type WorkoutType = 'charge' | 'calisthenics' | 'yoga';
 
-export const EXERCISES: Exercise[] = [
+const CHARGE = [
   { name: 'Джампинг джек', hint: 'Прыжки: ноги врозь, руки вверх' },
   { name: 'Приседания', hint: 'Спина прямая, колени не выходят за носки' },
   { name: 'Отжимания', hint: 'Можно с колен — главное корпус ровный' },
@@ -19,34 +23,67 @@ export const EXERCISES: Exercise[] = [
   { name: 'Выпады вперёд', hint: 'Поочерёдно каждой ногой' },
   { name: 'Скручивания', hint: 'Поясница прижата к полу' },
   { name: 'Бег на месте', hint: 'Держи ровный темп' },
-  { name: 'Берпи', hint: 'В своём темпе, без рывков' },
-  { name: 'Скалолаз', hint: 'В планке колени к груди попеременно' },
   { name: 'Высокие колени', hint: 'Бег с подъёмом колен до пояса' },
   { name: 'Ягодичный мостик', hint: 'Пауза наверху на 1 секунду' },
-  { name: 'Стул у стены', hint: 'Бёдра параллельны полу, держим' },
-  { name: 'Боковая планка слева', hint: 'Локоть строго под плечом' },
-  { name: 'Боковая планка справа', hint: 'Корпус — одна линия' },
   { name: 'Велосипед', hint: 'Локоть к противоположному колену' },
-  { name: 'Супермен', hint: 'Руки и ноги отрываем одновременно' },
-  { name: 'Подъём ног лёжа', hint: 'Поясница остаётся на полу' },
-  { name: 'Приседания с прыжком', hint: 'Приземляйся мягко, на носки' },
-  { name: 'Обратные выпады', hint: 'Шаг назад, колено почти к полу' },
-  { name: 'Отжимания от стула', hint: 'Локти назад, плечи вниз' },
-  { name: 'Русские скручивания', hint: 'Сидя, поворот корпуса в стороны' },
-  { name: 'Прыжки со скакалкой', hint: 'Можно без скакалки — имитация' },
-  { name: 'Подъём на носки', hint: 'Медленно вверх и вниз' },
-  { name: 'Наклоны к ногам', hint: 'Тянемся к носкам, колени мягкие' },
-  { name: 'Наклоны в стороны', hint: 'Рука скользит по бедру' },
-  { name: 'Кошка-корова', hint: 'Плавный прогиб и округление спины' },
   { name: 'Махи руками', hint: 'Круги вперёд, затем назад' },
   { name: 'Круги тазом', hint: 'Разминаем корпус в обе стороны' },
   { name: 'Захлёст голени', hint: 'Бег на месте, пятки к ягодицам' },
-  { name: 'Растяжка плеч', hint: 'Рука поперёк груди, тянем плечо' },
-].map((e, i) => ({ ...e, img: `/workout/ex-${String(i + 1).padStart(2, '0')}.jpg` }));
+  { name: 'Наклоны к ногам', hint: 'Тянемся к носкам, колени мягкие' },
+];
+
+const CALISTHENICS = [
+  { name: 'Отжимания', hint: 'Локти вдоль тела, корпус — одна линия' },
+  { name: 'Приседания', hint: 'Ниже параллели, пятки от пола не отрывать' },
+  { name: 'Отжимания узким хватом', hint: 'Ладони под грудью, работают трицепсы' },
+  { name: 'Обратные отжимания от стула', hint: 'Локти назад, опускайся до угла 90°' },
+  { name: 'Болгарские выпады', hint: 'Задняя нога на диване, вес на передней' },
+  { name: 'Планка', hint: 'Держи прямую линию от пяток до макушки' },
+  { name: 'Боковая планка слева', hint: 'Локоть под плечом, таз вверх' },
+  { name: 'Боковая планка справа', hint: 'Не проваливай бедро' },
+  { name: 'Приседания с прыжком', hint: 'Взрывной вверх, мягкое приземление' },
+  { name: 'Скалолаз', hint: 'Быстро подтягивай колени к груди' },
+  { name: 'Ягодичный мостик на одной ноге', hint: 'Вторая нога вытянута' },
+  { name: 'Супермен', hint: 'Отрывай руки и ноги, держи 2 секунды' },
+  { name: 'Подъём ног лёжа', hint: 'Медленно вниз, поясница прижата' },
+  { name: 'Стул у стены', hint: 'Бёдра параллельны полу, держим' },
+  { name: 'Отжимания «щучка»', hint: 'Таз вверх, отжимайся под углом — плечи' },
+];
+
+const YOGA = [
+  { name: 'Поза горы', hint: 'Стой ровно, дыши глубоко, плечи вниз' },
+  { name: 'Собака мордой вниз', hint: 'Таз вверх, пятки тянем к полу' },
+  { name: 'Поза ребёнка', hint: 'Колени врозь, лоб на пол, расслабься' },
+  { name: 'Кошка-корова', hint: 'Плавно на вдохе прогиб, на выдохе округление' },
+  { name: 'Поза кобры', hint: 'Грудь вверх, плечи от ушей, таз на полу' },
+  { name: 'Поза воина II', hint: 'Переднее колено над стопой, руки в стороны' },
+  { name: 'Наклон вперёд стоя', hint: 'Колени мягкие, отпусти шею и руки' },
+  { name: 'Поза дерева (слева)', hint: 'Стопа на голени, взгляд в точку' },
+  { name: 'Поза дерева (справа)', hint: 'Держи баланс, дыши ровно' },
+  { name: 'Скручивание сидя', hint: 'Спина прямая, поворот от талии' },
+  { name: 'Поза голубя', hint: 'Раскрытие бедра, дыши в натяжение' },
+  { name: 'Мостик лёжа', hint: 'Таз вверх, лопатки вместе' },
+  { name: 'Поза лодки', hint: 'Баланс на седалищных костях, пресс' },
+  { name: 'Шавасана / дыхание', hint: 'Ляг, расслабься, дыши животом' },
+];
+
+function withImg(list: { name: string; hint: string }[], slug: string): Exercise[] {
+  return list.map((e, i) => ({ ...e, img: `/workout/${slug}-${String(i + 1).padStart(2, '0')}.jpg` }));
+}
+
+export const WORKOUT_TYPES: { id: WorkoutType; label: string; icon: React.ElementType; hint: string; exercises: Exercise[] }[] = [
+  { id: 'charge', label: 'Зарядка', icon: Dumbbell, hint: 'Лёгкая разминка на всё тело', exercises: withImg(CHARGE, 'ex') },
+  { id: 'calisthenics', label: 'Калистеника', icon: Flame, hint: 'Сила с весом тела, без снаряжения', exercises: withImg(CALISTHENICS, 'calisthenics') },
+  { id: 'yoga', label: 'Йога', icon: Flower2, hint: 'Растяжка, баланс и дыхание', exercises: withImg(YOGA, 'yoga') },
+];
+
+/** Для превью виджета — упражнения зарядки (обратная совместимость с /workout/ex-NN.jpg). */
+export const EXERCISES = WORKOUT_TYPES[0].exercises;
 
 const EX_SECONDS = 60;
 const EX_COUNT = 7;
 export const WORKOUT_DONE_KEY = 'workout.last.v1';
+const TYPE_KEY = 'workout.type.v1';
 
 /** Каждый запуск — новая зарядка: тасуем базу и берём 7. */
 function shuffle<T>(arr: readonly T[]): T[] {
@@ -107,6 +144,7 @@ interface Props {
 /** Полноэкранная зарядка: 7 упражнений × 1 минута, кольцо-таймер, картинка в круге. */
 export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const { startTimeEntry, finishTimeEntry } = useStore();
+  const [type, setType] = useState<WorkoutType>(() => (localStorage.getItem(TYPE_KEY) as WorkoutType) || 'charge');
   const [plan, setPlan] = useState<Exercise[]>([]);
   const [idx, setIdx] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(EX_SECONDS);
@@ -115,10 +153,12 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const entryRef = useRef<string | null>(null);
   const elapsedRef = useRef(0);
 
+  const exercisesOf = (t: WorkoutType) => WORKOUT_TYPES.find((x) => x.id === t)!.exercises;
+
   // Новый случайный план на каждое открытие
   useEffect(() => {
     if (open) {
-      setPlan(shuffle(EXERCISES).slice(0, EX_COUNT));
+      setPlan(shuffle(exercisesOf(type)).slice(0, EX_COUNT));
       setIdx(0);
       setSecondsLeft(EX_SECONDS);
       setRunning(false);
@@ -132,6 +172,15 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Смена типа до старта — пересобираем план под новый тип
+  const pickType = (t: WorkoutType) => {
+    setType(t);
+    try { localStorage.setItem(TYPE_KEY, t); } catch {}
+    setPlan(shuffle(exercisesOf(t)).slice(0, EX_COUNT));
+    setIdx(0);
+    setSecondsLeft(EX_SECONDS);
+  };
+
   const finish = () => {
     setRunning(false);
     setFinished(true);
@@ -141,6 +190,10 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
     // который сведёт зарядку в healthLogs('workout') → виджеты и цели
     logWorkout(isoDate(new Date()), elapsedRef.current);
     window.dispatchEvent(new CustomEvent('thedad:workout-done'));
+    // Крупный эмоциональный отклик: конфетти (App) + праздничный оверлей (Celebration)
+    window.dispatchEvent(new CustomEvent('thedad:celebrate', {
+      detail: { title: `${WORKOUT_TYPES.find((w) => w.id === type)!.label} — готово!`, subtitle: 'Минимальная активность на сегодня выполнена 💪', emoji: '🎉' },
+    }));
     beep(880); setTimeout(() => beep(1175), 180); setTimeout(() => beep(1568), 360);
   };
 
@@ -216,7 +269,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
       </button>
 
       <div className={`hidden sm:flex absolute top-5 right-6 items-center gap-2 ${glass} !rounded-full px-4 py-2 text-sm`}>
-        <Dumbbell className="h-4 w-4 text-emerald-300" /> Зарядка · 7 минут
+        {(() => { const T = WORKOUT_TYPES.find((w) => w.id === type)!; return <><T.icon className="h-4 w-4 text-emerald-300" /> {T.label} · 7 минут</>; })()}
       </div>
 
       {finished ? (
@@ -225,8 +278,8 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
           <div className="h-20 w-20 rounded-full bg-emerald-400/15 text-emerald-300 flex items-center justify-center mb-5">
             <Check className="h-10 w-10" />
           </div>
-          <div className="text-3xl font-bold">Зарядка сделана!</div>
-          <p className="text-white/50 mt-2 max-w-xs">7 минут движения — день уже лучше. Завтра будет новый набор упражнений.</p>
+          <div className="text-3xl font-bold">{WORKOUT_TYPES.find((w) => w.id === type)!.label} — готово!</div>
+          <p className="text-white/50 mt-2 max-w-xs">7 минут движения — день уже лучше. Каждый запуск — новый набор упражнений.</p>
           <button onClick={onClose} className={`mt-7 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
             Готово
           </button>
@@ -262,6 +315,24 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
             <div className="text-sm text-white/45 mt-1">{ex?.hint}</div>
           </div>
 
+          {/* Выбор типа тренировки — только до старта */}
+          {!started && (
+            <div className="flex items-center gap-2 mt-5">
+              {WORKOUT_TYPES.map((wt) => (
+                <button
+                  key={wt.id}
+                  onClick={() => pickType(wt.id)}
+                  title={wt.hint}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm transition-all ${
+                    type === wt.id ? 'bg-white/15 text-white ring-1 ring-white/50' : 'text-white/55 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <wt.icon className="h-4 w-4" /> {wt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Прогресс из 7 точек */}
           <div className="flex items-center gap-2 mt-4">
             {plan.map((_, i) => (
@@ -276,7 +347,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
           <div className="flex items-center gap-2 mt-6">
             {!running ? (
               <button onClick={start} className={`flex items-center gap-2 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
-                <Play className="h-4 w-4" fill="white" /> {started ? 'Продолжить' : 'Начать зарядку'}
+                <Play className="h-4 w-4" fill="white" /> {started ? 'Продолжить' : `Начать · ${WORKOUT_TYPES.find((w) => w.id === type)!.label}`}
               </button>
             ) : (
               <button onClick={() => setRunning(false)} className={`flex items-center gap-2 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>

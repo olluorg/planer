@@ -3,7 +3,7 @@ import {
   Sun, Moon, CalendarDays, CalendarClock, ListTodo, Repeat, BarChart3, PieChart,
   Target, NotebookPen, Bell, Sparkles, Crosshair, Trophy, Flag, Mail, Plus,
   Gauge, HeartPulse, Dumbbell, Smile, PenLine, Rocket, Newspaper, CircleDot,
-  Grid3x3, LayoutGrid, Flame, Activity,
+  Grid3x3, LayoutGrid, Flame, Activity, Volume2, Bot,
 } from 'lucide-react';
 
 /** Категории виджетов — фильтр в окне добавления («Все, Спорт, …»). */
@@ -60,7 +60,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 
   // — Спорт и здоровье
   { id: 'health',     label: 'Здоровье',            description: 'Шаги, сон, вода и другие метрики', category: 'health', icon: HeartPulse, w: 4, h: 6, minW: 3, minH: 4 },
-  { id: 'workout',    label: 'Зарядка 7 минут',     description: '7 упражнений × 1 минута, каждый раз новый набор', category: 'health', icon: Dumbbell, w: 4, h: 6, minW: 3, minH: 5 },
+  { id: 'workout',    label: 'Зарядка 7 минут',     description: '7 упражнений × 1 минута, каждый раз новый набор', category: 'health', icon: Dumbbell, w: 4, h: 6, minW: 3, minH: 6 },
   { id: 'calories',   label: 'Калории сегодня',     description: 'Кольцо съеденного, баланс дня, меню по клику', category: 'health', icon: Flame, w: 4, h: 6, minW: 3, minH: 5 },
   { id: 'activity',   label: 'Активность',          description: 'Шаги + зарядка + тренировки = сожжённые ккал', category: 'health', icon: Activity, w: 4, h: 6, minW: 3, minH: 5 },
   { id: 'stats',      label: 'Фитнес-статистика',   description: 'Шаги, калории, тренировки, вода', category: 'health', icon: Dumbbell, w: 4, h: 5, minW: 3, minH: 4 },
@@ -83,4 +83,6 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   { id: 'quick-add',     label: 'Быстрое добавление',  description: 'Кнопки: задача, привычка, помодоро…', category: 'tools', icon: Plus, w: 3, h: 4, minW: 3, minH: 3 },
   { id: 'reminders',     label: 'Напоминания',         description: 'Простой чек-лист напоминаний', category: 'tools', icon: Bell, w: 3, h: 4, minW: 3, minH: 3 },
   { id: 'coach',         label: 'Коуч дня',            description: 'Цитата-настрой на день', category: 'tools', icon: Sparkles, w: 3, h: 4, minW: 3, minH: 3 },
+  { id: 'ai-coach',      label: 'AI-помощник',         description: 'Составляет план из описания, отвечает на вопросы', category: 'tools', icon: Bot, w: 4, h: 12, minW: 4, minH: 10 },
+  { id: 'soundscape',    label: 'Атмосфера (звуки)',   description: 'Дождь, океан, костёр… продолжается и вне фокуса', category: 'tools', icon: Volume2, w: 4, h: 6, minW: 3, minH: 5 },
 ];

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Responsive, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -34,6 +34,7 @@ import {
   Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning, Medal,
 } from 'lucide-react';
 import { getWeather, type Weather } from '@/lib/weather';
+import { WeatherModal } from '@/components/dashboard/WeatherModal';
 import { useStore } from '@/lib/store';
 import { isoDate, fmtNum, colorByPct } from '@/lib/utils';
 import { addDays, format, startOfWeek } from 'date-fns';
@@ -50,7 +51,9 @@ import { xpInWeek, leagueFor, nextLeague, buildHistory } from '@/lib/leagues';
 import { pickLetter, lastShownDate, markShown } from '@/lib/letters';
 import { computeStreak, levelFromXp, xpToday, xpTotal } from '@/lib/gamification';
 import { Mascot } from '@/components/Mascot';
-import { PRESETS } from '@/lib/dashboardPresets';
+import { PRESETS, DEFAULT_LAYOUT, DEFAULT_HIDDEN } from '@/lib/dashboardPresets';
+import { useScreens } from '@/lib/screens';
+import { ScreenTabs } from '@/components/dashboard/ScreenTabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { WIDGET_CATALOG, type WidgetMeta } from '@/lib/widgetCatalog';
 import { getInstalledPlugins, PLUGINS_EVENT, type PluginWidgetDef } from '@/lib/plugins';
@@ -72,7 +75,9 @@ import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
 import { WorkoutWidget } from '@/components/dashboard/WorkoutWidget';
 import { CaloriesWidget } from '@/components/dashboard/CaloriesWidget';
 import { ActivityWidget } from '@/components/dashboard/ActivityWidget';
+import { SoundscapeWidget } from '@/components/dashboard/SoundscapeWidget';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
+import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
 import { Sparkles } from 'lucide-react';
@@ -83,67 +88,6 @@ const BLOCKS = [
   { key: 'evening', label: '16:00 – 20:00', icon: Sun },
   { key: 'night', label: '20:00 – 23:00', icon: Moon },
 ] as const;
-
-// Раскладка по макету: жёсткие min/max держат пропорции карточек
-const DEFAULT_LAYOUT: Layout[] = [
-  // Ряд 1: фокус дня + сводка (правее — фиксированный рейл с AI-коучем)
-  { i: 'today-focus',    x: 0, y: 0,  w: 7, h: 5, minW: 4, minH: 4, maxH: 7 },
-  { i: 'day-brief',      x: 7, y: 0,  w: 5, h: 5, minW: 3, minH: 4, maxH: 7 },
-  // Ряд 2: план · привычки · постоянство
-  { i: 'today-plan',     x: 0, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
-  { i: 'habit-dots',     x: 4, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
-  { i: 'consistency',    x: 8, y: 5,  w: 4, h: 6, minW: 3, minH: 4 },
-  // Ряд 3: графики
-  { i: 'time-alloc',     x: 0, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'week-progress',  x: 4, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'goals-progress', x: 8, y: 11, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
-  // В рейле по умолчанию, но доступны и как виджеты сетки
-  { i: 'upcoming',       x: 0, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
-  { i: 'quick-capture',  x: 4, y: 16, w: 4, h: 5, minW: 3, minH: 4, maxH: 7 },
-  { i: 'health',         x: 8, y: 16, w: 4, h: 6, minW: 3, minH: 4 },
-  { i: 'calendar',       x: 0, y: 22, w: 4, h: 7, minW: 3, minH: 6 },
-  { i: 'workout',        x: 4, y: 22, w: 4, h: 6, minW: 3, minH: 5 },
-  { i: 'calories',       x: 8, y: 22, w: 4, h: 6, minW: 3, minH: 5 },
-  { i: 'activity',       x: 8, y: 28, w: 4, h: 6, minW: 3, minH: 5 },
-  // Дополнительные виджеты (скрыты по умолчанию, включаются в редакторе)
-  { i: 'goals-week',    x: 0,  y: 16, w: 12, h: 6, minW: 6, minH: 5 },
-  { i: 'block-morning', x: 0,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
-  { i: 'block-day',     x: 3,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
-  { i: 'block-evening', x: 6,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
-  { i: 'block-night',   x: 9,  y: 22, w: 3,  h: 7, minW: 2, minH: 5 },
-  { i: 'notes',         x: 0,  y: 29, w: 4,  h: 5, minW: 3, minH: 4 },
-  { i: 'plan-future',   x: 0,  y: 34, w: 12, h: 5, minW: 6, minH: 5, maxH: 6 },
-  { i: 'focus',         x: 0,  y: 39, w: 6,  h: 4, minW: 4, minH: 4 },
-  { i: 'quests',        x: 6,  y: 39, w: 3,  h: 4, minW: 3, minH: 4 },
-  { i: 'weekly-challenge', x: 9, y: 39, w: 3, h: 4, minW: 3, minH: 4 },
-  { i: 'letter',        x: 0,  y: 43, w: 6,  h: 4, minW: 4, minH: 3 },
-  { i: 'quick-add',     x: 6,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
-  { i: 'reflection',    x: 9,  y: 43, w: 3,  h: 4, minW: 3, minH: 3 },
-  { i: 'kpi-grid',      x: 0,  y: 47, w: 6,  h: 4, minW: 4, minH: 4 },
-  { i: 'reminders',     x: 6,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
-  { i: 'coach',         x: 9,  y: 47, w: 3,  h: 4, minW: 3, minH: 3 },
-  { i: 'leagues',       x: 0,  y: 51, w: 12, h: 4, minW: 6, minH: 4 },
-];
-
-// Скрыты по умолчанию — включаются через «Показать скрытые» в редакторе
-const DEFAULT_HIDDEN = [
-  'goals-week', 'block-morning', 'block-day', 'block-evening', 'block-night',
-  'notes', 'plan-future', 'focus', 'quests', 'weekly-challenge', 'letter',
-  'quick-add', 'kpi-grid', 'reminders', 'leagues', 'coach',
-];
-
-// Mobile layout: single-column (4 cols), stacked vertically
-const MOBILE_LAYOUT: Layout[] = [
-  { i: 'today-focus',    x: 0, y: 0,  w: 4, h: 5 },
-  { i: 'day-brief',      x: 0, y: 5,  w: 4, h: 5 },
-  { i: 'health',         x: 0, y: 9, w: 4, h: 6 },
-  { i: 'today-plan',     x: 0, y: 10, w: 4, h: 6 },
-  { i: 'habit-dots',     x: 0, y: 16, w: 4, h: 6 },
-  { i: 'consistency',    x: 0, y: 22, w: 4, h: 6 },
-  { i: 'time-alloc',     x: 0, y: 28, w: 4, h: 5 },
-  { i: 'week-progress',  x: 0, y: 33, w: 4, h: 5 },
-  { i: 'goals-progress', x: 0, y: 38, w: 4, h: 5 },
-];
 
 const ROW_HEIGHT = 48;
 
@@ -185,6 +129,7 @@ const WEATHER_ICON: Record<Weather['kind'], React.ElementType> = {
 
 const WeatherChip: React.FC = () => {
   const [w, setW] = useState<Weather | null>(null);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     let on = true;
     void getWeather().then((x) => { if (on) setW(x); });
@@ -194,10 +139,17 @@ const WeatherChip: React.FC = () => {
   const Icon = w ? WEATHER_ICON[w.kind] : hour >= 6 && hour < 21 ? Sun : Moon;
   const clear = !w || w.kind === 'clear';
   return (
-    <span className="inline-flex items-center gap-1.5 align-middle shrink-0">
-      <Icon className={`h-6 w-6 ${clear ? 'text-warning' : 'text-text-muted'}`} />
-      {w && <span className="text-lg font-medium tabular-nums text-text-muted">{w.temp}°</span>}
-    </span>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 align-middle shrink-0 rounded-lg px-1.5 py-0.5 -mx-1 hover:bg-bg-soft transition-colors"
+        title="Прогноз погоды"
+      >
+        <Icon className={`h-6 w-6 ${clear ? 'text-warning' : 'text-text-muted'}`} />
+        {w && <span className="text-lg font-medium tabular-nums text-text-muted">{w.temp}°</span>}
+      </button>
+      <WeatherModal open={open} onClose={() => setOpen(false)} />
+    </>
   );
 };
 
@@ -209,13 +161,22 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
   const today = isoDate(date);
 
   const [gridRef, gridW] = useContainerWidth();
-  const [layout, setLayout] = useLocalStorage<Layout[]>('dashboard.layout.v8', DEFAULT_LAYOUT);
-  // Новые виджеты из DEFAULT_LAYOUT доезжают в сохранённую раскладку старых пользователей
+  // Раскладка живёт в активном экране (мульти-экраны). Имена layout/setLayout сохранены —
+  // ниже по файлу они используются повсюду.
+  const activeScreen = useScreens((s) => s.screens.find((x) => x.id === s.activeId) ?? s.screens[0]);
+  const updateScreen = useScreens((s) => s.update);
+  const layout = activeScreen.layout;
+  const setLayout = useCallback(
+    (v: Layout[] | ((prev: Layout[]) => Layout[])) =>
+      updateScreen(activeScreen.id, { layout: typeof v === 'function' ? v(activeScreen.layout) : v }),
+    [updateScreen, activeScreen.id, activeScreen.layout],
+  );
+  // Новые виджеты из DEFAULT_LAYOUT доезжают в раскладку экрана (в т.ч. после обновления приложения)
   useEffect(() => {
     const missing = DEFAULT_LAYOUT.filter((d) => !layout.some((l) => l.i === d.i));
     if (missing.length) setLayout([...layout, ...missing]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeScreen.id]);
   const [editing, setEditingRaw] = useState(false);
   const [backup, setBackup] = useState<Layout[] | null>(null);
   const enterEditor = () => { setBackup(JSON.parse(JSON.stringify(layout))); setEditingRaw(true); };
@@ -230,7 +191,12 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     setEditingRaw(false);
   };
   const revertToBackup = () => { if (backup) { setLayout(backup); } };
-  const [hidden, setHidden] = useLocalStorage<string[]>('dashboard.hidden.v6', DEFAULT_HIDDEN);
+  const hidden = activeScreen.hidden;
+  const setHidden = useCallback(
+    (v: string[] | ((prev: string[]) => string[])) =>
+      updateScreen(activeScreen.id, { hidden: typeof v === 'function' ? v(activeScreen.hidden) : v }),
+    [updateScreen, activeScreen.id, activeScreen.hidden],
+  );
   const [notes, setNotes] = useLocalStorage<Record<string, string>>('dashboard.notes', {});
   const [reminders, setReminders] = useLocalStorage<{ id: string; text: string; done: boolean }[]>(
     'dashboard.reminders',
@@ -240,6 +206,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     ],
   );
   const [quickTab, setQuickTab] = useState<'task' | 'habit' | null>(null);
+  const [reminderText, setReminderText] = useState('');
   const [kpiGoals, setKpiGoals] = useLocalStorage<string[]>('dashboard.kpiGoals', []);
 
   const applyPreset = (id: string) => {
@@ -349,9 +316,8 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     addProgress({ goal_id: id, date: today, value: nextValue, note: null });
   };
 
-  const addReminder = () => {
-    const text = window.prompt('Текст напоминания:');
-    if (!text?.trim()) return;
+  const addReminder = (text: string) => {
+    if (!text.trim()) return;
     setReminders((r) => [...r, { id: Math.random().toString(36).slice(2, 10), text: text.trim(), done: false }]);
   };
 
@@ -375,6 +341,19 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       const { minW, minH } = minsFor(l.i);
       return { ...l, minW, minH, w: Math.max(l.w, minW), h: Math.max(l.h, minH) };
     });
+
+  // xs (<640px) — одна колонка. Раскладку СОБИРАЕМ из видимых виджетов, а не держим ручным списком:
+  // виджет, которого нет в раскладке брейкпоинта, react-grid-layout кладёт как 1×1 — из-за этого
+  // все новые виджеты (зарядка, календарь, калории, активность, AI) схлопывались в узкие обрубки.
+  const mobileLayout = useMemo(() => {
+    let y = 0;
+    return visibleLayout.map((l) => {
+      const item = { ...l, x: 0, y, w: 4, minW: 4 };
+      y += l.h;
+      return item;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(visibleLayout.map((l) => [l.i, l.h]))]);
 
   /* === Добавление виджетов: плитка «+» в конце сетки → окно выбора === */
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -433,6 +412,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     'day-brief': () => (
       <Cell editing={editing} onHide={() => hideWidget('day-brief')}>
         <DayBrief date={date} />
+      </Cell>
+    ),
+    'ai-coach': () => (
+      <Cell editing={editing} onHide={() => hideWidget('ai-coach')}>
+        <CoachPanel date={date} />
       </Cell>
     ),
     'coach': () => (
@@ -509,6 +493,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     'activity': () => (
       <Cell editing={editing} onHide={() => hideWidget('activity')}>
         <ActivityWidget />
+      </Cell>
+    ),
+    'soundscape': () => (
+      <Cell editing={editing} onHide={() => hideWidget('soundscape')}>
+        <SoundscapeWidget />
       </Cell>
     ),
 
@@ -1181,12 +1170,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     'reminders': () => (
       <WidgetCard editing={editing} onHide={() => hideWidget('reminders')}>
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between mb-3">
-            <CardTitle className="mb-0">Напоминания</CardTitle>
-            <Button variant="ghost" size="icon" onClick={addReminder} disabled={editing}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
+          <CardTitle className="mb-3">Напоминания</CardTitle>
           <div className="space-y-2 text-sm flex-1 overflow-auto">
             {reminders.length === 0 && <div className="text-xs text-text-dim">Нет напоминаний</div>}
             {reminders.map((r) => (
@@ -1204,6 +1188,24 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                 </button>
               </div>
             ))}
+          </div>
+          {/* Своя форма вместо window.prompt */}
+          <div className="flex gap-2 mt-2 shrink-0">
+            <input
+              value={reminderText}
+              onChange={(e) => setReminderText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { addReminder(reminderText); setReminderText(''); } }}
+              disabled={editing}
+              placeholder="+ Новое напоминание…"
+              className="flex-1 min-w-0 h-9 rounded-lg bg-bg-soft border border-border-soft px-3 text-sm outline-none focus:border-border disabled:opacity-50"
+            />
+            <button
+              onClick={() => { addReminder(reminderText); setReminderText(''); }}
+              disabled={editing || !reminderText.trim()}
+              className="h-9 w-9 rounded-lg bg-accent text-white flex items-center justify-center hover:opacity-90 disabled:opacity-40 shrink-0 transition-opacity"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </WidgetCard>
@@ -1259,6 +1261,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             </div>
           </div>
 
+          {/* Экраны дашборда — у каждого своя раскладка и свой набор виджетов */}
+          <div className="mb-3">
+            <ScreenTabs />
+          </div>
+
           {/* Дашборд на всю ширину — правый рейл убран, всё живёт в виджетах */}
           <div>
             <div ref={gridRef} className="min-w-0 w-full">
@@ -1301,7 +1308,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             cols={{ sm: 12, xs: 4 }}
             layouts={{
               sm: visibleLayout,
-              xs: MOBILE_LAYOUT.filter((l) => !hidden.includes(l.i)),
+              xs: mobileLayout,
             }}
             rowHeight={ROW_HEIGHT}
             margin={[10, 10]}
@@ -1385,12 +1392,12 @@ const WidgetCard: React.FC<{
   children: React.ReactNode;
 }> = ({ title, editing, onHide, onClick, children }) => (
   // bg-bg-card классом (не inline) — чтобы glass-темы навешивали backdrop-blur.
-  // Фон у всех виджетов одинаковый: без акцентных карточек.
+  // Фон у всех виджетов одинаковый: в редактировании тот же фон + пунктирная рамка,
+  // без акцентной заливки (раньше accent-glow красил Напоминания/Рефлексию синим).
   <div
-    className={`relative h-full flex flex-col overflow-hidden rounded-xl transition-all duration-200 ${editing ? '' : 'bg-bg-card'} ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
+    className={`relative h-full flex flex-col overflow-hidden rounded-xl transition-all duration-200 bg-bg-card ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
     style={editing ? {
       border: '1px dashed var(--accent)',
-      background: 'var(--accent-glow)',
       padding: '16px',
     } : {
       border: '1px solid var(--border-soft)',

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { exec, getDB, query } from './db';
-import type { Goal, Habit, HabitLog, HealthLog, HealthMetric, Milestone, ProgressRecord, Reflection, Task, TimeEntry, ChangeLog, XpEntry, Achievement } from './types';
+import type { Goal, Habit, HabitLog, HealthLog, HealthMetric, Milestone, ProgressRecord, Reflection, Task, TaskStage, TimeEntry, ChangeLog, XpEntry, Achievement } from './types';
 import { ACHIEVEMENTS, checkNewAchievements, computeStreak, levelFromXp, xpTotal, XP_REWARDS, type XpSource } from './gamification';
 import { useCombo } from './combo';
 import { playSuccess, playUnlock } from './sound';
@@ -78,6 +78,7 @@ interface State {
   addTask: (t: Partial<Task> & { title: string; date?: string }) => Task;
   updateTask: (id: string, p: Partial<Task>) => void;
   toggleTask: (id: string) => void;
+  moveTaskStage: (id: string, stage: TaskStage) => void;
   removeTask: (id: string) => void;
   // habits
   addHabit: (h: Partial<Habit> & { title: string }) => Habit;
@@ -232,6 +233,7 @@ export const useStore = create<State>((set, get) => ({
       time_block: t.time_block ?? null,
       priority: t.priority ?? 2,
       status: t.status ?? 'active',
+      stage: t.stage ?? (t.status === 'done' ? 'done' : 'todo'),
       tags: t.tags ?? null,
       estimate_min: t.estimate_min ?? null,
       start_time: t.start_time ?? null,
@@ -241,9 +243,10 @@ export const useStore = create<State>((set, get) => ({
       updated_at: now(),
     };
     exec(
-      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, start_time, recurrence, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.tags, task.estimate_min, task.start_time, task.recurrence, task.completed_at, task.created_at, task.updated_at],
+      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, stage, tags, estimate_min, start_time, recurrence, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.stage, task.tags, task.estimate_min, task.start_time, task.recurrence, task.completed_at, task.created_at, task.updated_at],
     );
+    get().logChange('task', task.id, 'created', null, task.title);
     get().reload();
     return task;
   },
@@ -253,8 +256,8 @@ export const useStore = create<State>((set, get) => ({
     if (!cur) return;
     const next = { ...cur, ...p, updated_at: now() };
     exec(
-      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, tags=?, estimate_min=?, start_time=?, recurrence=?, completed_at=?, updated_at=? WHERE id=?`,
-      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.tags, next.estimate_min, next.start_time, next.recurrence, next.completed_at, next.updated_at, id],
+      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, stage=?, tags=?, estimate_min=?, start_time=?, recurrence=?, completed_at=?, updated_at=? WHERE id=?`,
+      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.stage, next.tags, next.estimate_min, next.start_time, next.recurrence, next.completed_at, next.updated_at, id],
     );
     get().reload();
   },
@@ -266,7 +269,10 @@ export const useStore = create<State>((set, get) => ({
     get().updateTask(id, {
       status: isDone ? 'active' : 'done',
       completed_at: isDone ? null : now(),
+      // стадия следует за статусом: выполнено → «Готово», снятие → «To do»
+      stage: isDone ? 'todo' : 'done',
     });
+    get().logChange('task', id, 'status', cur.status, isDone ? 'active' : 'done');
     if (!isDone) {
       useCombo.getState().recordCompletion();
       get().awardXp(cur.parent_id ? 'subtask' : 'task', id);
@@ -288,8 +294,27 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
+  // Перенос задачи между колонками канбан-доски (To do → В работе → Готово).
+  // Пересечение границы «Готово» переиспользует toggleTask (XP, повтор, лог статуса),
+  // движение todo↔doing логируется как смена стадии.
+  moveTaskStage: (id, stage) => {
+    const cur = query<Task>('SELECT * FROM tasks WHERE id = ?', [id])[0];
+    if (!cur || cur.stage === stage) return;
+    const wasDone = cur.status === 'done';
+    const toDone = stage === 'done';
+    if (toDone !== wasDone) {
+      get().toggleTask(id);                              // done ↔ active + награды/лог статуса
+      if (!toDone) get().updateTask(id, { stage });      // возврат из «Готово» — в выбранную колонку
+    } else {
+      get().updateTask(id, { stage });                   // todo ↔ doing (обе активные)
+      get().logChange('task', id, 'stage', cur.stage, stage);
+    }
+  },
+
   removeTask: (id) => {
     const rows = query<any>('SELECT * FROM tasks WHERE id = ? OR parent_id = ?', [id, id]);
+    const self = rows.find((r) => r.id === id);
+    if (self) get().logChange('task', id, 'deleted', self.title, null);
     deleteWithUndo('Задача',
       () => { exec('DELETE FROM tasks WHERE id = ? OR parent_id = ?', [id, id]); get().reload(); },
       () => { rows.forEach((r) => insertRow('tasks', r)); get().reload(); });
@@ -608,8 +633,8 @@ function seed() {
     ['Подготовка ко сну', 'night', 3, 'active'],
   ] as const;
   tasks.forEach(([title, block, prio, status]) => {
-    exec('INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, tags, estimate_min, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [nanoid(10), ids.g1, null, title, null, today, block, prio, status, null, null, status === 'done' ? t : null, t, t]);
+    exec('INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, stage, tags, estimate_min, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [nanoid(10), ids.g1, null, title, null, today, block, prio, status, status === 'done' ? 'done' : 'todo', null, null, status === 'done' ? t : null, t, t]);
   });
 
   // habits
