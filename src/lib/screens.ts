@@ -28,16 +28,30 @@ function readJson<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
+/** Разовая миграция: ai-coach изначально добавлялся в самый низ (y≈55) — переносим в верх
+ *  правой колонки (3-м по счёту: порядок массива = порядок на мобильном). Срабатывает только
+ *  для легаси-позиции (y≥40), поэтому расположение, выбранное пользователем, не трогает. */
+function relocateAiCoach(screens: Screen[]): Screen[] {
+  return screens.map((s) => {
+    const item = s.layout.find((l) => l.i === 'ai-coach');
+    if (!item || item.y < 40) return s;
+    const moved = { ...item, x: 8, y: 5, w: 4, h: 12, minW: 4, minH: 10 };
+    const rest = s.layout.filter((l) => l.i !== 'ai-coach');
+    rest.splice(2, 0, moved);
+    return { ...s, layout: rest };
+  });
+}
+
 /** Первый запуск: собираем экран «Главный» из старых ключей (или из дефолта). */
 function migrate(): Screen[] {
   const saved = readJson<Screen[] | null>(KEY, null);
-  if (saved && Array.isArray(saved) && saved.length) return saved;
-  return [{
+  if (saved && Array.isArray(saved) && saved.length) return relocateAiCoach(saved);
+  return relocateAiCoach([{
     id: nanoid(8),
     name: 'Главный',
     layout: readJson<Layout[]>(LEGACY_LAYOUT, DEFAULT_LAYOUT),
     hidden: readJson<string[]>(LEGACY_HIDDEN, DEFAULT_HIDDEN),
-  }];
+  }]);
 }
 
 function persist(screens: Screen[], activeId: string) {
