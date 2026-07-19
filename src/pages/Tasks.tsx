@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical, Search, Repeat } from 'lucide-react';
+import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical, Search, Repeat, Pencil } from 'lucide-react';
 import { PageContainer } from '@/components/ui/page-container';
+import { PriorityDot } from '@/components/ui/priority-dot';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import type { Task } from '@/lib/types';
@@ -111,6 +112,12 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
     setStartTime('');
   };
 
+  // Инлайн-редактирование названия задачи (двойной клик по строке или карандаш)
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editVal, setEditVal] = useState('');
+  const startEdit = (t: Task) => { setEditId(t.id); setEditVal(t.title); };
+  const commitEdit = () => { if (editId && editVal.trim()) updateTask(editId, { title: editVal.trim() }); setEditId(null); };
+
   const TaskRow: React.FC<{ task: Task; depth: number }> = ({ task, depth }) => {
     const goal = goals.find((g) => g.id === task.goal_id);
     const children = byParent[task.id] ?? [];
@@ -130,11 +137,28 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             <div className="w-3.5 shrink-0" />
           )}
           <Checkbox checked={task.status === 'done'} onCheckedChange={() => toggleTask(task.id)} />
+          {/* Кружок важности — клик открывает палитру (задача редактируется прямо здесь) */}
+          <PriorityDot priority={task.priority} onChange={(p) => updateTask(task.id, { priority: p })} size={11} />
           <div className="flex-1 min-w-0">
-            <div className={`text-sm truncate flex items-center gap-1.5 ${task.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>
-              {task.recurrence && <Repeat className="h-3 w-3 text-accent shrink-0" />}
-              {task.title}
-            </div>
+            {editId === task.id ? (
+              <Input
+                autoFocus
+                value={editVal}
+                onChange={(e) => setEditVal(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditId(null); }}
+                className="h-7 text-sm"
+              />
+            ) : (
+              <div
+                onDoubleClick={() => startEdit(task)}
+                title="Двойной клик — переименовать"
+                className={`text-sm truncate flex items-center gap-1.5 cursor-text ${task.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}
+              >
+                {task.recurrence && <Repeat className="h-3 w-3 text-accent shrink-0" />}
+                {task.title}
+              </div>
+            )}
             {(task.start_time || task.time_block || task.estimate_min) && (
               <div className="text-caption text-text-muted flex items-center gap-2 mt-0.5">
                 {task.start_time ? <span className="tabular-nums">{task.start_time}</span> : task.time_block && <span>{BLOCK_LABELS[task.time_block] ?? task.time_block}</span>}
@@ -148,6 +172,9 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
           </div>
           <div className="text-caption text-text-muted tabular-nums w-16 text-right shrink-0">{dueLabel}</div>
           <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+            <Button variant="ghost" size="icon" title="Переименовать" onClick={() => startEdit(task)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             <Button variant="ghost" size="icon" title="Фокус на задаче" onClick={() => window.dispatchEvent(new CustomEvent('thedad:focus-mode', { detail: { taskId: task.id } }))}>
               <Play className="h-3.5 w-3.5" />
             </Button>

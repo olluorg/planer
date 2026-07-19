@@ -1,0 +1,316 @@
+
+Огромный прогресс по воде — это уже DREDGE-настроение: тёмная глубокая вода, тёплый круг фонаря у лодки, бирюзовый потоп ушёл, белые «снежинки» в кадре пропали. Компас, радар, спидометр, миссия «A New Beginning», регион «Sunlit Shallows / Grayhaven», плеер — всё живёт.
+
+Остался ровно один баг: камера по-прежнему строго сверху, хотя я жёстко форсировал Follow 48° при старте. Это значит, что мои правки не попадают на ту камеру, что реально рендерит — иначе при pitch 48° был бы горизонт и вид из-за кормы, а не отвесный взгляд на палубу. Я уже несколько итераций правлю скрипт вслепую; чтобы не гадать дальше, мне нужен один факт из вашей сцены, который я увидеть не могу.
+
+В режиме Play кликните «Main Camera» в Hierarchy и гляньте в Inspector:
+
+Что показывает Inspector для объекта Main Camera (в Play)?
+
+Камера второстепенная ты опять на фигню тратишь токены, лучше  довести игру до ума, править камеру и тд я и сам могу, с моим опытом в Unreal это фигня
+
+
+Usage limit reached
+Продолжаем
+
+Принято — камеру больше не трогаю, она на вас. Двигаю геймплей: делаю острова причаливаемыми (док → пополнение чая, лог открытия, меню судна — это уже зашито в IslandInteraction) и закрываю петлю чай↔фонарь. Сначала прочту WarmthController, чтобы понять, что уже работает, и не дублировать.
+
+
+Found files, read a file
+WarmthController is fully built and self-bootstraps: warmth decays (~50s to dark), R brews a cup, Refill() on dock tops it up, lantern dims with warmth. Two gaps on the clean scene: (1) the tea reserve has no visible bar (it looks for a legacy TeaBarFill), and (2) docking isn't wired, so the reserve can only drain — never refill. I'll close both: a proximity docking system + a warmth/dock HUD. That completes the tea↔lantern pillar and gives islands their purpose.
+
+Docking logic (no physics — proximity check, avoids the static-collider issue):
+
+Created
+DockingController.cs
++95
+-0
+Now the warmth + dock HUD (tea reserve bar top-left, dock prompt center):
+
+Created
+WarmthHud.cs
++159
+-0
+Now the menu, plus adding it to the "All" bundle:
+
+Edited
+HearthstreamCleanSceneBuilder.cs
++23
+-1
+Готово — петля чай↔фонарь замкнута, острова теперь причаливаются.
+
+Что добавил:
+
+DockingController.cs — без физики: рядом с островом + заглуши двигатель + E → срабатывает уже готовый IslandInteraction (полный термос, лог открытия, +2 рыбы за первое посещение, открытие меню судна, если оно в сцене). Самоподключается.
+WarmthHud.cs — полоска TEA слева сверху (под уловом): тает по мере выгорания фонаря, краснеет на нуле; + подсказка дока по центру («Press E to dock» / «Cut the engine to dock»). Без цифр — как в дизайне.
+Меню HEARTSTREAM → Add HUD (Warmth & Dock, current scene) и в связке Add HUD (All…).
+Полный цикл, который теперь играется (всё уже было в WarmthController, просто не было видно/некуда пополнять):
+
+Фонарь жжёт тепло — за ~50 сек гаснет до тусклого (визуально темнеет круг света на воде).
+R — глоток чая: тепло на максимум, −1 чашка из ~20, полоска TEA падает.
+Чашки кончились → фонарь гаснет, плыви к острову.
+У острова заглуши мотор → «Press E to dock» → E → термос полный, полоска TEA снова заполнена, фонарь яркий.
+Проверить: Add HUD (All, current scene) → Play. Смотри, как TEA тает и фонарь тускнеет; жми R; доплыви до острова и пристань на E.
+
+Один пробел (полировка, не блокер): тосты WarmthController («Термос пуст — найди остров», «Тёплый глоток») идут через старый HUDController, которого на чистой сцене нет — текст не виден, но полоска и фонарь дают обратную связь. Могу следующим шагом сделать самодостаточный тостер.
+
+Дальше по «продолжаем» логично: успокоить погоду (старт в ясную, снег/дождь только вокруг лодки, без сплошного поля белых точек) — это тот «мусор» с прошлых кадров. Либо тостер сообщений. Что берём?
+
+Сделай выжимку по игре и механикам, хочу перенести проект на Unreal там лучше физика воды (механики рыбалки, островов, чай и тд)
+
+Понял — нужна портируемая выжимка по механикам и системам, чтобы пересобрать в Unreal (где лучше физика воды). Соберу её в один документ, привязанный к реальным значениям из кода, + заметки по маппингу на Unreal.
+
+Created
+PORT_SPEC_UNREAL.md
++248
+-0
+Готово. Полная выжимка здесь: PORT_SPEC_UNREAL.md. Документ привязан к реальным значениям из кода (пути к файлам указаны), engine-agnostic по дизайну + колонка маппинга на Unreal.
+
+Запишу в память сам факт пивота на Unreal, чтобы в будущих сессиях не предлагать Unity-системы:
+
+
+Recalled a memory, saved 2 memories
+Готово. Документ-выжимка: PORT_SPEC_UNREAL.md. Что внутри:
+
+Видение и столпы + основной геймплей-луп и раскладка управления (W/A/S/D/F/E/R/C/H).
+Все системы с точными значениями из кода и путями к файлам: лодка (моментум, wave-riding), общее волновое поле, шейдер воды + таблица глобальных параметров _Hs…, стриминг островов (сетка 170, seed 1207, density 0.22), мелководье, докинг (E, range 24), рыбалка (cast 0.7 / wait 2.2–6.5 / reel 1.5, 5 видов рыбы с весами), чай↔фонарь (decay 0.02/с ≈50с, 20 чашек, R, refill в доке), прогресс/сейв, апгрейды, HUD-виджеты, атмосфера (6 mood / 6 аудио-слоёв / 5 снапшотов), погода/биомы, дайректор встреч (20–45с / 180–360с) и монстр («стой на месте»).
+Таблица тюнинга одним блоком — копировать в дефолты UE.
+Маппинг Unity→Unreal: Water plugin + Buoyancy (главная причина порта), MPC вместо глобальных флоатов, DataAssets вместо ScriptableObjects, GameInstance Subsystems вместо синглтонов, USaveGame, UMG, Niagara (эмиттер у лодки, локальный радиус — чинит «снег по всему морю»), Enhanced Input.
+Что нельзя терять: одно общее волновое поле и для buoyancy, и для материала воды; плавные (никогда не резкие) переходы; кадр «крошечная лодка / тёмное море / тёплый фонарь»; глагол «стой на месте» (общий для рыбалки и монстра); полупрозрачный затухающий HUD.
+Также записал в память факт пивота на Unreal — больше не буду предлагать Unity-системы.
+
+Подсказка по порядку в UE: начните с Water plugin + buoyancy лодки (там вы сразу выиграете по физике), затем общий wave-field в MPC, потом рыбалка/чай/докинг как Blueprint-FSM, и в конце острова через PCG. Если на этапе UE захотите — могу писать C++/Blueprint-логику по этому же спеку (камеру и арт держите на себе).
+
+Я похоже нашел ту воду, что мне нужна https://www.fab.com/listings/ddd28113-6f59-4ba3-bf60-ad7b1920a547  https://youtu.be/dXuwb4PpodQ судя по видео она ведет себя именно так как мне нужно, но ассет стоит 6000. У тебя есть возможность воссоздать такой же блюпринт? Там несколько блюпринов под разные состояния воды, с отдельным меню контроля True FFT ocean simulation : Tessendorf/JONSWAP spectrum drives the surface, the same approach used in AAA water. Layered swell, mid waves, and fine chop all move and interact like real water, never as looping noise.
+
+Made for Games and Cinematics. Optimized for games usage, and stable under Sequencer/Movie Render Queue/Graph.
+
+Tiling-Free: EasyWaterscape offers tools to create a tile-free water surface (User adjustable), including real-world phenomenons to naturally break up repeating patterns.
+
+Boundless ocean or bounded lake: Switch between an endless ocean or a smaller contained lake or pond. The water follows the camera, so you can sail or fly indefinitely without running out of surface.
+
+Buoyancy: Includes 3 buoyancy types based on your needs. A Blueprint Component, A Niagara System Blueprint, and a material function. Samples live wave height anywhere on the surface to float boats, debris, or characters convincingly on the real waves.
+
+Built-in CoastMaker tool: One-click coastlines. Adds foam, wave runup, and breaking surf form automatically along the edges of your land. No manual work.
+
+Dynamic foam: Physically-derived foam forms where the water naturally folds (Jacobian-based), builds up and fades in a natural way. Optional crashing foam builds along coastlines.
+
+One-click presets: Includes Calm Lake, Rough Sea, and Stormy Ocean, selectable from a simple dropdown. The preset system is Data Asset–driven, so custom presets can be created too.
+
+Fully exposed controls. All variables are Instance-Editable with tooltips and tunable live in the editor.
+
+100% Blueprint. No C++, no external plugins required. Fully readable and extensible.    в  идеале если получется повторить все его ассеты, тк  у нас еще есть дождь https://www.fab.com/listings/274c81ae-3554-4801-8ec0-04f93212da06, снег https://www.fab.com/listings/4fda5b2e-c44d-4df5-b7e2-afb7f2d6ed35 , атмосфера https://www.fab.com/listings/a7333445-ba38-4a78-9eab-f51c14c9161a , смог и туман https://www.fab.com/listings/0a1c0c21-ff23-4fb7-9dc5-7beb6e16ce64  https://www.fab.com/sellers/William%20Faucher
+
+Честно и по делу.
+
+Про воду: могу ли повторить именно этот блюпринт?
+Буквально 1:1 — нет, и никто в чате не сможет. EasyWaterscape рекламирует настоящую FFT-симуляцию (спектр Tessendorf/JONSWAP → обратное БПФ на GPU каждый кадр). Их «100% Blueprint без C++» — маркетинг: FFT физически не считается в Blueprint-нодах, под капотом почти наверняка Niagara sim-stage или предрасчёт спектра в текстуры. Воспроизвести их код я не могу (да и не нужно — это их IP).
+
+Но воссоздать тот же результат и поведение — да, двумя путями:
+
+Путь A — расширенный Gerstner-океан (рекомендую). ~85% их картинки, 100% их поведения буйности, малой кровью.
+Строим поверх того, что у тебя уже есть (HeartOcean + WaterZone + буйность из памяти):
+
+8–12 волновых полос Gerstner (свелл + средние + чоп) с разными направлениями/крутизной → «tiling-free» вид без повторов (много направлений + доменный варп).
+Foam по Якобиану — ровно их «foam where water folds»: из производных Gerstner считаем складку (det J < порога → маска пены). Это ~30 строк матанода, известная техника.
+Пресеты Calm/Rough/Stormy как UDataAsset с выпадающим списком — как у них, «data-asset driven».
+Одна общая волновая функция в C++ → её сэмплит и материал (через MPC), и буйность. То самое «samples live wave height anywhere», которое у тебя частично уже есть.
+Путь B — настоящий Tessendorf FFT (их уровень, большой труд). Спектр Phillips/JONSWAP → IFFT через compute-шейдеры в render targets (displacement + normal + Jacobian-foam), сэмплится материалом и буйностью. Это реально в твоём C++-модуле Th, но это многосессионная стройка (кастомные global shaders / compute-пассы). В лоу-фай ночной игре разницу с хорошим Gerstner+чоп почти никто не увидит.
+
+Мой совет: делаем A сейчас, к B возвращаемся, только если по картинке реально упрёмся. Технику берём из публичных работ (Tessendorf 2001, Gerstner, JONSWAP, Jacobian foam) — это законно, файлы Faucher не трогаем.
+
+Про дождь/снег/атмосферу/туман
+Это воспроизвести гораздо проще и близко к оригиналу — там нет FFT, только грамотная настройка движка:
+
+Дождь/снег — Niagara-эмиттер, привязанный к камере, локальный радиус (чинит «снег по всему морю»), брызги/рябь декалями, ветровой снос + мокрый/морозный post-process.
+Атмосфера — Sky Atmosphere + Volumetric Clouds + пресеты света/skylight + цветокоррекция, data-asset по времени суток/настроению (ложится прямо на твой AtmosphereMoodController).
+Смог/туман — Exponential Height Fog + volumetric fog + локальные fog volumes.
+Предлагаю начать так
+Первый конкретный артефакт — общая Gerstner-функция (C++, модуль Th) + материал океана + Jacobian-foam + пресеты Calm/Rough/Stormy (DataAsset), поверх твоего HeartOcean. Дальше по одному: береговая пена (аналог CoastMaker), затем дождь/снег/атмосфера/туман.
+
+Скажи «начинаем с A» — и я пишу под твой модуль Th (я вижу из заметок, что проект в Unreal Projects\Th, UE 5.8, классы AHeart*, сборка через Build.bat … -NoXGE). Камеру и финальный арт держишь на себе, как договорились.
+
+Одно уточнение, чтобы не гадать: водный материал у тебя сейчас — сток Water plugin, или ты уже правил HeartOcean-материал? От этого зависит, наращиваю я поверх Single Layer Water или собираю материал океана заново.
+
+
+
+Hearthstream — Mechanics & Systems Spec (for Unreal port)
+Engine-agnostic design + the concrete tuning values from the current Unity build, so the game can be rebuilt in Unreal with the same feel. Numbers below are the real values in the Unity scripts (file paths given). UE-specific mapping notes are in each section and collected at the end.
+
+1. Vision & pillars
+An atmospheric lo-fi ocean exploration + fishing game. A tiny boat on a vast, procedurally generated night sea. The crossbreed target:
+
+DREDGE — stylized low-poly fishing + quiet dread, see-through water, biomes, monster.
+Sid Meier's Pirates — travel/economy loop: sail named regions, dock, upgrade, sell catch.
+Frostpunk — presentation & a survival pressure (here: warmth/tea instead of cold/coal), translucent minimal UI.
+No combat. Relaxation + mystery. Atmosphere first: world before UI, beauty before rewards, mystery before explanation.
+Feel rules (do not lose these):
+
+Large empty space, tiny vessel, warm lantern against dark water.
+All transitions are eased (SmoothStep/Lerp), never snapped — mood, weather, camera, lantern.
+Translucent, sparse HUD that fades when idle. No RPG inventory clutter, no hypercasual reward spam.
+2. Core gameplay loop
+Sail the open sea (momentum boat). Lantern burns warmth; it slowly dims.
+Stop & fish (cut engine) to land fish = soft currency. Moving scares fish.
+Warmth drains → sip tea (limited reserve ~20 cups) to relight the lantern.
+Reserve empties → seek an island; dock to refill the thermos, log a discovery, open the vessel/shop menu.
+Spend fish on upgrades (bigger thermos, brighter lantern, better catch). Visit new regions/biomes.
+Deep water hides a monster: it drags you under if you keep moving — stay still to survive. Death = respawn at dock, current catch reset.
+The tea↔lantern pressure is what makes the empty sea matter and pulls the player toward islands.
+
+3. Controls
+Key	Action
+W / S	Throttle forward / reverse
+A / D	Steer
+F	Cast line / land fish (when stopped)
+E	Dock at a nearby island (when stopped)
+R	Brew/sip tea (restore warmth, −1 cup)
+C	Cycle camera modes
+H	Cycle HUD visibility states
+4. Systems
+4.1 Boat & movement — _Project/Scripts/Boat/BoatController.cs
+Momentum-based, not direct velocity. Drifts; turns slower at speed.
+
+maxForwardSpeed 7.8, maxReverseSpeed 3.6, acceleration 2.6, deceleration 1.8.
+turnSpeed: 42°/s at low speed → 28°/s at high speed; turnResponsiveness 3.4.
+driftFactor 0.88 (velocity lerps toward heading; AutoDriftAssist doubles the correction).
+minimumSteerSpeed 0.26 (can still pivot when nearly stopped).
+NormalizedSpeed (0..1) drives fishing/docking "is the engine cut?" checks and the speed HUD.
+Visual "mood motion": bob (amp 0.055, freq 0.42), pitch (0.65), roll (1.1) applied to a VisualRoot child on top of the authored model rotation (so the boat's facing is never overwritten).
+Wave riding: each frame samples the shared wave field at bow/stern/port/starboard (hullHalfLength 2.4, hullHalfWidth 1.1) → sets hull height + pitch/roll from the water slope, so the boat physically rides the same waves the shader draws. This sync is the heart of the "feel" — keep it.
+
+UE: Pawn + floating-pawn-style movement, or a custom movement component. For the water response, use the Water plugin buoyancy (Buoyancy Component samples the water body) — UE's strength here. Replace the manual bow/stern sampling with multiple pontoon points on the buoyancy component.
+
+4.2 Shared ocean wave field — _HEARTSTREAM/Scripts/Water/OceanWaves.cs
+One analytic wave function used by both the boat physics and the water shader so they never desync.
+
+4 summed sine waves with deep-water dispersion. Amplitude 0.9 (eased toward TargetAmplitude by weather). GetHeight(worldPos, time) returns surface height.
+ShallowWaterTracker eases Amplitude toward the weather's target each frame (waveAmplitudeEase 0.35).
+UE: If using the Water plugin's Gerstner waves, expose the same wave params to both the buoyancy and a Material Parameter Collection so C++/Blueprint gameplay can query wave height. If hand-rolling, keep one shared HLSL/MPC wave function callable from both render and gameplay.
+
+4.3 Water rendering — _HEARTSTREAM/Shaders/Water/S_HeartstreamWater_Prototype.shader
+Stylized, see-through. Key features:
+
+Depth-based color (scene depth) → turquoise shallows to deep navy.
+Refraction via opaque scene color.
+Shoreline/intersection foam and crest foam.
+Vertex displacement from the shared wave field (matches OceanWaves).
+Warm lantern pool painted at the boat position; daylight and warmth globals dim/tint it.
+Island shallows: turquoise + foam ring around each nearby island.
+Global shader params (set by C#):
+
+Param	Meaning	Source
+_HsWaveAmp	current wave amplitude	ShallowWaterTracker
+_HsBoatPos	boat world pos (lantern pool)	ShallowWaterTracker
+_HsLanternWarmth	0..1 lantern fuel × brightness	WarmthController
+_HsDaylight	day/night factor	AtmosphereMoodController
+_HsIslandShallows[8]	xz = center, w = radius (34 m)	ShallowWaterTracker
+_HsIslandShallowCount	active island count (≤8)	ShallowWaterTracker
+UE: Material Parameter Collection for these globals. UE's Single Layer Water + Water plugin gives you depth color, refraction, and proper buoyancy out of the box — this is the main reason to port. Island shallows = either a distance-field/decal approach or feed the same 8 island centers into the MPC.
+
+4.4 Islands (streaming lattice) — _HEARTSTREAM/Scripts/World/IslandField.cs
+Infinite-feeling, seeded, pooled.
+
+Grid cell 170 m, view radius 2 cells (5×5 around the boat), density 0.22, seed 1207, cap 14.
+Cell (0,0) kept clear (open spawn). Per-cell deterministic RNG → occupancy + position jitter + scale (0.7–1.6) + yaw.
+Far cells recycle into a pool. Each island carries IslandInteraction (used by shallows + docking).
+Visual = placeholder rounded mounds (swap for real low-poly island models).
+UE: PCG framework or a custom streaming grid keyed by the player's cell; deterministic per-cell seed (hash of seed,x,y). Pool instances. Each island actor = a "DockableIsland" with a region/discovery id.
+
+4.5 Shallows feed — _HEARTSTREAM/Scripts/Water/ShallowWaterTracker.cs
+Scans nearest 8 islands every 1.5 s, sorted by distance, writes their xz+radius (34 m) into the shader globals; also drives _HsWaveAmp and _HsBoatPos. Keep the 8-slot limit (cheap, "what you see").
+
+4.6 Docking — _HEARTSTREAM/Scripts/World/DockingController.cs + …/World/POI/IslandInteraction.cs
+No physics — pure proximity.
+
+dockRange 24 m, must be slow (NormalizedSpeed ≤ 0.12), press E.
+Docking payoff (IslandInteraction.Interact): log a unique discovery (id from rounded x,z); first visit gives +2 fish and a flavor message; refill the thermos; open the vessel/shop menu.
+UE: Overlap sphere on the boat vs island, or a gameplay-ability interact. Same payoff order.
+
+4.7 Fishing — _HEARTSTREAM/Scripts/Fishing/FishingController.cs
+Calm timing minigame. Cutting the engine is required — quietly teaches the "stay still" instinct the monster later exploits.
+
+State machine: Idle → Casting → Waiting → Bite → Result.
+
+Can cast only when NormalizedSpeed ≤ 0.07. Press F to cast.
+castDuration 0.7 s → wait 2.2–6.5 s (random) for a bite.
+Bite = reel window 1.5 s; press F again inside it to land. HUD shows a shrinking urgency bar.
+Moving during cast/wait cancels ("the wake scared them off").
+Result message holds 2.0 s, then back to Idle.
+Species table (name, fish value, weight): Silverfin 3 / w5 · Moonperch 5 / w3 · Hollow Cod 6 / w2.5 · Dusk Eel 9 / w1.4 · Pale Lantern 14 / w0.6. Weighted random pick → AddFish(value) + RecordCatch(name).
+UE: Same state machine as a simple FSM/Blueprint. Species table = DataTable. Later: bias the table by biome and by proximity to islands ("hotspots").
+
+4.8 Tea ↔ lantern warmth — _HEARTSTREAM/Scripts/Atmosphere/WarmthController.cs
+The survival pressure.
+
+warmth 0..1, decays 0.02/s (~50 s full→dark if you never sip).
+Lantern (boat point light) intensity = lanternMinFactor(0.06) + 0.94*warmth, × upgrade brightness. Also writes _HsLanternWarmth = warmth × brightness to the water shader.
+R brews: −1 cup, warmth→1, sipCooldown 1.2 s. Empty reserve → no relight ("find an island").
+Reserve baseMaxCups 20 (+ thermos upgrades). Docking Refill() → cups full, warmth 1.
+HUD: bar only, no number (design rule).
+UE: Timeline/tick for decay; the lantern is a Point/Spot light whose intensity binds to warmth; warmth → MPC scalar for the water lantern tint.
+
+4.9 Progression & save — _HEARTSTREAM/Scripts/Progression/TemporaryRunState.cs
+fishCount (soft currency), currentDay, activeBoatId, owned items, per-species catch counts, discoveries.
+TotalCaught = lifetime sum (HUD catch tally). AddFish/TrySpendFish/RecordCatch/RecordDiscovery/AdvanceDay/ResetProgress.
+JSON save to disk (dictionaries stored as parallel lists). Autosaves on quit/pause and key events.
+UE: USaveGame object + SaveGameToSlot. Singleton = a GameInstance subsystem.
+
+4.10 Upgrades / economy — _HEARTSTREAM/Scripts/Progression/WorldUpgrades.cs + UI shop
+Upgrades read by other systems: BonusCups (thermos), LanternBrightness, fish-density multiplier, etc.
+Bought with fishCount via the dock shop (ShopController / DockVesselController).
+4.11 HUD (self-contained widgets, built from code) — _HEARTSTREAM/Scripts/UI/
+All translucent, theme in UITheme.cs (panel #0A0E14@.5, accent warm gold #D9B36C).
+
+CompassBar — scrolling cardinal strip (N/E/S/W + ticks) past a fixed pointer, north-up. Top-center.
+MinimapRadar — north-up disc, boat heading-arrow at center, island dots by world offset (range 360 m). Top-right.
+SpeedGauge — segment pips from NormalizedSpeed. Bottom-center.
+FishingHud — catch tally (top-left) + center prompt + reel urgency bar.
+WarmthHud — TEA reserve bar (top-left) + dock prompt (center).
+(Legacy/full-UI also exists: music player, mood mixer, pause, settings, shop, dock, logbook, main menu.)
+UE: UMG widgets. Compass + radar are trivial in UMG (rotate/translate child widgets by heading/offset).
+
+4.12 Atmosphere — mood + audio
+AtmosphereMoodController — 6 mood presets; lerps fog, directional light, water tint, _HsDaylight.
+AtmosphereAudioController — 6 layered sources (music, ocean, wind, rain, underwater, lantern), 5 snapshots blended by weather/time. All cross-faded, never cut.
+UE: Post Process Volume + a lighting/“sky” blend driven by a mood curve; MetaSounds or a layered audio component with parameter-driven mixing.
+
+4.13 Weather & biomes
+WeatherEffectsController — rain/snow particles; storm ≠ rain (denser, faster, wind-skewed, darker). Known issue to fix in port: particles should spawn only in a radius around the boat, not as a full-sea field.
+Biomes: paradise / open / storm / arctic — each its own weather, fish set, light, sea state.
+BiomeState, IceFloeField (drifting ice in arctic; collision at speed ends the voyage).
+Chunk/region types: EmptyOcean, SafeShallows, MidDepth, DeepWater, IslandCluster (distance-based depth zones).
+RegionController — named locations (e.g. "Sunlit Shallows / Grayhaven"), minimap labels, weather warnings.
+UE: Niagara for weather (emitter follows the pawn). Biome = data asset selected by region; drives weather, fish table, lighting preset, wave amplitude.
+
+4.14 Encounters & monster
+OceanEncounterDirector — rhythm spawner: minor life every 20–45 s, mystery every 180–360 s.
+Deep-water monster (MonsterController): in deep zones, continuing to move triggers it to drag you under. Stay still / cut engine to survive. Death = respawn at dock, catch reset to 0.
+FishSchoolController — boid-like ambient fish, 3 presets (Circular, Traveling, Sparse).
+UE: Director = a timer-driven subsystem. Monster = behavior triggered by sustained speed in a deep biome; ties back to the same "be still" verb as fishing.
+
+5. Data → Unreal DataAssets
+Everything content-shaped is a Unity ScriptableObject under _HEARTSTREAM/ScriptableObjects/: boats, weather, fish, tea, music tracks, regions, time-of-day. Port these as UDataAsset / DataTables so designers add content without code, exactly as today.
+
+6. Tuning quick-reference (copy into UE defaults)
+Boat:    fwd 7.8  rev 3.6  accel 2.6  decel 1.8  turn 42→28  drift 0.88
+Waves:   amplitude 0.9 (eased by weather)   shared field used by physics + shader
+Islands: grid 170  view 5x5  density 0.22  seed 1207  cap 14  shallowRadius 34
+Dock:    range 24  stillSpeed ≤0.12  (E)
+Fishing: cast 0.7  wait 2.2–6.5  reel 1.5  result 2.0  stillSpeed ≤0.07  (F)
+Tea:     decay 0.02/s (~50s)  cups 20  sipCooldown 1.2  lanternMin 0.06  (R)  refill on dock
+Encounter: minor 20–45s  mystery 180–360s
+7. Unreal mapping summary
+Unity	Unreal
+URP stylized water shader + manual wave sampling	Water plugin (Single Layer Water + Buoyancy Component) — the reason to port
+Global shader floats (_Hs…)	Material Parameter Collection
+ScriptableObjects	DataAssets / DataTables
+Self-bootstrapping singletons	GameInstance Subsystems
+TemporaryRunState JSON	USaveGame
+uGUI HUD widgets (code-built)	UMG widgets
+Particle weather	Niagara (emitter attached to pawn, local radius)
+Input System (W/A/S/D/F/E/R/C/H)	Enhanced Input
+Keep above all: one shared wave field feeding both buoyancy and water material; the eased (never snapped) transitions; the tiny-boat / huge-dark-sea / warm-lantern framing; the "stay still" verb shared by fishing and the monster; translucent fading HUD.
+
+
+

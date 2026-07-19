@@ -50,6 +50,7 @@ interface YtState {
   frame: HTMLIFrameElement | null;
 
   setFrame: (el: HTMLIFrameElement | null) => void;
+  register: () => void;
   play: (id: string) => void;
   togglePlay: () => void;
   next: () => void;
@@ -59,6 +60,9 @@ interface YtState {
   addByUrl: (url: string) => boolean;
   remove: (id: string) => void;
   toggleVideo: () => void;
+  /** Текущий ролик не встроился (owner запретил / приватный) — пропустить на следующий доступный.
+   *  Возвращает id, на который переключились, или null, если доступных больше нет. */
+  skipUnplayable: (failed: Set<string>) => string | null;
   activeItem: () => YtItem | null;
 }
 
@@ -84,6 +88,12 @@ export const useYtPlayer = create<YtState>((set, get) => {
     frame: null,
 
     setFrame: (el) => set({ frame: el }),
+
+    // Рукопожатие с iframe (enablejsapi): без него YouTube не шлёт события, в т.ч. onError.
+    // Вызывать после onLoad — тогда мы узнаём про запрет встраивания (коды 101/150/153).
+    register: () => {
+      get().frame?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'thedad-yt', channel: 'widget' }), '*');
+    },
 
     // Смена трека: src iframe пересобирается по activeId — элемент остаётся смонтированным.
     // Повторный выбор того же трека src не меняет, поэтому будим плеер командой.
@@ -124,6 +134,19 @@ export const useYtPlayer = create<YtState>((set, get) => {
       set({ list });
       try { localStorage.setItem(YT_KEY, JSON.stringify(list)); } catch {}
       if (get().activeId === id) get().stop();
+    },
+
+    skipUnplayable: (failed) => {
+      const { list, activeId } = get();
+      if (activeId) failed.add(activeId);
+      // ищем следующий после текущего, не входящий в список сломанных
+      const start = activeId ? list.findIndex((x) => x.id === activeId) : -1;
+      for (let i = 1; i <= list.length; i++) {
+        const cand = list[(start + i + list.length) % list.length];
+        if (cand && !failed.has(cand.id)) { get().play(cand.id); return cand.id; }
+      }
+      get().stop(); // доступных не осталось
+      return null;
     },
 
     toggleVideo: () => set({ showVideo: !get().showVideo }),
