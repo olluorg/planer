@@ -10,6 +10,7 @@ import { isoDate } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { generatePlan, type GeneratedPlan } from '@/lib/aiGenerate';
 import { resolveProvider, type ProviderKind } from '@/lib/aiProvider';
+import { PRIORITY_LABEL as PRIO_LABEL } from '@/components/ui/priority-dot';
 
 const EXAMPLES = [
   'Хочу пробежать полумарафон через 3 месяца',
@@ -19,7 +20,6 @@ const EXAMPLES = [
 ];
 
 const TYPE_LABEL: Record<string, string> = { long: 'Долгосрочная', mid: 'Среднесрочная', short: 'Короткая' };
-const PRIO_LABEL: Record<number, string> = { 1: 'Высокий', 2: 'Средний', 3: 'Низкий' };
 const dayLabel = (d: number) => (d === 0 ? 'сегодня' : d === 1 ? 'завтра' : `через ${d} дн.`);
 
 /** AI-генерация плана: описание на естественном языке → цель + задачи + привычки.

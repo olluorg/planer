@@ -5,7 +5,7 @@ import type { GoalType, Recurrence } from './types';
 
 export interface GenTask {
   title: string;
-  priority: 1 | 2 | 3;
+  priority: number;                // 1 срочно … 5 фоновая (по умолчанию 3)
   day_offset: number;              // 0 = сегодня, 1 = завтра …
   recurrence: Recurrence;
 }
@@ -24,10 +24,10 @@ const SYSTEM = `Ты — планировщик в приложении THEDAD. 
 Отвечай ТОЛЬКО валидным JSON без markdown-обёртки и пояснений, строго по схеме:
 {
   "goal": { "title": string, "type": "long"|"mid"|"short", "metric": string|null, "target_value": number|null, "unit": string|null, "deadline_days": number|null } | null,
-  "tasks": [ { "title": string, "priority": 1|2|3, "day_offset": number, "recurrence": "daily"|"weekdays"|"weekends"|"weekly"|null } ],
+  "tasks": [ { "title": string, "priority": 1|2|3|4|5, "day_offset": number, "recurrence": "daily"|"weekdays"|"weekends"|"weekly"|null } ],
   "habits": [ { "title": string, "schedule": "daily"|"weekly", "target_per_week": number } ]
 }
-Правила: всё по-русски. 3–7 задач, конкретных и небольших. priority: 1 высокий, 3 низкий. day_offset — через сколько дней от сегодня делать (0..30). type: long — годовые, mid — на месяцы, short — на недели. Если цель не подразумевается — goal=null. habits добавляй только если это уместно (регулярные действия). Никакого текста вне JSON.`;
+Правила: всё по-русски. 3–7 задач, конкретных и небольших. priority: 1 срочно, 2 высокий, 3 обычный, 4 низкий, 5 фоновая (по умолчанию 3). day_offset — через сколько дней от сегодня делать (0..30). type: long — годовые, mid — на месяцы, short — на недели. Если цель не подразумевается — goal=null. habits добавляй только если это уместно (регулярные действия). Никакого текста вне JSON.`;
 
 /** Достаёт JSON из ответа модели (срезает markdown-заборы и лишний текст вокруг). */
 function extractJson(raw: string): any {
@@ -41,7 +41,7 @@ function extractJson(raw: string): any {
 }
 
 const RECS = new Set(['daily', 'weekdays', 'weekends', 'weekly']);
-const clampPrio = (n: any): 1 | 2 | 3 => (n === 1 || n === 3 ? n : 2);
+const clampPrio = (n: any): number => (Number.isInteger(n) && n >= 1 && n <= 5 ? n : 3);
 
 /** Нормализуем «сырой» JSON модели в надёжную структуру (модель может врать по типам). */
 function normalize(data: any): GeneratedPlan {

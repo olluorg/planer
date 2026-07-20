@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import { Check, Plus } from 'lucide-react';
+import { priorityColor } from '@/components/ui/priority-dot';
 
 const BLOCK_DOT: Record<string, string> = {
   morning: '#facc15', day: '#60a5fa', evening: '#fb923c', night: '#a78bfa',
@@ -32,12 +34,19 @@ export const TodayPlanList: React.FC<{ date: Date }> = ({ date }) => {
         <span className="text-xs text-text-muted tabular-nums">{done}/{list.length}</span>
       </div>
 
-      <div className="flex-1 space-y-0.5 -mx-2 overflow-y-auto max-h-[420px]">
+      {/* layout-анимация: выполненная задача плавно съезжает вниз, а не телепортируется */}
+      <div className="flex-1 flex flex-col -mx-2 overflow-y-auto max-h-[420px]">
         {list.length === 0 && <div className="text-xs text-text-muted px-2 py-4">Нет задач на сегодня</div>}
+        <AnimatePresence initial={false}>
         {list.map((t) => (
-          <label
+          <motion.label
             key={t.id}
-            className="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer hover:bg-bg-soft transition-colors"
+            layout
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer hover:bg-bg-soft"
           >
             <button
               onClick={() => toggleTask(t.id)}
@@ -47,16 +56,15 @@ export const TodayPlanList: React.FC<{ date: Date }> = ({ date }) => {
             >
               {t.status === 'done' && <Check className="h-3 w-3" strokeWidth={3} />}
             </button>
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: priorityColor(t.priority) }} title="Важность" />
             <span className={`flex-1 text-sm truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>
               {t.title}
             </span>
-            {t.priority === 1 && t.status !== 'done' && (
-              <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-danger/10 text-danger shrink-0">важно</span>
-            )}
             {t.time_block && <span className="h-2 w-2 rounded-full shrink-0" style={{ background: BLOCK_DOT[t.time_block] }} title={t.time_block} />}
             {t.start_time && <span className="text-xs text-text-muted tabular-nums shrink-0 w-10 text-right">{t.start_time}</span>}
-          </label>
+          </motion.label>
         ))}
+        </AnimatePresence>
       </div>
 
       <button

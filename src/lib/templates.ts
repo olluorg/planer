@@ -29,7 +29,7 @@ export interface GoalTpl {
 export interface TemplatePack {
   id: string;
   emoji: string;
-  category: 'routine' | 'fitness' | 'work' | 'study' | 'finance' | 'mindfulness';
+  category: 'persona' | 'routine' | 'fitness' | 'work' | 'study' | 'finance' | 'mindfulness';
   title: string;
   description: string;
   goals?: GoalTpl[];
@@ -38,6 +38,122 @@ export interface TemplatePack {
 }
 
 export const TEMPLATES: TemplatePack[] = [
+  // ─── Под разные группы людей (готовый набор целей + привычек + задач на день) ───
+  {
+    id: 'persona_student',
+    emoji: '🎓',
+    category: 'persona',
+    title: 'Студент',
+    description: 'Учёба, дедлайны и жизнь в балансе — готовый день студента',
+    goals: [
+      { title: 'Закрыть сессию без хвостов', type: 'mid', start_value: 0, target_value: 100, unit: '%', deadline_in_days: 60 },
+    ],
+    habits: [
+      { title: 'Учёба 2 часа', color: '#3b82f6', target_per_week: 6 },
+      { title: 'Повторение по карточкам', color: '#8b5cf6' },
+      { title: 'Лечь до 00:00', color: '#6366f1' },
+    ],
+    tasks: [
+      { title: 'Пары / лекции', time_block: 'morning', start_time: '09:00', priority: 1 },
+      { title: 'Самостоятельная подготовка', time_block: 'day', start_time: '15:00', priority: 1, estimate_min: 90 },
+      { title: 'Разобрать заметки за день', time_block: 'evening', start_time: '19:00', priority: 2, estimate_min: 30 },
+    ],
+  },
+  {
+    id: 'persona_parent',
+    emoji: '👨‍👩‍👧',
+    category: 'persona',
+    title: 'Родитель',
+    description: 'Дом, дети и время на себя — чтобы день не проглотил всё',
+    habits: [
+      { title: 'Время с детьми без телефона', color: '#22c55e' },
+      { title: '15 минут только на себя', color: '#ec4899' },
+      { title: 'Порядок вечером', color: '#f59e0b' },
+    ],
+    tasks: [
+      { title: 'Собрать детей / завтрак', time_block: 'morning', start_time: '07:00', priority: 1, estimate_min: 40 },
+      { title: 'Дела по дому', time_block: 'day', start_time: '13:00', priority: 2, estimate_min: 45 },
+      { title: 'Игры / уроки с ребёнком', time_block: 'evening', start_time: '18:00', priority: 1, estimate_min: 60 },
+      { title: 'Планирование завтра', time_block: 'night', start_time: '21:30', priority: 2, estimate_min: 10 },
+    ],
+  },
+  {
+    id: 'persona_entrepreneur',
+    emoji: '💼',
+    category: 'persona',
+    title: 'Предприниматель',
+    description: 'Стратегия, продажи и не выгореть — фокус на главном',
+    goals: [
+      { title: 'Выручка за квартал', type: 'mid', start_value: 0, target_value: 1000000, unit: '₽', deadline_in_days: 90 },
+    ],
+    habits: [
+      { title: 'Час на стратегию', color: '#6366f1' },
+      { title: 'Контакт с клиентом', color: '#22c55e' },
+      { title: 'Спорт для энергии', color: '#ef4444', target_per_week: 4 },
+    ],
+    tasks: [
+      { title: 'Главная задача бизнеса', time_block: 'morning', start_time: '09:00', priority: 1, estimate_min: 90 },
+      { title: 'Продажи / переговоры', time_block: 'day', start_time: '13:00', priority: 1, estimate_min: 60 },
+      { title: 'Разбор метрик и планов', time_block: 'evening', start_time: '18:00', priority: 2, estimate_min: 30 },
+    ],
+  },
+  {
+    id: 'persona_developer',
+    emoji: '💻',
+    category: 'persona',
+    title: 'Разработчик',
+    description: 'Глубокий код, рост и здоровье спины — день инженера',
+    goals: [
+      { title: 'Освоить новую технологию', type: 'mid', start_value: 0, target_value: 100, unit: '%', deadline_in_days: 45 },
+    ],
+    habits: [
+      { title: 'Читать код / статьи', color: '#3b82f6' },
+      { title: 'Разминка каждый час', color: '#22c55e' },
+      { title: 'Коммит в пет-проект', color: '#8b5cf6', target_per_week: 5 },
+    ],
+    tasks: [
+      { title: 'Deep work · главная задача', time_block: 'morning', start_time: '10:00', priority: 1, estimate_min: 90 },
+      { title: 'Код-ревью и созвоны', time_block: 'day', start_time: '14:00', priority: 2, estimate_min: 60 },
+      { title: 'Обучение / пет-проект', time_block: 'evening', start_time: '19:00', priority: 2, estimate_min: 60 },
+    ],
+  },
+  {
+    id: 'persona_freelancer',
+    emoji: '🧑‍🎨',
+    category: 'persona',
+    title: 'Фрилансер',
+    description: 'Клиенты, поток задач и стабильный доход без хаоса',
+    goals: [
+      { title: 'Стабильный доход в месяц', type: 'mid', start_value: 0, target_value: 200000, unit: '₽', deadline_in_days: 60 },
+    ],
+    habits: [
+      { title: 'Поиск / общение с клиентами', color: '#22c55e' },
+      { title: 'Учёт часов и денег', color: '#f59e0b' },
+      { title: 'Развитие навыка', color: '#8b5cf6' },
+    ],
+    tasks: [
+      { title: 'Работа над заказом', time_block: 'morning', start_time: '10:00', priority: 1, estimate_min: 120 },
+      { title: 'Ответить клиентам', time_block: 'day', start_time: '14:00', priority: 2, estimate_min: 30 },
+      { title: 'Выставить счёт / записать доход', time_block: 'evening', start_time: '18:00', priority: 2, estimate_min: 15 },
+    ],
+  },
+  {
+    id: 'persona_pupil',
+    emoji: '🎒',
+    category: 'persona',
+    title: 'Школьник',
+    description: 'Уроки, кружки и отдых — понятный день для учёбы',
+    habits: [
+      { title: 'Сделать домашку сам', color: '#3b82f6' },
+      { title: 'Читать 20 минут', color: '#22c55e' },
+      { title: 'Лечь спать вовремя', color: '#6366f1' },
+    ],
+    tasks: [
+      { title: 'Школа / уроки', time_block: 'morning', start_time: '08:00', priority: 1 },
+      { title: 'Домашнее задание', time_block: 'day', start_time: '15:00', priority: 1, estimate_min: 60 },
+      { title: 'Кружок / спорт', time_block: 'evening', start_time: '17:30', priority: 2, estimate_min: 60 },
+    ],
+  },
   {
     id: 'morning_routine',
     emoji: '🌅',
@@ -310,6 +426,7 @@ export const TEMPLATES: TemplatePack[] = [
 ];
 
 export const CATEGORY_LABEL: Record<TemplatePack['category'], string> = {
+  persona: 'Для тебя',
   routine: 'Рутина',
   fitness: 'Здоровье',
   work: 'Работа',

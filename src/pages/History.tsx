@@ -42,7 +42,7 @@ export const HistoryPage = () => {
   const TONE_CLASS = { accent: 'text-accent', good: 'text-success', muted: 'text-text-muted', danger: 'text-danger' } as const;
 
   return (
-    <div className="p-4 space-y-4 max-w-3xl">
+    <div className="p-4 sm:p-6 space-y-4 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-h1">История изменений</h1>
         <Select value={entityFilter} onValueChange={setEntityFilter}>

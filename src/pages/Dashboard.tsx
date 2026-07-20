@@ -205,7 +205,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       { id: 'r2', text: 'Медитация в 21:30', done: false },
     ],
   );
-  const [quickTab, setQuickTab] = useState<'task' | 'habit' | null>(null);
+  const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
   const [reminderText, setReminderText] = useState('');
   const [kpiGoals, setKpiGoals] = useLocalStorage<string[]>('dashboard.kpiGoals', []);
 
@@ -1088,22 +1088,19 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       <WidgetCard title="Быстрое добавление" editing={editing} onHide={() => hideWidget('quick-add')}>
         <div className="grid grid-cols-5 gap-2">
           {([
-            { l: 'Задача',     i: CheckSquare, t: 'task' as const },
-            { l: 'Привычка',   i: Repeat,      t: 'habit' as const },
-            { l: 'Тренировка', i: Dumbbell,    t: null },
-            { l: 'Заметка',    i: NotebookPen, t: null },
-            { l: 'Помодоро',   i: Timer,       t: null },
-          ] as { l: string; i: React.ElementType; t: 'task' | 'habit' | null }[]).map((q) => (
+            { l: 'Задача',     i: CheckSquare, act: () => setQuickTab('task') },
+            { l: 'Привычка',   i: Repeat,      act: () => setQuickTab('habit') },
+            { l: 'Цель',       i: Target,      act: () => setQuickTab('goal') },
+            { l: 'Показатель', i: NotebookPen, act: () => setQuickTab('progress') },
+            { l: 'Фокус',      i: Timer,       act: () => window.dispatchEvent(new CustomEvent('thedad:focus-mode')) },
+          ] as { l: string; i: React.ElementType; act: () => void }[]).map((q) => (
             <button
               key={q.l}
-              onClick={() => {
-                if (q.t) setQuickTab(q.t);
-                else { document.querySelector<HTMLTextAreaElement>('textarea')?.focus(); }
-              }}
+              onClick={q.act}
               disabled={editing}
-              className="flex flex-col items-center gap-1.5 text-text-muted hover:text-text disabled:opacity-50"
+              className="flex flex-col items-center gap-1.5 text-text-muted hover:text-accent disabled:opacity-50 group/qa"
             >
-              <div className="h-10 w-10 border border-border flex items-center justify-center">
+              <div className="h-10 w-10 rounded-xl border border-border-soft bg-bg-soft/40 group-hover/qa:border-accent/40 group-hover/qa:bg-accent/5 flex items-center justify-center transition-colors">
                 <q.i className="h-4 w-4" />
               </div>
               <span className="text-[10px]">{q.l}</span>

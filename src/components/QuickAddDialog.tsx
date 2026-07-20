@@ -53,7 +53,6 @@ export const QuickAddDialog: React.FC<Props> = ({ open, onOpenChange, date, init
         date: isoDate(date),
         time_block: inferredBlock,
         start_time: startTime || null,
-        priority: 2,
       });
     } else if (tab === 'habit' && title.trim()) {
       addHabit({ title: title.trim(), goal_id: goalId ?? null, schedule: 'daily' });

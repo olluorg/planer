@@ -9,12 +9,14 @@ import { notify } from '@/lib/notifications';
 import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
   CheckCircle2, Flame, Image as ImageIcon,
-  Lock, BellOff, Maximize, BarChart3, Upload, Coffee, Clapperboard, Sliders,
+  Lock, BellOff, Maximize, BarChart3, Upload, Coffee, Clapperboard, Sliders, Search,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { YouTubeBg } from '@/components/LiveWallpaper';
 import { useSoundscape, LAYERS, MIX_PRESETS } from '@/lib/soundscape';
 import { useYtPlayer, ytThumb } from '@/lib/ytPlayer';
 import { PriorityDot } from '@/components/ui/priority-dot';
+import { loadFocusSession, saveFocusSession, type FocusSession } from '@/lib/focusSession';
 
 // Помидоро-циклы: работа + отдых (мин). Когда цикл завершается — переходим к новой задаче.
 const CYCLES = [
@@ -83,11 +85,13 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   const tickRef = useRef<number | null>(null);
   const entryRef = useRef<string | null>(null);
   const elapsedRef = useRef(0);
+  // Момент конца текущей фазы (мс). Таймер считается от него — переживает перезагрузку/новую вкладку.
+  const endsAtRef = useRef<number | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tasksExpanded, setTasksExpanded] = useState(true); // задачи дня видны по умолчанию
   const [newTask, setNewTask] = useState('');
-  const [newPriority, setNewPriority] = useState(2);
+  const [newPriority, setNewPriority] = useState(3);
   // Инлайн-редактирование названия задачи
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -181,13 +185,34 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     return s;
   }, [timeEntries]);
 
+  // Восстановление сессии при открытии: продолжаем таймер с того же места (перезагрузка/новая вкладка)
   useEffect(() => {
     if (open) {
-      setPhase('work');
-      setSecondsLeft(work * 60);
-      setRunning(false);
+      const s = loadFocusSession();
       elapsedRef.current = 0;
-      if (initialTaskId) setSelectedId(initialTaskId); // фокус на конкретной задаче (из списка задач)
+      if (s) {
+        setPomodoro(s.pomodoro); setCycleIdx(s.cycleIdx); setTimerIdx(s.timerIdx); setPhase(s.phase);
+        if (initialTaskId) setSelectedId(initialTaskId); else setSelectedId(s.selectedId);
+        const phaseSecs = (s.pomodoro
+          ? (s.phase === 'work' ? CYCLES[s.cycleIdx].work : CYCLES[s.cycleIdx].rest)
+          : TIMERS[s.timerIdx]) * 60;
+        if (s.running && s.endsAt && s.endsAt > Date.now()) {
+          endsAtRef.current = s.endsAt;
+          setSecondsLeft(Math.ceil((s.endsAt - Date.now()) / 1000));
+          setRunning(true);
+          setZen(true);
+        } else {
+          endsAtRef.current = null;
+          setSecondsLeft(s.running ? 0 : (s.secondsLeft || phaseSecs)); // running+истёк = фаза закончилась
+          setRunning(false);
+        }
+      } else {
+        setPhase('work');
+        setSecondsLeft(work * 60);
+        setRunning(false);
+        endsAtRef.current = null;
+        if (initialTaskId) setSelectedId(initialTaskId);
+      }
     } else {
       stop();
       // Музыку НЕ трогаем: плеер глобальный и продолжает играть вне фокуса
@@ -196,18 +221,30 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Тик считает остаток от endsAt (а не декрементом) — устойчив к перезагрузке и заморозке вкладки
   useEffect(() => {
     if (!running) return;
     tickRef.current = window.setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) { onPhaseEnd(); return 0; }
-        elapsedRef.current += 1;
-        return s - 1;
-      });
+      const left = endsAtRef.current ? Math.ceil((endsAtRef.current - Date.now()) / 1000) : 0;
+      if (left <= 0) { onPhaseEnd(); setSecondsLeft(0); return; }
+      elapsedRef.current += 1;
+      setSecondsLeft(left);
     }, 1000);
     return () => { if (tickRef.current) window.clearInterval(tickRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, phase, cycleIdx, timerIdx, pomodoro]);
+
+  // Сохраняем сессию при изменении running/фазы/конфига (не на каждый тик — endsAt стабилен)
+  useEffect(() => {
+    if (!open) return;
+    const s: FocusSession = {
+      running, phase, pomodoro, cycleIdx, timerIdx, selectedId,
+      endsAt: running ? endsAtRef.current : null,
+      secondsLeft,
+    };
+    saveFocusSession(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, running, phase, pomodoro, cycleIdx, timerIdx, selectedId]);
 
   useEffect(() => {
     setGlobal({ running, phase, secondsLeft, taskTitle: currentTask?.title ?? 'Focus' });
@@ -229,14 +266,19 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
       entryRef.current = e.id;
       elapsedRef.current = 0;
     }
+    // фиксируем момент конца фазы — от него считается таймер и восстановление после перезагрузки
+    endsAtRef.current = Date.now() + secondsLeft * 1000;
     setRunning(true);
     setZen(true);
     setPanel(null);
   };
-  const pause = () => { setRunning(false); setZen(false); };
+  const pause = () => { setRunning(false); setZen(false); endsAtRef.current = null; };
+  // stop() лишь финализирует таймер/запись — НЕ трогает персист (иначе монтирование с open=false
+  // при загрузке стёрло бы сохранённую сессию до того, как её прочитает авто-возобновление).
   const stop = () => {
     setRunning(false);
     setZen(false);
+    endsAtRef.current = null;
     if (entryRef.current) {
       finishTimeEntry(entryRef.current, elapsedRef.current);
       entryRef.current = null;
@@ -252,17 +294,21 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
         if (!blockNotifs) void notify('Focus Mode', { body: `Сессия ${work} мин завершена` });
         setRunning(false);
         setZen(false);
+        endsAtRef.current = null;
         setSecondsLeft(work * 60);
+        saveFocusSession(null); // простой таймер отработал — сессия закрыта
         return;
       }
       if (!blockNotifs) void notify('Focus Mode', { body: `Помидор ${work} мин завершён — отдых ${rest} мин` });
       setPhase('rest');
       setSecondsLeft(rest * 60);
+      endsAtRef.current = Date.now() + rest * 60 * 1000; // фаза сменилась — новый endsAt для персиста
     } else {
       const next = nextTaskAfter(selectedId);
       setSelectedId(next);
       setPhase('work');
       setSecondsLeft(work * 60);
+      endsAtRef.current = Date.now() + work * 60 * 1000;
       const e = startTimeEntry(next ?? null, 'pomodoro');
       entryRef.current = e.id;
       elapsedRef.current = 0;
@@ -329,7 +375,8 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     setNewTask('');
   };
 
-  const close = () => { stop(); onClose(); };
+  // Явный выход пользователя — завершаем и стираем сессию (в отличие от перезагрузки)
+  const close = () => { stop(); saveFocusSession(null); onClose(); };
 
   useEffect(() => {
     if (!open) return;
@@ -368,9 +415,20 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
           <span className="text-sm">Выйти из фокуса</span>
           <kbd className="text-[10px] bg-white/10 rounded px-1.5 py-0.5">Esc</kbd>
         </button>
-        <div className={`hidden sm:flex items-center gap-3 ${glass} !rounded-full px-4 py-2 text-sm`}>
-          <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-white/80" /> Focus Mode</span>
-          <span className="text-white/35 text-xs">вход <kbd className="bg-white/10 rounded px-1 py-0.5">⌘K</kbd> · выход <kbd className="bg-white/10 rounded px-1 py-0.5">Esc</kbd></span>
+        <div className="flex items-center gap-3">
+          {/* Поиск по делам / Google прямо из фокуса — палитра открывается поверх */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('thedad:search'))}
+            className={`flex items-center gap-2 ${glass} !rounded-full px-4 py-2 text-sm text-white/60 hover:text-white transition-colors`}
+            title="Поиск по задачам и в Google (⌘K)"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline">Поиск</span>
+            <kbd className="hidden sm:inline text-[10px] bg-white/10 rounded px-1.5 py-0.5">⌘K</kbd>
+          </button>
+          <div className={`hidden lg:flex items-center gap-2 ${glass} !rounded-full px-4 py-2 text-sm`}>
+            <span className="h-2 w-2 rounded-full bg-white/80" /> Focus Mode
+          </div>
         </div>
       </div>
 
@@ -464,15 +522,22 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                 )}
               </div>
 
-              {/* Список задач: чек, цветной кружок важности (клик → палитра), редактируемое название */}
-              <ul className="space-y-1.5 max-h-[34vh] overflow-y-auto pr-0.5 -mr-0.5">
+              {/* Список задач: чек, цветной кружок важности (клик → палитра), редактируемое название.
+                  layout-анимация — выполненная задача плавно съезжает вниз, а не телепортируется. */}
+              <ul className="flex flex-col gap-1.5 max-h-[34vh] overflow-y-auto pr-0.5 -mr-0.5">
                 {sessionTasks.length === 0 && (
                   <li className="text-sm text-white/35 py-2">Нет задач на сегодня — добавь первую ниже, дальше просто работай.</li>
                 )}
+                <AnimatePresence initial={false}>
                 {(tasksExpanded ? sessionTasks : activeTask ? [activeTask] : []).map((t) => (
-                  <li
+                  <motion.li
                     key={t.id}
-                    className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors ${activeTask?.id === t.id ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/[0.05]'}`}
+                    layout
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                    className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 ${activeTask?.id === t.id ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/[0.05]'}`}
                   >
                     <button
                       onClick={() => checkTask(t.id)}
@@ -519,8 +584,9 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
-                  </li>
+                  </motion.li>
                 ))}
+                </AnimatePresence>
               </ul>
 
               {!tasksExpanded && nextPending && (

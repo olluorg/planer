@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical, Search, Repeat, Pencil } from 'lucide-react';
 import { PageContainer } from '@/components/ui/page-container';
-import { PriorityDot } from '@/components/ui/priority-dot';
+import { PriorityDot, PRIORITY_LEVELS, PRIORITY_LABEL, priorityColor } from '@/components/ui/priority-dot';
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import type { Task } from '@/lib/types';
@@ -19,11 +19,8 @@ import {
 
 const BLOCK_LABELS: Record<string, string> = { morning: 'Утро', day: 'День', evening: 'Вечер', night: 'Ночь' };
 
-const PRIORITY_COLUMNS = [
-  { id: 1, label: 'Высокий', color: '#ef4444' },
-  { id: 2, label: 'Средний', color: '#eab308' },
-  { id: 3, label: 'Низкий',  color: '#737373' },
-] as const;
+// Колонки/секции по важности — 5 уровней из единого источника (priority-dot)
+const PRIORITY_COLUMNS = PRIORITY_LEVELS.map((id) => ({ id, label: PRIORITY_LABEL[id], color: priorityColor(id) }));
 
 // Канбан-доска по стадиям рабочего процесса
 const STAGE_COLUMNS = [
@@ -380,10 +377,10 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             if (!e.over) return;
             const taskId = String(e.active.id);
             const priority = Number(String(e.over.id).replace('priority-', ''));
-            if ([1, 2, 3].includes(priority)) updateTask(taskId, { priority });
+            if (PRIORITY_LEVELS.includes(priority)) updateTask(taskId, { priority });
           }}
         >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {PRIORITY_COLUMNS.map((col) => {
               const items = filtered.filter((t) => !t.parent_id && t.priority === col.id);
               return (

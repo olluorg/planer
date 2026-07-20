@@ -11,6 +11,7 @@ import { Confetti } from './components/Confetti';
 import { FocusMode } from './components/FocusMode';
 import { Onboarding } from './components/Onboarding';
 import { isOnboardingDone } from './lib/onboarding';
+import { focusShouldResume } from './lib/focusSession';
 import { InboxPopover } from './components/InboxPopover';
 import { Toaster } from './components/Toaster';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
@@ -68,6 +69,8 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aiGenOpen, setAiGenOpen] = useState(false);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
+  // Фокус-сессия ещё идёт (перезагрузили страницу / открыли в новой вкладке) — продолжаем с того же места
+  useEffect(() => { if (ready && focusShouldResume()) setFocusOpen(true); }, [ready]);
 
   // Единая точка синхронизации: питание/зарядка/активность → healthLogs → цели
   useHealthSync();
@@ -170,7 +173,10 @@ export default function App() {
     // Праздничный отклик (конфетти) — зарядка/еда/достижения дают всплеск, как в Duolingo
     const onCelebrate = () => setConfettiTrigger((v) => v + 1);
     const onAiGenerate = () => setAiGenOpen(true);
+    // Открыть палитру поиска из любого места (в т.ч. из Focus Mode — палитра поверх него)
+    const onSearch = (e: Event) => { setPaletteQuery((e as CustomEvent<{ query?: string }>).detail?.query ?? ''); setPaletteOpen(true); };
     window.addEventListener('keydown', onKey);
+    window.addEventListener('thedad:search', onSearch);
     window.addEventListener('thedad:quick-capture', onQuick);
     window.addEventListener('thedad:focus-mode', onFocus);
     window.addEventListener('thedad:expand', onExpand);
@@ -178,6 +184,7 @@ export default function App() {
     window.addEventListener('thedad:ai-generate', onAiGenerate);
     return () => {
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('thedad:search', onSearch);
       window.removeEventListener('thedad:quick-capture', onQuick);
       window.removeEventListener('thedad:focus-mode', onFocus);
       window.removeEventListener('thedad:expand', onExpand);

@@ -231,7 +231,7 @@ export const useStore = create<State>((set, get) => ({
       notes: t.notes ?? null,
       date: t.date ?? todayISO(),
       time_block: t.time_block ?? null,
-      priority: t.priority ?? 2,
+      priority: t.priority ?? 3, // 3 = «Обычный» (зелёный) по умолчанию, см. priority-dot.tsx
       status: t.status ?? 'active',
       stage: t.stage ?? (t.status === 'done' ? 'done' : 'todo'),
       tags: t.tags ?? null,

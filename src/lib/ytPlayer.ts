@@ -10,6 +10,7 @@ export interface YtItem { id: string; title: string }
 
 const YT_KEY = 'focus.youtube.v2';
 const VOL_KEY = 'yt.volume.v1';
+const ACTIVE_KEY = 'yt.active.v1'; // активный трек — чтобы после перезагрузки плеер продолжил
 
 const YT_DEFAULTS: YtItem[] = [
   { id: 'PB8ZrGinWi0', title: 'Focus music · 1' },
@@ -79,10 +80,16 @@ export const useYtPlayer = create<YtState>((set, get) => {
     get().play(list[nextIdx].id);
   };
 
+  const savedActive = (() => { try { return localStorage.getItem(ACTIVE_KEY); } catch { return null; } })();
+  const persistActive = (id: string | null) => {
+    try { if (id) localStorage.setItem(ACTIVE_KEY, id); else localStorage.removeItem(ACTIVE_KEY); } catch {}
+  };
+
   return {
     list: loadList(),
-    activeId: null,
-    playing: false,
+    // восстанавливаем активный трек — iframe с autoplay продолжит (звук — по политике браузера, с жеста)
+    activeId: savedActive,
+    playing: !!savedActive,
     volume: Number(localStorage.getItem(VOL_KEY) || '70'),
     showVideo: false,
     frame: null,
@@ -98,6 +105,7 @@ export const useYtPlayer = create<YtState>((set, get) => {
     // Смена трека: src iframe пересобирается по activeId — элемент остаётся смонтированным.
     // Повторный выбор того же трека src не меняет, поэтому будим плеер командой.
     play: (id) => {
+      persistActive(id);
       if (get().activeId === id) { cmd('playVideo'); set({ playing: true }); return; }
       set({ activeId: id, playing: true });
     },
@@ -111,7 +119,7 @@ export const useYtPlayer = create<YtState>((set, get) => {
 
     next: () => shift(1),
     prev: () => shift(-1),
-    stop: () => set({ activeId: null, playing: false }),
+    stop: () => { persistActive(null); set({ activeId: null, playing: false }); },
 
     setVolume: (v) => {
       set({ volume: v });

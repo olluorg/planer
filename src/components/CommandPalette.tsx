@@ -46,7 +46,7 @@ export const CommandPalette: React.FC<{
       open={open}
       onOpenChange={onOpenChange}
       label="Палитра команд"
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[260] flex items-start justify-center pt-20 px-4 bg-black/50 backdrop-blur-sm animate-fade-in"
       contentClassName="modal-surface w-full max-w-xl rounded-xl overflow-hidden border border-border bg-bg-card shadow-2xl outline-none origin-top animate-scale-in"
     >
       <div className="flex items-center gap-2 border-b border-border px-3">

@@ -175,6 +175,15 @@ function ensure(): { ctx: AudioContext; master: GainNode } {
   return { ctx: ctx!, master: masterGain! };
 }
 
+// Персист микса — какие слои играли (звук должен переживать перезагрузку страницы)
+const MIX_KEY = 'soundscape.mix.v1';
+function loadMix(): Partial<Record<LayerKey, number>> {
+  try { return JSON.parse(localStorage.getItem(MIX_KEY) || '{}'); } catch { return {}; }
+}
+function saveMix(m: Partial<Record<LayerKey, number>>) {
+  try { localStorage.setItem(MIX_KEY, JSON.stringify(m)); } catch {}
+}
+
 interface SoundState {
   mix: Partial<Record<LayerKey, number>>;
   master: number;
@@ -185,10 +194,13 @@ interface SoundState {
   setMaster: (v: number) => void;
   togglePause: () => void;
   anyActive: () => boolean;
+  /** Запустить сохранённые слои заново (после перезагрузки — только по пользовательскому жесту). */
+  resumeAudio: () => void;
 }
 
 export const useSoundscape = create<SoundState>((set, get) => ({
-  mix: {},
+  // восстанавливаем СОСТОЯНИЕ микса сразу (UI показывает активные слои); сам звук стартует по жесту
+  mix: loadMix(),
   master: Number(localStorage.getItem('soundscape.master') || '0.6'),
   paused: false,
 
@@ -196,6 +208,7 @@ export const useSoundscape = create<SoundState>((set, get) => ({
     const next = { ...get().mix, [key]: vol };
     if (vol <= 0) delete next[key];
     set({ mix: next });
+    saveMix(next);
     try {
       const { ctx, master } = ensure();
       void ctx.resume();
@@ -226,6 +239,7 @@ export const useSoundscape = create<SoundState>((set, get) => ({
     running.forEach((l) => { l.stop(); l.gain.disconnect(); });
     running.clear();
     set({ mix: {}, paused: false });
+    saveMix({});
   },
 
   setMaster: (v) => {
@@ -241,4 +255,22 @@ export const useSoundscape = create<SoundState>((set, get) => ({
   },
 
   anyActive: () => Object.keys(get().mix).length > 0,
+
+  resumeAudio: () => {
+    const m = get().mix;
+    Object.entries(m).forEach(([k, v]) => { if (v && v > 0) get().setLayer(k as LayerKey, v); });
+  },
 }));
+
+// После перезагрузки браузер запускает аудио только по пользовательскому жесту — если был
+// сохранён микс, стартуем слои при первом клике/нажатии, один раз.
+if (typeof window !== 'undefined' && Object.keys(loadMix()).length > 0) {
+  const resume = () => {
+    window.removeEventListener('pointerdown', resume);
+    window.removeEventListener('keydown', resume);
+    const st = useSoundscape.getState();
+    if (Object.keys(st.mix).length > 0) st.resumeAudio();
+  };
+  window.addEventListener('pointerdown', resume, { once: false });
+  window.addEventListener('keydown', resume, { once: false });
+}

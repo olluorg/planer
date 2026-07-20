@@ -78,7 +78,7 @@ export const CalendarWidget: React.FC<{ date: Date }> = ({ date }) => {
 
       {/* Панель дня — открывается всегда, даже если задач нет (можно сразу добавить) */}
       {sel && (
-        <div ref={panelRef} className="absolute inset-x-2 bottom-2 top-9 z-20 rounded-xl bg-bg-elevated border border-border shadow-2xl flex flex-col overflow-hidden animate-[slide-up_140ms_ease-out]">
+        <div ref={panelRef} className="modal-surface absolute inset-x-2 bottom-2 top-9 z-20 rounded-xl bg-bg-elevated backdrop-blur-xl border border-border shadow-2xl flex flex-col overflow-hidden animate-[slide-up_140ms_ease-out]">
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-soft shrink-0 bg-bg-soft/60">
             <CalendarDays className="h-4 w-4 text-accent shrink-0" />
             <span className="text-sm font-semibold text-text capitalize flex-1 truncate">{format(new Date(`${sel}T00:00:00`), 'd MMMM, EEEE', { locale: ru })}</span>
