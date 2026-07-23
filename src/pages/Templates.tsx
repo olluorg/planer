@@ -5,7 +5,8 @@ import { CATEGORY_LABEL, TEMPLATES, type TemplatePack } from '@/lib/templates';
 import { useStore } from '@/lib/store';
 import { todayISO } from '@/lib/utils';
 import { toast } from '@/lib/toast';
-import { Check, ChevronRight } from 'lucide-react';
+import { openMarketplace } from '@/lib/marketplace';
+import { Check, ChevronRight, ShoppingBag } from 'lucide-react';
 
 export const TemplatesPage = () => {
   const { addTask, addHabit, addGoal } = useStore();
@@ -65,6 +66,12 @@ export const TemplatesPage = () => {
           <h1 className="text-2xl font-bold text-text">Шаблоны</h1>
           <p className="text-sm text-text-muted mt-1">Готовые наборы целей, привычек и задач. Применяй одним кликом, потом редактируй под себя.</p>
         </div>
+        <button
+          onClick={openMarketplace}
+          className="inline-flex items-center gap-2 rounded-xl border border-accent/40 hover:border-accent/70 bg-accent/[0.06] hover:bg-accent/[0.1] px-4 py-2.5 text-sm font-medium text-accent transition-colors shrink-0 self-start"
+        >
+          <ShoppingBag className="h-4 w-4" /> Премиум-программы
+        </button>
       </div>
 
       {/* Filter chips */}

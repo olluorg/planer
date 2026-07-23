@@ -25,6 +25,10 @@ import { AppLiveWallpaper } from './components/AppLiveWallpaper';
 import { Celebration } from './components/Celebration';
 import { MiniPlayer } from './components/MiniPlayer';
 import { AiGenerateModal } from './components/AiGenerateModal';
+import { MarketplaceModal } from './components/marketplace/MarketplaceModal';
+import { ProgramRunner } from './components/marketplace/ProgramRunner';
+import { WorkoutHub } from './components/marketplace/WorkoutHub';
+import { MARKETPLACE_EVENT, PROGRAM_OPEN_EVENT, PROGRAM_HUB_EVENT } from './lib/marketplace';
 
 const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
 const TasksPage = lazy(() => import('./pages/Tasks').then((m) => ({ default: m.TasksPage })));
@@ -68,6 +72,9 @@ export default function App() {
   const [inboxTab, setInboxTab] = useState<'inbox' | 'insights'>('inbox');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aiGenOpen, setAiGenOpen] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
+  const [programId, setProgramId] = useState<string | null>(null);
+  const [hubId, setHubId] = useState<string | null>(null);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
   // Фокус-сессия ещё идёт (перезагрузили страницу / открыли в новой вкладке) — продолжаем с того же места
   useEffect(() => { if (ready && focusShouldResume()) setFocusOpen(true); }, [ready]);
@@ -173,6 +180,9 @@ export default function App() {
     // Праздничный отклик (конфетти) — зарядка/еда/достижения дают всплеск, как в Duolingo
     const onCelebrate = () => setConfettiTrigger((v) => v + 1);
     const onAiGenerate = () => setAiGenOpen(true);
+    const onMarket = () => setMarketOpen(true);
+    const onProgram = (e: Event) => setProgramId((e as CustomEvent<{ id?: string }>).detail?.id ?? null);
+    const onHub = (e: Event) => setHubId((e as CustomEvent<{ id?: string }>).detail?.id ?? null);
     // Открыть палитру поиска из любого места (в т.ч. из Focus Mode — палитра поверх него)
     const onSearch = (e: Event) => { setPaletteQuery((e as CustomEvent<{ query?: string }>).detail?.query ?? ''); setPaletteOpen(true); };
     window.addEventListener('keydown', onKey);
@@ -182,6 +192,9 @@ export default function App() {
     window.addEventListener('thedad:expand', onExpand);
     window.addEventListener('thedad:celebrate', onCelebrate);
     window.addEventListener('thedad:ai-generate', onAiGenerate);
+    window.addEventListener(MARKETPLACE_EVENT, onMarket);
+    window.addEventListener(PROGRAM_OPEN_EVENT, onProgram);
+    window.addEventListener(PROGRAM_HUB_EVENT, onHub);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('thedad:search', onSearch);
@@ -190,6 +203,9 @@ export default function App() {
       window.removeEventListener('thedad:expand', onExpand);
       window.removeEventListener('thedad:celebrate', onCelebrate);
       window.removeEventListener('thedad:ai-generate', onAiGenerate);
+      window.removeEventListener(MARKETPLACE_EVENT, onMarket);
+      window.removeEventListener(PROGRAM_OPEN_EVENT, onProgram);
+      window.removeEventListener(PROGRAM_HUB_EVENT, onHub);
     };
   }, []);
 
@@ -305,6 +321,9 @@ export default function App() {
       <AppLiveWallpaper suspended={focusOpen} />
       <MiniPlayer />
       <AiGenerateModal open={aiGenOpen} onOpenChange={setAiGenOpen} />
+      <MarketplaceModal open={marketOpen} onClose={() => setMarketOpen(false)} />
+      <ProgramRunner programId={programId} onClose={() => setProgramId(null)} />
+      <WorkoutHub programId={hubId} onClose={() => setHubId(null)} />
       <ShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <Toaster />
     </div>

@@ -27,6 +27,8 @@ import { getLiveWallpaper, setYouTubeWallpaper, setVideoWallpaper, clearLiveWall
 import { chromeAiPresent, chromeAvailability, chromePreferred, setChromePreferred, downloadChromeModel, type Availability } from "@/lib/aiProvider";
 import { ChromeAiSetupModal } from "@/components/ChromeAiSetupModal";
 import { LearnModal } from "@/components/LearnModal";
+import { AboutModal } from "@/components/AboutModal";
+import { Info } from "lucide-react";
 import { parseYouTubeId } from "@/components/LiveWallpaper";
 import { Clapperboard } from "lucide-react";
 import { loadReminders, saveReminders, requestPermission, scheduleAll, type Reminder } from "@/lib/notifications";
@@ -232,17 +234,24 @@ export const SettingsPage = () => {
   };
 
   const [learnOpen, setLearnOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
     <div className="page py-6">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h1 className="text-h1">Настройки</h1>
-        {/* Обучение: сетка мини-онбордингов (как сменить тему, включить AI, собрать дашборд…) */}
-        <Button variant="soft" onClick={() => setLearnOpen(true)}>
-          <GraduationCap className="h-4 w-4" /> Обучение
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Обучение: сетка мини-онбордингов (как сменить тему, включить AI, собрать дашборд…) */}
+          <Button variant="soft" onClick={() => setLearnOpen(true)}>
+            <GraduationCap className="h-4 w-4" /> Обучение
+          </Button>
+          <Button variant="soft" onClick={() => setAboutOpen(true)}>
+            <Info className="h-4 w-4" /> О приложении
+          </Button>
+        </div>
       </div>
       <LearnModal open={learnOpen} onClose={() => setLearnOpen(false)} />
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {/* Разделы-«карточки» раскладываются в колонки по ширине экрана (masonry) */}
       <div className="columns-1 lg:columns-2 2xl:columns-3 gap-4 [&>*]:break-inside-avoid [&>*]:mb-4">

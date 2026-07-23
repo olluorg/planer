@@ -60,7 +60,7 @@ const ToolButton: React.FC<{ active?: boolean; onClick: () => void; title: strin
   </button>
 );
 
-type PanelKey = 'wp' | 'yt' | 'mixer' | 'blockers' | 'stats';
+type PanelKey = 'wp' | 'yt' | 'mixer' | 'blockers' | 'stats' | 'time';
 
 interface Props {
   open: boolean;
@@ -246,6 +246,24 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, running, phase, pomodoro, cycleIdx, timerIdx, selectedId]);
 
+  // Страховка: сохраняем актуальное состояние при закрытии/сворачивании вкладки (beforeunload не всегда
+  // успевает; visibilitychange надёжнее в браузерах). Так «новая вкладка» и перезагрузка точно подхватят сессию.
+  useEffect(() => {
+    if (!open) return;
+    const save = () => saveFocusSession({
+      running, phase, pomodoro, cycleIdx, timerIdx, selectedId,
+      endsAt: running ? endsAtRef.current : null, secondsLeft,
+    });
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', save);
+    return () => {
+      window.removeEventListener('beforeunload', save);
+      window.removeEventListener('pagehide', save);
+      document.removeEventListener('visibilitychange', save);
+    };
+  }, [open, running, phase, pomodoro, cycleIdx, timerIdx, selectedId, secondsLeft]);
+
   useEffect(() => {
     setGlobal({ running, phase, secondsLeft, taskTitle: currentTask?.title ?? 'Focus' });
     return () => setGlobal({ running: false, secondsLeft: 0, taskTitle: null });
@@ -271,8 +289,13 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     setRunning(true);
     setZen(true);
     setPanel(null);
+    // сохраняем сразу (не дожидаясь эффекта) — иначе гонка на монтировании могла бы потерять запись
+    saveFocusSession({ running: true, phase, pomodoro, cycleIdx, timerIdx, selectedId, endsAt: endsAtRef.current, secondsLeft });
   };
-  const pause = () => { setRunning(false); setZen(false); endsAtRef.current = null; };
+  const pause = () => {
+    setRunning(false); setZen(false); endsAtRef.current = null;
+    saveFocusSession({ running: false, phase, pomodoro, cycleIdx, timerIdx, selectedId, endsAt: null, secondsLeft });
+  };
   // stop() лишь финализирует таймер/запись — НЕ трогает персист (иначе монтирование с open=false
   // при загрузке стёрло бы сохранённую сессию до того, как её прочитает авто-возобновление).
   const stop = () => {
@@ -496,6 +519,23 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
           </div>
         </div>
 
+        {/* В зен-режиме список скрыт — но показываем текущую задачу, чтобы понимать, что делать.
+            Клик разворачивает полный список (выходит из зена). */}
+        {zen && phase === 'work' && (
+          <button
+            onClick={() => setZen(false)}
+            className="text-center group"
+            title="Показать все задачи"
+          >
+            <div className="text-[11px] uppercase tracking-widest text-white/40 mb-1">Сейчас в работе</div>
+            <div className="text-xl font-semibold text-white/90 group-hover:text-white transition-colors max-w-[420px] truncate">
+              {activeTask?.title ?? 'Свободный фокус — без конкретной задачи'}
+            </div>
+            {nextPending && <div className="text-xs text-white/40 mt-1">дальше: {nextPending.title}</div>}
+            <div className="text-[10px] text-white/25 mt-1.5">нажми, чтобы увидеть все задачи</div>
+          </button>
+        )}
+
         {/* ===== Задачи дня (цели сессии слиты сюда) — скрываются в зене ===== */}
         <div className={`w-full transition-[opacity,transform] duration-500 ${zen ? 'opacity-0 translate-y-4 pointer-events-none h-0 overflow-hidden' : ''}`}>
           {phase === 'rest' ? (
@@ -629,27 +669,15 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                 pomodoro ? 'ring-1 ring-red-300/70 bg-white/10' : 'opacity-60 grayscale hover:opacity-100 hover:grayscale-0 hover:bg-white/10'
               }`}
             >🍅</button>
-            {pomodoro ? CYCLES.map((c, i) => (
-              <button
-                key={c.work}
-                onClick={() => { setCycleIdx(i); setPhase('work'); if (!running) setSecondsLeft(c.work * 60); }}
-                disabled={running}
-                title={`${c.work} мин работа · ${c.rest} мин отдых`}
-                className={`h-10 w-10 rounded-full text-sm font-semibold transition-all disabled:opacity-40 ${
-                  cycleIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'
-                }`}
-              >{c.work}</button>
-            )) : TIMERS.map((m, i) => (
-              <button
-                key={m}
-                onClick={() => { setTimerIdx(i); setPhase('work'); if (!running) setSecondsLeft(m * 60); }}
-                disabled={running}
-                title={`Таймер ${m} мин без перерывов`}
-                className={`h-10 w-10 rounded-full text-sm font-semibold transition-all disabled:opacity-40 ${
-                  timerIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/55 hover:text-white hover:bg-white/10'
-                }`}
-              >{m}</button>
-            ))}
+
+            {/* Одна кнопка с текущей длительностью — клик открывает выбор (убрали 3 лишние кнопки) */}
+            <ToolButton
+              active={panel === 'time'}
+              onClick={() => { if (!running) togglePanel('time'); }}
+              title={running ? 'Идёт сессия — длительность нельзя менять' : pomodoro ? `${work} мин работа · ${rest} мин отдых. Клик — выбрать другое` : `Таймер ${work} мин. Клик — выбрать другое`}
+            >
+              <span className={`text-sm font-semibold tabular-nums ${running ? 'opacity-40' : ''}`}>{work}</span>
+            </ToolButton>
             <span className="h-6 w-px bg-white/10" />
 
             {/* Пауза/стоп/скип — на весь звук сразу */}
@@ -680,6 +708,39 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
           </div>
 
           {/* ===== Попап-панели (взаимоисключающие) ===== */}
+          {panel === 'time' && (
+            <div className={`${glass} p-3 w-full max-w-md`}>
+              <div className="text-[11px] uppercase tracking-widest text-white/45 mb-2.5 px-1">Длительность сессии</div>
+              <div className="grid grid-cols-4 gap-2">
+                {pomodoro ? CYCLES.map((c, i) => (
+                  <button
+                    key={c.work}
+                    onClick={() => { setCycleIdx(i); setPhase('work'); if (!running) setSecondsLeft(c.work * 60); setPanel(null); }}
+                    title={`${c.work} мин работа · ${c.rest} мин отдых`}
+                    className={`rounded-xl py-2.5 flex flex-col items-center transition-all ${
+                      cycleIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/60 hover:text-white bg-white/[0.04] hover:bg-white/10'
+                    }`}
+                  >
+                    <span className="text-base font-semibold tabular-nums leading-none">{c.work}</span>
+                    <span className="text-[10px] text-white/40 mt-1">+{c.rest} отдых</span>
+                  </button>
+                )) : TIMERS.map((m, i) => (
+                  <button
+                    key={m}
+                    onClick={() => { setTimerIdx(i); setPhase('work'); if (!running) setSecondsLeft(m * 60); setPanel(null); }}
+                    title={`Таймер ${m} мин без перерывов`}
+                    className={`rounded-xl py-2.5 flex flex-col items-center transition-all ${
+                      timerIdx === i ? 'ring-1 ring-white/70 text-white bg-white/10' : 'text-white/60 hover:text-white bg-white/[0.04] hover:bg-white/10'
+                    }`}
+                  >
+                    <span className="text-base font-semibold tabular-nums leading-none">{m}</span>
+                    <span className="text-[10px] text-white/40 mt-1">мин</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {panel === 'mixer' && (
             <div className={`${glass} p-4 w-full max-w-md`}>
               <div className="flex flex-wrap gap-1.5 mb-4">

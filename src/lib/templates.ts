@@ -29,7 +29,7 @@ export interface GoalTpl {
 export interface TemplatePack {
   id: string;
   emoji: string;
-  category: 'persona' | 'routine' | 'fitness' | 'work' | 'study' | 'finance' | 'mindfulness';
+  category: 'persona' | 'growth' | 'routine' | 'fitness' | 'work' | 'study' | 'finance' | 'mindfulness';
   title: string;
   description: string;
   goals?: GoalTpl[];
@@ -152,6 +152,137 @@ export const TEMPLATES: TemplatePack[] = [
       { title: 'Школа / уроки', time_block: 'morning', start_time: '08:00', priority: 1 },
       { title: 'Домашнее задание', time_block: 'day', start_time: '15:00', priority: 1, estimate_min: 60 },
       { title: 'Кружок / спорт', time_block: 'evening', start_time: '17:30', priority: 2, estimate_min: 60 },
+    ],
+  },
+  // ─── Прокачка: бесплатная альтернатива инфокурсам. Не «успешный успех», а конкретные
+  //     задачи и навыки, которые реально двигают. Каждый набор = цель + привычки + шаги на день. ───
+  {
+    id: 'growth_first_income',
+    emoji: '🚀',
+    category: 'growth',
+    title: 'Первый доход на навыке',
+    description: 'От нуля до первых заработанных денег на реальном навыке — без «инвестиций в курс»',
+    goals: [
+      { title: 'Заработать первые 10 000 ₽ на навыке', type: 'mid', start_value: 0, target_value: 10000, unit: '₽', deadline_in_days: 30 },
+    ],
+    habits: [
+      { title: 'Час практики навыка', color: '#8b5cf6', target_per_week: 6 },
+      { title: 'Написать 3 потенциальным клиентам', color: '#22c55e', target_per_week: 5 },
+      { title: 'Выложить результат работы', color: '#3b82f6', target_per_week: 3 },
+    ],
+    tasks: [
+      { title: 'Выбрать 1 навык, который можно продать', time_block: 'morning', start_time: '09:00', priority: 1, estimate_min: 30 },
+      { title: 'Сделать бесплатный кейс для портфолио', time_block: 'day', start_time: '13:00', priority: 1, estimate_min: 90 },
+      { title: 'Найти 3 места, где сидят твои клиенты', time_block: 'evening', start_time: '19:00', priority: 2, estimate_min: 30 },
+    ],
+  },
+  {
+    id: 'growth_discipline',
+    emoji: '🔥',
+    category: 'growth',
+    title: 'Дисциплина за 30 дней',
+    description: 'Не мотивация, а система. Держишь слово себе — и всё остальное подтягивается',
+    goals: [
+      { title: '30 дней без пропусков', type: 'short', start_value: 0, target_value: 30, unit: 'дней', deadline_in_days: 30 },
+    ],
+    habits: [
+      { title: 'Подъём по будильнику без «ещё 5 минут»', color: '#ef4444', target_per_week: 7 },
+      { title: 'Сначала самое трудное дело', color: '#f97316', target_per_week: 6 },
+      { title: 'Холодный душ', color: '#06b6d4', target_per_week: 5 },
+      { title: 'Ноль оправданий в дневнике', color: '#22c55e', target_per_week: 7 },
+    ],
+    tasks: [
+      { title: 'Одно неприятное дело, которое откладываешь', time_block: 'morning', start_time: '08:00', priority: 1, estimate_min: 30 },
+      { title: 'Итог дня: сдержал слово себе?', time_block: 'night', start_time: '22:00', priority: 2, estimate_min: 5 },
+    ],
+  },
+  {
+    id: 'growth_mentor',
+    emoji: '🧭',
+    category: 'growth',
+    title: 'Ментор в кармане',
+    description: 'То, что даёт хороший наставник: фокус на главном, обратная связь себе и рост каждый день',
+    habits: [
+      { title: '1 главное дело дня сделано', color: '#6366f1', target_per_week: 7 },
+      { title: 'Учиться 30 минут', color: '#3b82f6', target_per_week: 6 },
+      { title: 'Разбор: что улучшить завтра', color: '#22c55e', target_per_week: 7 },
+    ],
+    tasks: [
+      { title: 'Определить ОДНУ задачу, которая двигает вперёд', time_block: 'morning', start_time: '08:30', priority: 1, estimate_min: 15 },
+      { title: 'Работа над главной задачей', time_block: 'day', start_time: '11:00', priority: 1, estimate_min: 90 },
+      { title: 'Рефлексия: 1 победа + 1 урок', time_block: 'evening', start_time: '20:30', priority: 2, estimate_min: 10 },
+    ],
+  },
+  {
+    id: 'growth_body_reset',
+    emoji: '🏋️',
+    category: 'growth',
+    title: 'Форма, сон, энергия',
+    description: 'Здоровая версия «прокачай себя»: тело, сон и режим без БАД-разводов и марафонов',
+    goals: [
+      { title: 'Привести тело в форму', type: 'mid', start_value: 0, target_value: 100, unit: '%', deadline_in_days: 60 },
+    ],
+    habits: [
+      { title: 'Тренировка (зал/дом)', color: '#ef4444', target_per_week: 4 },
+      { title: '8000+ шагов', color: '#22c55e', target_per_week: 7 },
+      { title: 'Белок в каждый приём пищи', color: '#f59e0b', target_per_week: 7 },
+      { title: 'Отбой до 23:00', color: '#6366f1', target_per_week: 6 },
+      { title: 'Без сахара и фастфуда', color: '#8b5cf6', target_per_week: 5 },
+    ],
+    tasks: [
+      { title: 'Тренировка', time_block: 'morning', start_time: '07:30', priority: 1, estimate_min: 50 },
+      { title: 'Приготовить нормальную еду', time_block: 'day', start_time: '13:00', priority: 2, estimate_min: 30 },
+    ],
+  },
+  {
+    id: 'growth_confidence',
+    emoji: '🎤',
+    category: 'growth',
+    title: 'Уверенность и речь',
+    description: 'Навык говорить и держаться — то, что продают «менторы харизмы», только через практику',
+    habits: [
+      { title: 'Говорить вслух 5 минут (запись)', color: '#ec4899', target_per_week: 5 },
+      { title: 'Начать 1 разговор с незнакомым', color: '#22c55e', target_per_week: 4 },
+      { title: 'Осанка и зрительный контакт', color: '#3b82f6', target_per_week: 7 },
+    ],
+    tasks: [
+      { title: 'Пересказать вслух идею за 2 минуты', time_block: 'morning', start_time: '09:00', priority: 2, estimate_min: 15 },
+      { title: 'Разобрать свою запись: что убрать', time_block: 'evening', start_time: '20:00', priority: 3, estimate_min: 15 },
+    ],
+  },
+  {
+    id: 'growth_business_zero',
+    emoji: '💡',
+    category: 'growth',
+    title: 'Бизнес с нуля',
+    description: 'Вместо «бизнес-молодости» — проверить идею и получить первую продажу реально',
+    goals: [
+      { title: 'Первая продажа', type: 'mid', start_value: 0, target_value: 1, unit: 'продажа', deadline_in_days: 45 },
+    ],
+    habits: [
+      { title: 'Поговорить с 1 потенциальным клиентом', color: '#22c55e', target_per_week: 5 },
+      { title: 'Работа над продуктом', color: '#6366f1', target_per_week: 5 },
+    ],
+    tasks: [
+      { title: 'Сформулировать проблему, которую решаешь', time_block: 'morning', start_time: '09:30', priority: 1, estimate_min: 30 },
+      { title: 'Опросить 3 людей из целевой аудитории', time_block: 'day', start_time: '14:00', priority: 1, estimate_min: 45 },
+      { title: 'Собрать простейшее предложение (оффер)', time_block: 'evening', start_time: '19:00', priority: 2, estimate_min: 40 },
+    ],
+  },
+  {
+    id: 'growth_anti_procrastination',
+    emoji: '⏱️',
+    category: 'growth',
+    title: 'Победить прокрастинацию',
+    description: 'Не «взять себя в руки», а простые механики: маленький старт и фокус-блоки',
+    habits: [
+      { title: 'Правило 2 минут: начать сразу', color: '#f97316', target_per_week: 7 },
+      { title: '2 pomodoro фокуса', color: '#8b5cf6', target_per_week: 6 },
+      { title: 'Телефон в другой комнате в работе', color: '#6366f1', target_per_week: 6 },
+    ],
+    tasks: [
+      { title: 'Разбить пугающую задачу на 3 шага', time_block: 'morning', start_time: '09:00', priority: 1, estimate_min: 10 },
+      { title: 'Фокус-блок 25 мин на первом шаге', time_block: 'morning', start_time: '09:15', priority: 1, estimate_min: 25 },
     ],
   },
   {
@@ -427,6 +558,7 @@ export const TEMPLATES: TemplatePack[] = [
 
 export const CATEGORY_LABEL: Record<TemplatePack['category'], string> = {
   persona: 'Для тебя',
+  growth: 'Прокачка',
   routine: 'Рутина',
   fitness: 'Здоровье',
   work: 'Работа',

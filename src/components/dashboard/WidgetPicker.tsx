@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Plus, Upload } from 'lucide-react';
+import { X, Plus, Upload, ShoppingBag } from 'lucide-react';
 import { WIDGET_CATEGORY_LABEL, type WidgetCategory, type WidgetMeta } from '@/lib/widgetCatalog';
 import { installPlugin } from '@/lib/plugins';
+import { openMarketplace } from '@/lib/marketplace';
 import { toast } from '@/lib/toast';
 
 interface Props {
@@ -150,6 +151,22 @@ export const WidgetPicker: React.FC<Props> = ({ open, onClose, available, onAdd,
                 </span>
               </button>
             )}
+
+            {/* Премиум-программы — ненавязчивый вход в маркетплейс */}
+            <button
+              onClick={() => { onClose(); openMarketplace(); }}
+              className="flex items-start gap-3 rounded-xl border border-dashed border-accent/40 hover:border-accent/70 bg-accent/[0.04] hover:bg-accent/[0.08] p-3.5 text-left transition-colors"
+            >
+              <span className="h-9 w-9 rounded-lg bg-accent/12 flex items-center justify-center shrink-0 text-accent">
+                <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-text">Премиум-программы</span>
+                <span className="block text-xs text-text-muted mt-0.5 leading-snug">
+                  Готовые многонедельные курсы: питание, тренировки, цели и задачи в связке.
+                </span>
+              </span>
+            </button>
           </div>
 
           {list.length === 0 && cat !== 'plugins' && cat !== 'all' && (

@@ -12,7 +12,9 @@
       "Bash(git -C \"C:/Users/X/Documents/GitHub/planer\" log --oneline -10)",
       "Bash(git -C \"C:/Users/X/Documents/GitHub/planer\" diff --stat src/components/Topbar.tsx)",
       "Bash(git -C \"C:/Users/X/Documents/GitHub/planer\" diff src/components/Topbar.tsx)",
-      "Bash(git -C \"C:/Users/X/Documents/GitHub/planer\" stash list)"
+      "Bash(git -C \"C:/Users/X/Documents/GitHub/planer\" stash list)",
+      "WebFetch(domain:github.com)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

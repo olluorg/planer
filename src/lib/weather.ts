@@ -23,6 +23,28 @@ function kindFromCode(code: number): Weather['kind'] {
   return 'cloudy';
 }
 
+/** Координаты: сперва точная геолокация браузера, при отказе — приблизительно по IP (без ключа).
+ *  Так погода работает и когда пользователь не дал доступ к геолокации (частый случай в расширении). */
+async function getCoords(): Promise<{ lat: number; lon: number } | null> {
+  if ('geolocation' in navigator) {
+    try {
+      const pos = await new Promise<GeolocationPosition>((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, maximumAge: TTL }),
+      );
+      return { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    } catch { /* нет доступа — пробуем по IP ниже */ }
+  }
+  try {
+    const r = await fetch('https://ipapi.co/json/');
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (typeof j.latitude === 'number' && typeof j.longitude === 'number') {
+      return { lat: j.latitude, lon: j.longitude };
+    }
+  } catch { /* IP-сервис недоступен */ }
+  return null;
+}
+
 export interface ForecastHour { time: string; temp: number; kind: Weather['kind'] }
 export interface ForecastDay { date: string; min: number; max: number; kind: Weather['kind']; precip: number }
 export interface Forecast { hourly: ForecastHour[]; daily: ForecastDay[] }
@@ -31,15 +53,13 @@ const FKEY = 'thedad.forecast.v1';
 const FTTL = 30 * 60 * 1000;
 
 /** Почасовой (сутки вперёд) и подневный (до 14 дней) прогноз. Open-Meteo, без ключа. */
-export async function getForecast(): Promise<Forecast | null> {
+export async function getForecast(force = false): Promise<Forecast | null> {
   try {
     const cached = JSON.parse(localStorage.getItem(FKEY) ?? 'null') as { at: number; f: Forecast | null } | null;
-    if (cached && Date.now() - cached.at < FTTL) return cached.f;
-    if (!('geolocation' in navigator)) return null;
-    const pos = await new Promise<GeolocationPosition>((res, rej) =>
-      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, maximumAge: TTL }),
-    );
-    const { latitude, longitude } = pos.coords;
+    if (!force && cached && Date.now() - cached.at < FTTL) return cached.f;
+    const coords = await getCoords();
+    if (!coords) return null;
+    const { lat: latitude, lon: longitude } = coords;
     const r = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}`
       + `&hourly=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max`
@@ -73,11 +93,9 @@ export async function getWeather(): Promise<Weather | null> {
     const cached = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { at: number; w: Weather | null } | null;
     if (cached && Date.now() - cached.at < TTL) return cached.w;
 
-    if (!('geolocation' in navigator)) return null;
-    const pos = await new Promise<GeolocationPosition>((res, rej) =>
-      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, maximumAge: TTL }),
-    );
-    const { latitude, longitude } = pos.coords;
+    const coords = await getCoords();
+    if (!coords) return null;
+    const { lat: latitude, lon: longitude } = coords;
     const r = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}&current=temperature_2m,weather_code`,
     );

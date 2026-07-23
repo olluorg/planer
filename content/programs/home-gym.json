@@ -1,0 +1,72 @@
+{
+  "schema": "thedad.program/v1",
+  "id": "home-gym",
+  "title": "Стань лучшей версией себя",
+  "emoji": "🏋️",
+  "goals": [
+    { "title": "Тренироваться 4 раза в неделю", "type": "mid", "start_value": 0, "target_value": 16, "unit": "трен", "deadline_in_days": 30 }
+  ],
+  "habits": [
+    { "title": "Тренировка по расписанию", "color": "#ef4444", "schedule": "weekly", "target_per_week": 4 },
+    { "title": "Белок в каждый приём пищи", "color": "#f59e0b", "schedule": "daily", "target_per_week": 7 },
+    { "title": "10 000 шагов", "color": "#22c55e", "schedule": "daily", "target_per_week": 7 }
+  ],
+  "hub": {
+    "headline": "Стань лучшей версией себя",
+    "quote": "Фитнес — это не про то, чтобы быть лучше других. Это про то, чтобы быть лучше, чем ты был вчера.",
+    "hero": "",
+    "goals": [
+      "16% жира в теле",
+      "Решить боль в колене",
+      "5 подтягиваний с выходом",
+      "Кубики пресса",
+      "Белок каждый день",
+      "Готовить дважды в неделю"
+    ],
+    "sessions": [
+      { "id": "legs", "title": "Ноги · зал", "type": "Strength", "duration": "1 час", "note": "База на низ тела. Разомнись 5 минут перед стартом.", "video": "", "photo": "", "exercises": [
+        { "name": "Приседания со штангой", "reps": "4×8", "detail": "Спина прямая, глубина до параллели." },
+        { "name": "Румынская тяга", "reps": "4×10", "detail": "Чувствуй растяжение задней поверхности бедра." },
+        { "name": "Выпады с гантелями", "reps": "3×12 на ногу" },
+        { "name": "Подъёмы на носки", "reps": "4×15" }
+      ] },
+      { "id": "push", "title": "Жимовая · зал", "type": "Strength", "duration": "1 час", "note": "Грудь, плечи, трицепс.", "video": "", "photo": "", "exercises": [
+        { "name": "Жим лёжа", "reps": "4×8" },
+        { "name": "Жим гантелей под углом", "reps": "3×10" },
+        { "name": "Разведения в стороны", "reps": "3×15" },
+        { "name": "Отжимания на брусьях", "reps": "3×максимум" }
+      ] },
+      { "id": "pull", "title": "Тяговая · зал", "type": "Strength", "duration": "1 час", "note": "Спина и бицепс.", "video": "", "photo": "", "exercises": [
+        { "name": "Подтягивания", "reps": "4×максимум" },
+        { "name": "Тяга штанги в наклоне", "reps": "4×10" },
+        { "name": "Тяга верхнего блока", "reps": "3×12" },
+        { "name": "Подъём на бицепс", "reps": "3×12" }
+      ] },
+      { "id": "abs", "title": "Пресс", "type": "Strength", "duration": "8 мин", "note": "Быстрый круг на кор.", "video": "", "photo": "", "exercises": [
+        { "name": "Скручивания", "reps": "3×20" },
+        { "name": "Планка", "reps": "3×40 сек" },
+        { "name": "Велосипед", "reps": "3×20" },
+        { "name": "Подъёмы ног", "reps": "3×15" }
+      ] },
+      { "id": "cardio-walk", "title": "Прогулка", "type": "Cardio", "duration": "45 мин", "note": "Лёгкое кардио, восстановление и шаги.", "video": "", "photo": "" },
+      { "id": "rowing", "title": "Гребля", "type": "Cardio", "duration": "20 мин", "note": "Интервальная гребля.", "video": "", "photo": "" },
+      { "id": "yoga", "title": "Йога для начинающих", "type": "Yoga", "duration": "20 мин", "note": "Растяжка и мобильность.", "video": "", "photo": "" },
+      { "id": "calisthenics", "title": "Калистеника", "type": "Calisthenics", "duration": "15 мин", "note": "Работа с собственным весом.", "video": "", "photo": "", "exercises": [
+        { "name": "Отжимания", "reps": "4×15" },
+        { "name": "Приседания", "reps": "4×20" },
+        { "name": "Подтягивания", "reps": "4×максимум" },
+        { "name": "Планка", "reps": "3×45 сек" }
+      ] },
+      { "id": "dance", "title": "Танцевальная кардио", "type": "Cardio", "duration": "15 мин", "note": "Заряд энергии под музыку.", "video": "", "photo": "" }
+    ],
+    "schedule": [
+      { "label": "Пн", "sessions": ["legs", "abs"] },
+      { "label": "Вт", "sessions": ["cardio-walk"] },
+      { "label": "Ср", "sessions": ["push"] },
+      { "label": "Чт", "sessions": ["yoga"] },
+      { "label": "Пт", "sessions": ["pull", "abs"] },
+      { "label": "Сб", "sessions": ["calisthenics", "rowing"] },
+      { "label": "Вс", "sessions": [] }
+    ]
+  }
+}
