@@ -7,7 +7,8 @@
  * Чистая функция без побочных эффектов: analyzeProgram(...) → список инсайтов.
  */
 import type { HealthLog } from './types';
-import type { ProgramPack } from './marketplace';
+import type { ProgramPack, WorkoutHub } from './marketplace';
+import { workoutStreak } from './marketplace';
 
 export interface AdaptiveInsight {
   tone: 'good' | 'warn' | 'info';
@@ -123,4 +124,63 @@ export function analyzeProgram({ pack, healthLogs, start, currentDay }: AnalyzeO
   }
 
   return out.slice(0, 3);
+}
+
+/* ==================== Адаптивная рекомендация тренировки на сегодня ==================== */
+
+export interface WorkoutRecommendation {
+  tone: 'good' | 'warn' | 'info';
+  title: string;
+  message: string;
+  sessionId?: string;   // если движок предлагает конкретную тренировку — её id
+}
+
+const RECOVERY_TYPES = ['yoga', 'mobility', 'cardio'];
+
+/** Что тренировать сегодня — по расписанию + фактической активности:
+ *  уже тренировался → отдых; длинный стрик → восстановление; отставание → наверстать. */
+export function recommendWorkout(hub: WorkoutHub, healthLogs: HealthLog[]): WorkoutRecommendation {
+  const now = new Date();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const today = iso(now);
+  const mondayIdx = (now.getDay() + 6) % 7;
+
+  const doneDays = new Set(healthLogs.filter((l) => l.metric === 'workout' && l.value > 0).map((l) => l.date));
+  const doneToday = doneDays.has(today);
+  const streak = workoutStreak(healthLogs);
+
+  const byId = (id: string) => hub.sessions.find((s) => s.id === id);
+  const planned = (hub.schedule?.[mondayIdx]?.sessions ?? []).map(byId).filter((s): s is NonNullable<ReturnType<typeof byId>> => !!s);
+
+  // тренировок за последние 7 дней (уникальные дни) vs запланировано в неделю
+  let weekDone = 0;
+  for (let i = 0; i < 7; i++) { const d = new Date(now); d.setDate(d.getDate() - i); if (doneDays.has(iso(d))) weekDone++; }
+  const weekPlanned = (hub.schedule ?? []).filter((d) => d.sessions.length > 0).length;
+
+  if (doneToday) {
+    return { tone: 'good', title: 'Сегодня уже тренировался', message: 'Отличная работа. Дай телу восстановиться — завтра продолжим по плану.' };
+  }
+  if (streak >= 5) {
+    const recovery = hub.sessions.find((s) => RECOVERY_TYPES.includes(s.type.trim().toLowerCase()));
+    return {
+      tone: 'warn',
+      title: `${streak} дней подряд — пора восстановиться`,
+      message: recovery ? `Мышцы растут в отдыхе. Сегодня лёгкое: «${recovery.title}».` : 'Мышцы растут в отдыхе. Сделай сегодня лёгкую активность или отдохни.',
+      sessionId: recovery?.id,
+    };
+  }
+  if (planned.length > 0) {
+    return { tone: 'info', title: 'План на сегодня', message: `По расписанию: «${planned[0].title}». Начни, когда будешь готов.`, sessionId: planned[0].id };
+  }
+  // день отдыха по расписанию, но если отстаёшь от недельной нормы — предложи наверстать
+  if (weekPlanned > 0 && weekDone < weekPlanned - 1) {
+    const catchUp = hub.sessions.find((s) => s.type.trim().toLowerCase() === 'strength') ?? hub.sessions[0];
+    return {
+      tone: 'warn',
+      title: 'Отстаёшь от недельной нормы',
+      message: catchUp ? `За неделю ${weekDone} из ${weekPlanned} тренировок. Наверстай: «${catchUp.title}».` : `За неделю ${weekDone} из ${weekPlanned}. Добавь тренировку сегодня.`,
+      sessionId: catchUp?.id,
+    };
+  }
+  return { tone: 'good', title: 'Сегодня день отдыха', message: 'По плану восстановление. Держи шаги и сон — это тоже часть прогресса.' };
 }

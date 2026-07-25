@@ -356,7 +356,7 @@ export function applyProgram(pack: ProgramPack, actions: ProgramActions): number
     installPlugin(pack.plugin);
     count++;
   }
-  markInstalled(pack.id);
+  markInstalled(pack);
   ensureProgramStart(pack.id);
   return count;
 }
@@ -392,23 +392,42 @@ export function workoutStreak(healthLogs: { metric: string; date: string; value:
   return streak;
 }
 
-export function installedProgramIds(): string[] {
+/** Лёгкая мета установленной программы — чтобы виджет знал title/emoji/kind без расшифровки. */
+export interface InstalledProgram {
+  id: string;
+  title: string;
+  emoji: string;
+  kind: 'program' | 'hub';
+}
+
+export function installedPrograms(): InstalledProgram[] {
   try {
     const l = JSON.parse(localStorage.getItem(INSTALLED_KEY) || '[]');
-    return Array.isArray(l) ? l.filter((x) => typeof x === 'string') : [];
+    if (!Array.isArray(l)) return [];
+    // Миграция со старого формата (массив строк)
+    return l
+      .map((x): InstalledProgram | null =>
+        typeof x === 'string'
+          ? { id: x, title: x, emoji: '🎯', kind: 'program' }
+          : (x && typeof x.id === 'string' ? { id: x.id, title: x.title ?? x.id, emoji: x.emoji ?? '🎯', kind: x.kind === 'hub' ? 'hub' : 'program' } : null))
+      .filter((x): x is InstalledProgram => x !== null);
   } catch {
     return [];
   }
+}
+
+export function installedProgramIds(): string[] {
+  return installedPrograms().map((p) => p.id);
 }
 
 export function isInstalled(id: string): boolean {
   return installedProgramIds().includes(id);
 }
 
-function markInstalled(id: string) {
-  const set = new Set(installedProgramIds());
-  set.add(id);
-  localStorage.setItem(INSTALLED_KEY, JSON.stringify([...set]));
+function markInstalled(pack: ProgramPack) {
+  const list = installedPrograms().filter((p) => p.id !== pack.id);
+  list.push({ id: pack.id, title: pack.title, emoji: pack.emoji, kind: pack.hub ? 'hub' : 'program' });
+  localStorage.setItem(INSTALLED_KEY, JSON.stringify(list));
   window.dispatchEvent(new CustomEvent(PROGRAMS_EVENT));
 }
 

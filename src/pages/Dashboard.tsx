@@ -59,6 +59,8 @@ import { WIDGET_CATALOG, type WidgetMeta } from '@/lib/widgetCatalog';
 import { getInstalledPlugins, PLUGINS_EVENT, type PluginWidgetDef } from '@/lib/plugins';
 import { WidgetPicker } from '@/components/dashboard/WidgetPicker';
 import { PluginWidget, PLUGIN_ICONS } from '@/components/dashboard/PluginWidget';
+import { ProgramWidget } from '@/components/dashboard/ProgramWidget';
+import { installedPrograms, PROGRAMS_EVENT, type InstalledProgram } from '@/lib/marketplace';
 import { Puzzle } from 'lucide-react';
 import { TodayFocus } from '@/components/dashboard/TodayFocus';
 import { DayBrief } from '@/components/dashboard/DayBrief';
@@ -385,8 +387,36 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
     minH: 3,
   }));
 
+  // Купленные премиум-программы → отдельные виджеты (как плагины)
+  const [programs, setPrograms] = useState<InstalledProgram[]>(installedPrograms);
+  useEffect(() => {
+    const sync = () => setPrograms(installedPrograms());
+    window.addEventListener(PROGRAMS_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener(PROGRAMS_EVENT, sync); window.removeEventListener('storage', sync); };
+  }, []);
+  useEffect(() => {
+    const ids = new Set(programs.map((p) => `program:${p.id}`));
+    if (layout.some((l) => l.i.startsWith('program:') && !ids.has(l.i))) {
+      setLayout(layout.filter((l) => !l.i.startsWith('program:') || ids.has(l.i)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programs]);
+
+  const programMetas: WidgetMeta[] = programs.map((p) => ({
+    id: `program:${p.id}`,
+    label: p.title,
+    description: p.kind === 'hub' ? 'Фитнес-зал · премиум' : 'Программа · премиум',
+    category: 'health',
+    icon: Dumbbell,
+    w: 4,
+    h: 5,
+    minW: 3,
+    minH: 4,
+  }));
+
   const visibleIds = new Set(visibleLayout.map((l) => l.i));
-  const availableWidgets = [...WIDGET_CATALOG, ...pluginMetas].filter((m) => !visibleIds.has(m.id));
+  const availableWidgets = [...WIDGET_CATALOG, ...pluginMetas, ...programMetas].filter((m) => !visibleIds.has(m.id));
 
   const addWidget = (meta: WidgetMeta) => {
     setHidden((h) => h.filter((x) => x !== meta.id));
@@ -1217,6 +1247,10 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
       const p = plugins.find((x) => `plugin:${x.id}` === id);
       return p ? <PluginWidget def={p} /> : null;
     }
+    if (id.startsWith('program:')) {
+      const p = programs.find((x) => `program:${x.id}` === id);
+      return p ? <ProgramWidget program={p} /> : null;
+    }
     return previewWidgets[id]?.();
   };
 
@@ -1327,6 +1361,13 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                     {(() => {
                       const p = plugins.find((x) => `plugin:${x.id}` === l.i);
                       return p ? <PluginWidget def={p} /> : null;
+                    })()}
+                  </Cell>
+                ) : l.i.startsWith('program:') ? (
+                  <Cell editing={editing} onHide={() => hideWidget(l.i)}>
+                    {(() => {
+                      const p = programs.find((x) => `program:${x.id}` === l.i);
+                      return p ? <ProgramWidget program={p} /> : null;
                     })()}
                   </Cell>
                 ) : widgets[l.i]?.()}

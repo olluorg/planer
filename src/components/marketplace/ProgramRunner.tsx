@@ -51,14 +51,10 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [programId, onClose, total]);
 
-  if (!programId) return null;
-
+  // ВАЖНО: все хуки — ДО любого раннего return (правила хуков). Иначе при открытии
+  // (programId null → id) меняется число хуков и React падает в белый экран.
   const progress = programId ? getProgress(programId) : { start: '', done: [] as number[] };
-  const doneCount = progress.done.length;
-  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
-  const isDayDone = progress.done.includes(day);
   const today = programId ? currentDay(programId, total) : 1;
-
   const dayData: ProgramDay | undefined = pack?.days?.find((d) => d.day === day);
 
   const insights: AdaptiveInsight[] = useMemo(() => {
@@ -66,6 +62,12 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
     return analyzeProgram({ pack, healthLogs, start: progress.start, currentDay: today });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pack, programId, healthLogs, today, doneTick]);
+
+  if (!programId) return null;
+
+  const doneCount = progress.done.length;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  const isDayDone = progress.done.includes(day);
 
   const markDone = () => {
     toggleDayDone(programId, day);
