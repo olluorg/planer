@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
-import { exec, getDB, query } from './db';
+import { exec, getDB, query, bindPersistFlush, requestPersistentStorage, autoBackup } from './db';
 import type { Goal, Habit, HabitLog, HealthLog, HealthMetric, Milestone, ProgressRecord, Reflection, Task, TaskStage, TimeEntry, ChangeLog, XpEntry, Achievement } from './types';
 import { ACHIEVEMENTS, checkNewAchievements, computeStreak, levelFromXp, xpTotal, XP_REWARDS, type XpSource } from './gamification';
 import { useCombo } from './combo';
@@ -42,6 +42,8 @@ function rollRecurring() {
 
 interface State {
   ready: boolean;
+  /** Ошибка открытия БД (например, база новее приложения). Данные при этом целы. */
+  initError: Error | null;
   goals: Goal[];
   tasks: Task[];
   habits: Habit[];
@@ -102,6 +104,7 @@ const now = () => new Date().toISOString();
 
 export const useStore = create<State>((set, get) => ({
   ready: false,
+  initError: null,
   goals: [],
   tasks: [],
   habits: [],
@@ -118,12 +121,22 @@ export const useStore = create<State>((set, get) => ({
   recentUnlocks: [],
 
   init: async () => {
-    await getDB();
+    try {
+      await getDB();
+    } catch (e) {
+      // Не показываем пустое приложение поверх целой базы — падаем в явный экран ошибки.
+      set({ initError: e instanceof Error ? e : new Error(String(e)) });
+      return;
+    }
+    bindPersistFlush();
     // Демо-данные больше НЕ сеются автоматически — чистый старт по умолчанию.
     // Примеры можно загрузить вручную (Настройки) или получить цели из онбординга.
     rollRecurring(); // переносим просроченные активные повторы на сегодня
     get().reload();
     set({ ready: true });
+    // Фоном, после первого рендера: браузер не должен выселить данные, плюс суточный бэкап.
+    void requestPersistentStorage();
+    void autoBackup();
   },
 
   reload: () => {

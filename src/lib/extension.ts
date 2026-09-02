@@ -28,3 +28,24 @@ export function syncTasksToExtension(
   if (!isExtension) return;
   void cr().storage.local.set({ planer_tasks: tasks.filter((t) => t.status === 'active') });
 }
+
+/** Хосты AI-провайдеров и погоды объявлены в манифесте как optional_host_permissions:
+ *  расширение не должно требовать доступ к сторонним API у того, кто эти функции
+ *  не включал. Запрашиваем их в момент включения — обязательно из обработчика
+ *  клика, иначе Chrome отклонит запрос без диалога. Вне расширения — no-op. */
+export async function ensureHostPermission(origins: string[]): Promise<boolean> {
+  if (!isExtension) return true;
+  const perms = cr()?.permissions;
+  if (!perms) return true;
+  try {
+    if (await perms.contains({ origins })) return true;
+    return await perms.request({ origins });
+  } catch {
+    return false;
+  }
+}
+
+/** Хост-паттерн для origin'а из произвольного URL (endpoint AI-провайдера). */
+export function originPattern(url: string): string | null {
+  try { return `${new URL(url).origin}/*`; } catch { return null; }
+}

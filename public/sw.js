@@ -1,12 +1,23 @@
 // Minimal app-shell service worker. Caches the navigation shell and same-origin static assets
 // so the app boots offline. Dynamic data lives in IndexedDB and is independent of the cache.
 
-const CACHE = 'thedad-shell-v1';
-const SHELL = ['/', '/index.html', '/site.webmanifest'];
+// Версию подставляет сборка (см. плагин sw-version в vite.config.ts). В dev
+// остаётся плейсхолдер — там service worker не регистрируется.
+const CACHE = 'thedad-shell-__SW_VERSION__';
+// Только то, что реально существует по этим путям в проде. Манифест сюда не
+// входит: Vite отдаёт его по хешированному имени, и addAll() на 404 отклоняет
+// ВЕСЬ precache — приложение молча остаётся без офлайн-оболочки.
+const SHELL = ['/', '/index.html'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
-  self.skipWaiting();
+  // Без skipWaiting: новый воркер ждёт, пока пользователь сам согласится
+  // обновиться — иначе ассеты подменяются под открытым приложением.
+});
+
+// Кнопка «обновить» в интерфейсе просит ожидающий воркер активироваться.
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {

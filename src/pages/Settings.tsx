@@ -1,6 +1,7 @@
 import { Card, CardTitle } from "@/components/ui/card";
+import { todayISO } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
-import { resetDB, persist, DB_KEY } from "@/lib/db";
+import { resetDB, persist, DB_KEY, saveBackup } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme, isGlass } from "@/lib/theme";
 import {
@@ -19,6 +20,8 @@ import { compressImage } from "@/lib/imageCompress";
 import { getAiConfig, setAiConfig, askAI, AI_PROVIDERS, type AiConfig } from "@/lib/ai";
 import { parseIcs } from "@/lib/ics";
 import { SyncSettings } from "@/components/SyncSettings";
+import { BackupRestore } from "@/components/BackupRestore";
+import { FEATURE_PLUS } from "@/lib/features";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
 import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, PLUGINS_EVENT } from "@/lib/plugins";
@@ -92,12 +95,23 @@ export const SettingsPage = () => {
 
   const importDb = async (file: File) => {
     const buf = new Uint8Array(await file.arrayBuffer());
+    // Текущая база уходит в бэкап: импорт чужого файла не должен быть необратим.
+    const current = await get<Uint8Array>(DB_KEY);
+    if (current) await saveBackup(current, "pre-import");
     await set(DB_KEY, buf);
     location.reload();
   };
 
   const reset = async () => {
-    if (!confirm("Удалить все данные и пересоздать БД?")) return;
+    // Экспорт принудительный: удаление всех данных не должно быть возможно
+    // без файла на диске, из которого можно вернуться.
+    await exportDb();
+    const word = prompt(
+      "Сейчас скачался файл бэкапа — сохраните его.\n\n" +
+        "Это удалит ВСЕ данные без возможности отмены.\n" +
+        'Чтобы подтвердить, введите слово: УДАЛИТЬ',
+    );
+    if (word?.trim().toUpperCase() !== "УДАЛИТЬ") return;
     await resetDB();
     reload();
     location.reload();
@@ -132,7 +146,7 @@ export const SettingsPage = () => {
         if (kind === "tasks" && r.title) {
           addTask({
             title: r.title,
-            date: r.date || new Date().toISOString().slice(0, 10),
+            date: r.date || todayISO(),
             time_block: (r.time_block as any) || null,
             priority: r.priority ? Number(r.priority) : 2,
             tags: r.tags || null,
@@ -309,14 +323,21 @@ export const SettingsPage = () => {
         <PluginsSettings />
       </Card>
 
-      <Card>
-        <CardTitle>Синхронизация устройств</CardTitle>
-        <SyncSettings />
-      </Card>
+      {FEATURE_PLUS ? (
+        <Card>
+          <CardTitle>Синхронизация устройств</CardTitle>
+          <SyncSettings />
+        </Card>
+      ) : null}
 
       <Card>
         <CardTitle>AI-коуч</CardTitle>
         <AiSettings />
+      </Card>
+
+      <Card>
+        <CardTitle>Резервные копии</CardTitle>
+        <BackupRestore />
       </Card>
 
       <Card>

@@ -1,12 +1,31 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
-import { get, set } from 'idb-keyval';
+import { get, set, del, keys } from 'idb-keyval';
 
 export const DB_KEY = 'thedad.sqlite.v1';
 const LEGACY_KEYS = ['reform.sqlite.v1'];
+
+/** Версия схемы, которую понимает ЭТА сборка (PRAGMA user_version).
+ *  Поднимать на 1 при добавлении миграции в MIGRATIONS. */
+export const SCHEMA_VERSION = 1;
+
+const BACKUP_PREFIX = 'thedad.backup.';
+const BACKUP_KEEP = 3;
+const BACKUP_EVERY_MS = 24 * 60 * 60 * 1000;
+const LAST_BACKUP_KEY = 'thedad.backup.last';
+
 let SQL: SqlJsStatic | null = null;
 let db: Database | null = null;
 let saveTimer: number | null = null;
+
+/** БД создана более новой версией приложения — открывать её нельзя, иначе
+ *  старая сборка молча потеряет незнакомые ей поля. */
+export class DbTooNewError extends Error {
+  constructor(public dbVersion: number) {
+    super(`База данных создана более новой версией приложения (схема ${dbVersion}, поддерживается ${SCHEMA_VERSION}).`);
+    this.name = 'DbTooNewError';
+  }
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS goals (
@@ -159,7 +178,23 @@ function columnExists(d: Database, table: string, col: string): boolean {
   return false;
 }
 
-function migrate(d: Database) {
+function userVersion(d: Database): number {
+  const stmt = d.prepare(`PRAGMA user_version`);
+  try {
+    return stmt.step() ? Number((stmt.getAsObject() as { user_version: number }).user_version ?? 0) : 0;
+  } finally { stmt.free(); }
+}
+
+/** Миграции по номерам: индекс 0 приводит схему к версии 1, индекс 1 — к версии 2 и т.д.
+ *  Каждая должна быть идемпотентной — базы «до user_version» приходят с любым набором колонок. */
+const MIGRATIONS: Array<(d: Database) => void> = [
+  // → 1: колонки, добавлявшиеся до введения версионирования схемы.
+  (d) => {
+    baselineColumns(d);
+  },
+];
+
+function baselineColumns(d: Database) {
   if (!columnExists(d, 'tasks', 'parent_id')) d.exec(`ALTER TABLE tasks ADD COLUMN parent_id TEXT`);
   if (!columnExists(d, 'tasks', 'tags')) d.exec(`ALTER TABLE tasks ADD COLUMN tags TEXT`);
   if (!columnExists(d, 'tasks', 'estimate_min')) d.exec(`ALTER TABLE tasks ADD COLUMN estimate_min INTEGER`);
@@ -174,6 +209,75 @@ function migrate(d: Database) {
   d.exec(POST_MIGRATE_INDEXES);
 }
 
+/** Прогоняет недостающие миграции. Бэкап снимается ДО первой из них. */
+async function migrate(d: Database, stored: Uint8Array | null) {
+  const from = userVersion(d);
+  if (from > SCHEMA_VERSION) throw new DbTooNewError(from);
+  if (from === SCHEMA_VERSION) return;
+
+  if (stored) await saveBackup(stored, `pre-migrate-${from}`);
+  for (let v = from; v < SCHEMA_VERSION; v++) MIGRATIONS[v](d);
+  d.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+/* ---------- кольцевой бэкап ---------- */
+
+/** Кладёт дамп в отдельный ключ и оставляет только BACKUP_KEEP последних. */
+export async function saveBackup(data: Uint8Array, reason: string) {
+  try {
+    await set(`${BACKUP_PREFIX}${Date.now()}.${reason}`, data);
+    const all = (await keys()).filter((k): k is string => typeof k === 'string' && k.startsWith(BACKUP_PREFIX));
+    const stale = all.sort().slice(0, Math.max(0, all.length - BACKUP_KEEP));
+    for (const k of stale) await del(k);
+  } catch {
+    // Бэкап — лучшее усилие: нехватка места не должна ломать запуск приложения.
+  }
+}
+
+export interface BackupEntry { key: string; at: number; reason: string; }
+
+export async function listBackups(): Promise<BackupEntry[]> {
+  const all = (await keys()).filter((k): k is string => typeof k === 'string' && k.startsWith(BACKUP_PREFIX));
+  return all
+    .map((key) => {
+      const rest = key.slice(BACKUP_PREFIX.length);
+      const dot = rest.indexOf('.');
+      return { key, at: Number(rest.slice(0, dot < 0 ? undefined : dot)) || 0, reason: dot < 0 ? '' : rest.slice(dot + 1) };
+    })
+    .sort((a, b) => b.at - a.at);
+}
+
+/** Восстанавливает БД из бэкапа. Текущее состояние предварительно уходит в бэкап же. */
+export async function restoreBackup(key: string) {
+  const data = await get<Uint8Array>(key);
+  if (!data) throw new Error('Бэкап не найден');
+  if (db) await saveBackup(db.export(), 'pre-restore');
+  await set(DB_KEY, data);
+  db = null;
+  await getDB();
+}
+
+/** Раз в сутки снимает бэкап текущей БД. Вызывается после старта приложения. */
+export async function autoBackup() {
+  const last = Number(localStorage.getItem(LAST_BACKUP_KEY) || 0);
+  if (Date.now() - last < BACKUP_EVERY_MS) return;
+  if (!db) return;
+  // Отметку ставим ДО записи: экспорт БД асинхронный, и два параллельных вызова
+  // (StrictMode, две вкладки) иначе оба проходят проверку и плодят дубли,
+  // вытесняя из кольца реальные старые копии.
+  try { localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); } catch {}
+  await saveBackup(db.export(), 'daily');
+}
+
+/** Просит браузер не выселять IndexedDB. Возвращает итоговый статус. */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch { return false; }
+}
+
 export async function getDB(): Promise<Database> {
   if (db) return db;
   if (!SQL) {
@@ -186,9 +290,16 @@ export async function getDB(): Promise<Database> {
       if (legacy) { stored = legacy; await set(DB_KEY, legacy); break; }
     }
   }
-  db = stored ? new SQL.Database(stored) : new SQL.Database();
-  db.exec(SCHEMA);
-  migrate(db);
+  const opened = stored ? new SQL.Database(stored) : new SQL.Database();
+  try {
+    opened.exec(SCHEMA);
+    await migrate(opened, stored ?? null);
+  } catch (e) {
+    // Не оставляем полуоткрытую БД в модуле: следующий getDB() должен пробовать заново.
+    opened.close();
+    throw e;
+  }
+  db = opened;
   if (!stored) await persist();
   return db;
 }
@@ -205,6 +316,25 @@ export function schedulePersist() {
     void persist();
     saveTimer = null;
   }, 250);
+}
+
+/** Сбрасывает отложенную запись немедленно — на уходе со вкладки. */
+export function flushPersist() {
+  if (!saveTimer) return;
+  window.clearTimeout(saveTimer);
+  saveTimer = null;
+  void persist();
+}
+
+let flushBound = false;
+/** Вешает flush на уход со вкладки: иначе правки последних 250 мс теряются. */
+export function bindPersistFlush() {
+  if (flushBound) return;
+  flushBound = true;
+  window.addEventListener('pagehide', flushPersist);
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPersist();
+  });
 }
 
 export function exec(sql: string, params: any[] = []) {

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { todayISO } from './lib/utils';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -28,6 +29,7 @@ import { AiGenerateModal } from './components/AiGenerateModal';
 import { MarketplaceModal } from './components/marketplace/MarketplaceModal';
 import { ProgramRunner } from './components/marketplace/ProgramRunner';
 import { WorkoutHub } from './components/marketplace/WorkoutHub';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { MARKETPLACE_EVENT, PROGRAM_OPEN_EVENT, PROGRAM_HUB_EVENT } from './lib/marketplace';
 
 const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
@@ -59,6 +61,7 @@ const Loader = () => (
 export default function App() {
   const ready = useStore((s) => s.ready);
   const init = useStore((s) => s.init);
+  const initError = useStore((s) => s.initError);
   const [date, setDate] = useState(new Date());
   const [quickTab, setQuickTab] = useState<'task' | 'habit' | 'goal' | 'progress' | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -117,7 +120,7 @@ export default function App() {
     scheduleHeartbeat({
       morningBody: () => {
         const st = useStore.getState();
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayISO();
         const top = st.tasks
           .filter((t) => t.date === today && t.status === 'active' && !t.parent_id)
           .sort((a, b) => a.priority - b.priority)
@@ -127,7 +130,7 @@ export default function App() {
       },
       eveningBody: () => {
         const st = useStore.getState();
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayISO();
         const has = st.reflections.some((r) => r.date === today && r.mood !== null);
         if (has) return 'Хороший день. Завтра тоже получится.';
         const dt = st.tasks.filter((t) => t.date === today);
@@ -209,6 +212,28 @@ export default function App() {
     };
   }, []);
 
+  // БД не открылась (чаще всего — создана более новой версией). Данные целы,
+  // но работать с ними этой сборкой нельзя: показываем это явно, а не пустой экран.
+  if (initError) {
+    return (
+      <div className="h-full flex items-center justify-center bg-bg p-6">
+        <div className="max-w-md space-y-4 text-center">
+          <div className="text-2xl font-semibold">Не удалось открыть базу данных</div>
+          <div className="text-sm text-text-muted">{initError.message}</div>
+          <div className="text-sm text-text-muted">
+            Данные не пострадали. Обновите приложение до последней версии — после этого база откроется.
+          </div>
+          <button
+            className="px-4 py-2 rounded-xl bg-accent text-white"
+            onClick={() => window.location.reload()}
+          >
+            Перезагрузить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!ready) {
     return (
       <div className="h-full flex flex-col bg-bg">
@@ -258,6 +283,9 @@ export default function App() {
         />
         <main className="flex-1 overflow-auto pb-16 sm:pb-0">
           <div key={location.pathname} className="animate-[slide-up_240ms_cubic-bezier(0,0,0.2,1)] h-full">
+            {/* Вложенная граница: падение одной страницы не должно уносить сайдбар и топбар,
+                иначе пользователь не может уйти с неё даже мышью. Ключ по пути — сброс при навигации. */}
+            <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<Loader />}>
               <Routes location={location}>
                 <Route path="/index.html" element={<Navigate to="/" replace />} />
@@ -277,6 +305,7 @@ export default function App() {
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>

@@ -1,8 +1,13 @@
 /// <reference types="vite/client" />
 
+/** Версия приложения, подставляется Vite из package.json. */
+declare const __APP_VERSION__: string;
+
 interface ImportMetaEnv {
   /** Адрес sync-сервера в проде, напр. https://sync.example.com */
   readonly VITE_SYNC_SERVER_URL?: string;
+  /** '1' — включить платные функции (синк через наш сервер). По умолчанию выключено. */
+  readonly VITE_FEATURE_PLUS?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;

@@ -13,6 +13,7 @@
  * которые проходят через addGoal/addTask/addHabit и валидацию плагинов.
  */
 import * as ed from '@noble/ed25519';
+import { todayISO } from './utils';
 import type { GoalTpl, HabitTpl, TaskTpl } from './templates';
 import type { TimeBlock } from './types';
 import { installPlugin, validatePlugin, type PluginWidgetDef } from './plugins';
@@ -454,13 +455,13 @@ function saveProgress(m: Record<string, ProgressState>) {
 export function ensureProgramStart(id: string) {
   const m = allProgress();
   if (!m[id]) {
-    m[id] = { start: new Date().toISOString().slice(0, 10), done: [] };
+    m[id] = { start: todayISO(), done: [] };
     saveProgress(m);
   }
 }
 
 export function getProgress(id: string): ProgressState {
-  return allProgress()[id] ?? { start: new Date().toISOString().slice(0, 10), done: [] };
+  return allProgress()[id] ?? { start: todayISO(), done: [] };
 }
 
 /** Текущий день программы по календарю от старта (1..total, не цикличный). */
@@ -474,7 +475,7 @@ export function currentDay(id: string, total: number): number {
 
 export function toggleDayDone(id: string, day: number) {
   const m = allProgress();
-  const st = m[id] ?? { start: new Date().toISOString().slice(0, 10), done: [] };
+  const st = m[id] ?? { start: todayISO(), done: [] };
   const set = new Set(st.done);
   set.has(day) ? set.delete(day) : set.add(day);
   m[id] = { ...st, done: [...set].sort((a, b) => a - b) };

@@ -6,11 +6,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDate(new Date());
 }
 
+/** Календарная дата в ЛОКАЛЬНОМ поясе пользователя.
+ *  toISOString() здесь нельзя: он переводит в UTC, и восточнее Гринвича
+ *  локальная полночь уезжает на предыдущий день — «сегодня» до 03:00 в Москве
+ *  считалось вчерашним, а повторяющиеся задачи не сдвигались на следующий день. */
 export function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export function clamp(n: number, min: number, max: number) {

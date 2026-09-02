@@ -1,4 +1,5 @@
 import type { Goal, ProgressRecord } from './types';
+import { todayISO } from './utils';
 
 export interface Forecast {
   series: { date: string; value: number }[];
@@ -29,7 +30,7 @@ export function forecastGoal(
   const target = goal.target_value;
   const start = goal.start_value;
   const direction = target >= start ? 1 : -1;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   if (series.length < 2) {
     const flat: Forecast = {

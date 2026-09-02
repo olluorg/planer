@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { todayISO } from '@/lib/utils';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -253,7 +254,7 @@ export const GoalsPage = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={() => nav('/plan')}><Rocket className="h-4 w-4" /> Перейти в фокус</Button>
                 <div className="flex-1 min-w-[200px]">
-                  <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
+                  <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: todayISO(), value: v, note: null })} />
                 </div>
               </div>
             </div>
@@ -313,7 +314,7 @@ export const GoalsPage = () => {
               </div>
 
               <div className="mt-3 pt-3 border-t border-border-soft">
-                <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: new Date().toISOString().slice(0, 10), value: v, note: null })} />
+                <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: todayISO(), value: v, note: null })} />
               </div>
 
               {children.length > 0 && (

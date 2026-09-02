@@ -1,4 +1,5 @@
 import type { Goal, ProgressRecord } from './types';
+import { todayISO } from './utils';
 import { forecastGoal as linregForecast, type Forecast } from './predict';
 
 export type ForecastMethod = 'linreg' | 'ema' | 'holt';
@@ -42,7 +43,7 @@ function emaForecast(goal: Goal, records: ProgressRecord[], horizon: number, mul
   // velocity from last 5 daily values
   const tail = values.slice(-5);
   const vel = tail.length > 1 ? (tail[tail.length - 1] - tail[0]) / (tail.length - 1) * multiplier : 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const std = stddev(values.slice(-Math.min(values.length, 14)));
   const ci = 1.96 * std;
   const forecast = Array.from({ length: horizon }, (_, i) => {
@@ -71,7 +72,7 @@ function holtForecast(goal: Goal, records: ProgressRecord[], horizon: number, mu
     trend = beta * (level - prevLevel) + (1 - beta) * trend;
   }
   trend *= multiplier;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const std = stddev(values.slice(-Math.min(values.length, 14)));
   const ci = 1.96 * std;
   const forecast = Array.from({ length: horizon }, (_, i) => {
