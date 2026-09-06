@@ -1,3 +1,8 @@
+/* Inter (переменное начертание, вес 100-900). Подмножества по unicode-range:
+   браузер качает только нужные — для русского это latin + cyrillic, ~68 КБ.
+   Файлы приезжают из node_modules и попадают в сборку, наружу ничего не ходит. */
+@import '@fontsource-variable/inter';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
