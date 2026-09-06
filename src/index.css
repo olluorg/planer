@@ -452,7 +452,12 @@
 }
 
 /* === Goals: 2 колонки когда колонка списка достаточно широкая === */
-.goals-col { container-type: inline-size; }
+/* container-type: inline-size включает containment по инлайновой оси: ширина
+   элемента считается БЕЗ учёта содержимого. Пока родитель — flex-column с
+   align-items: start (то есть на всех экранах уже xl), вкладу содержимого
+   неоткуда взяться и колонка схлопывается в ноль вместе с карточками целей.
+   width: 100% задаёт ширину явно; в flex-row её перебивает flex-basis. */
+.goals-col { container-type: inline-size; width: 100%; }
 .goals-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 @container (min-width: 680px) {
   .goals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

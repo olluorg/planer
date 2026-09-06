@@ -236,7 +236,15 @@ export const GoalsPage = () => {
                     {g.deadline ? `Дедлайн ${fmtDate(g.deadline)} · прогноз ${f.etaDate ?? '—'}` : 'Без дедлайна'}
                   </div>
                 </div>
-                <ECharts height={90} option={forecastChart(g, recs, f, cc, accent)} />
+                {distinctDays(recs) < 2 ? (
+                  /* Пустой график ничего не объясняет — говорим, чего не хватает.
+                     Считаем именно РАЗНЫЕ дни: две отметки одним днём дают нулевой
+                     интервал, скорость из них не выводится и прогноз всё равно
+                     остался бы прочерком. */
+                  <ForecastHint left={2 - distinctDays(recs)} />
+                ) : (
+                  <ECharts height={90} option={forecastChart(g, recs, f, cc, accent)} />
+                )}
               </div>
 
               <MilestoneChips goal={g} accent={accent} />
@@ -1026,6 +1034,27 @@ const GoalStat: React.FC<{ label: string; value: string; valueClass?: string }> 
     <div className={`text-small font-semibold tabular-nums truncate ${valueClass ?? 'text-text'}`}>{value}</div>
   </div>
 );
+
+/** Сколько разных дат в отметках прогресса — столько точек у линии тренда. */
+function distinctDays(recs: { date: string }[]): number {
+  return new Set(recs.map((r) => r.date)).size;
+}
+
+/** Заглушка вместо графика, пока прогноз построить не из чего.
+ *  Прогноз — главное отличие приложения, и молчащий пустой график этого не
+ *  объясняет: пользователь решает, что функция сломана. */
+function ForecastHint({ left }: { left: number }) {
+  return (
+    <div className="h-[90px] rounded-xl border border-dashed border-border-soft flex flex-col items-center justify-center text-center px-3">
+      <TrendingUp className="h-4 w-4 text-text-muted mb-1.5" />
+      <div className="text-caption text-text-muted">
+        {left === 2
+          ? 'Отмечайте прогресс — после отметок в два разных дня появится прогноз с датой достижения'
+          : 'Ещё одна отметка в другой день — и появится прогноз с датой достижения'}
+      </div>
+    </div>
+  );
+}
 
 function forecastChart(goal: any, recs: any[], f: any, cc: ChartColors, accent: string) {
   const histDates = recs.map((r) => r.date);

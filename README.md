@@ -46,14 +46,18 @@ THEDAD — это инструмент, который связывает **це
 - **Аналитика, календарь, рефлексия, инсайты, шаблоны, плагины** (свои виджеты из
   JSON — [spec](docs/PLUGINS_SPEC.md)), импорт/экспорт (CSV, JSON, зашифрованный
   `.sqlite`, Markdown-отчёт).
+- **Резервные копии** — локальные автоснимки (кольцо из 3, перед миграциями и импортом)
+  и шифруемая на устройстве копия в `appDataFolder` Google Диска.
+- **Напоминания при закрытом приложении** — трей и таймеры в main-процессе Electron,
+  `chrome.alarms` в расширении. В браузере — только при открытой вкладке.
 
 ## Установка
 
 | Вариант | Как поставить |
 |---|---|
 | **Web / PWA** | Открыть сайт → меню аватара → «Установить приложение». Работает офлайн на телефоне и десктопе. |
-| **Chrome-расширение** | Скачать `planer-extension.zip` из [Releases](../../releases), распаковать, `chrome://extensions` → Режим разработчика → «Загрузить распакованное». Открывается **вместо новой вкладки** (Chrome спросит подтверждение) — поиск прямо в топбаре. |
-| **Windows (desktop)** | Установщик/portable из релизов репозитория `planer-desktop` (Electron). Установленная версия сама подтягивает обновления с GitHub. |
+| **Chrome-расширение** | Скачать `planer-extension.zip` из [релизов](https://github.com/uyellowline/thedad-releases/releases), распаковать, `chrome://extensions` → Режим разработчика → «Загрузить распакованное». Открывается **вместо новой вкладки** (Chrome спросит подтверждение) — поиск прямо в топбаре. |
+| **Windows (desktop)** | Установщик/portable из [релизов](https://github.com/uyellowline/thedad-releases/releases) (Electron, оболочка в `electron/`). Установленная версия сама подтягивает обновления. |
 | **Self-host (Docker)** | `docker compose up -d` → приложение на `:8080` + локальный AI (Ollama + Gemma) на `:11434`. Модель скачивается автоматически. |
 
 ### Бесплатный AI в Chrome
@@ -87,19 +91,36 @@ bun run dev        # http://localhost:5173
 ```
 
 ```bash
-bun run build      # прод-сборка в dist/
-bun run build:ext  # сборка Chrome-расширения в dist/
-bun run preview    # локальный предпросмотр сборки
-bun run lint       # tsc --noEmit
+bun run build         # прод-сборка в dist/
+bun run build:ext     # сборка Chrome-расширения в dist/
+bun run preview       # локальный предпросмотр сборки
+bun run lint          # tsc --noEmit
+bun run test          # vitest: прогноз, повторы, шифрование экспорта
+bun run desktop:dev   # Electron поверх запущенного dev-сервера
+bun run desktop:dist  # Windows-установщик + portable в release/
 ```
+
+### Переменные окружения
+
+Шаблон — [`.env.example`](.env.example). Все необязательные: без них
+соответствующие разделы честно сообщают, что не настроены.
+
+| Переменная | Зачем |
+|---|---|
+| `VITE_SYNC_SERVER_URL` | адрес sync-сервера (см. [`server/`](server/README.md)) |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth-клиент для копии в Google Диск, scope `drive.appdata` |
+| `VITE_FEATURE_PLUS` | `1` открывает платные разделы. По умолчанию скрыты — биллинга ещё нет |
 
 ## CI/CD и подпись сборок
 
-- **CI** (`.github/workflows/ci.yml`) — typecheck + build на каждый push/PR в `main`.
+- **CI** (`.github/workflows/ci.yml`) — typecheck, тесты, сборка и порог размера бандла
+  на каждый push/PR в `main`.
 - **Deploy** (`.github/workflows/deploy.yml`) — push в `main` публикует веб-версию на
-  GitHub Pages и прикладывает свежий `planer-extension.zip` (+ SHA-256) к GitHub Release.
-- **Desktop** — собирается в репозитории `planer-desktop` (electron-builder → NSIS +
-  portable), релиз с автообновлением через GitHub Releases.
+  GitHub Pages, а расширение и Windows-установщик кладёт одним релизом в публичный
+  репозиторий [`thedad-releases`](https://github.com/uyellowline/thedad-releases).
+  Для этого нужен секрет `RELEASES_TOKEN` — PAT с правом `contents:write` на него.
+- **Desktop** — `electron-builder` (NSIS + portable), автообновление через
+  `electron-updater` и тот же публичный репозиторий.
 - **Подпись:** расширение подписывает Chrome Web Store при публикации (для sideload
   подпись не нужна). Windows-установщик без купленного сертификата подписи покажет
   предупреждение SmartScreen — это нормально для OSS; сертификат (OV/EV) подключается
@@ -111,7 +132,9 @@ bun run lint       # tsc --noEmit
 ```
 src/
 ├── lib/            # бизнес-логика без UI
-│   ├── db.ts         — SQLite WASM + миграции + персист
+│   ├── db.ts         — SQLite WASM, версионированные миграции, персист, автоснимки
+│   ├── driveBackup.ts— шифрованная копия в appDataFolder Google Диска
+│   ├── crashlog.ts   — локальный журнал ошибок (наружу не уходит)
 │   ├── store.ts      — Zustand-стор (репозитории CRUD)
 │   ├── forecast.ts   — модели прогноза
 │   ├── ai.ts         — BYOK-провайдеры (OpenAI/Claude/Gemini/Ollama)
@@ -119,6 +142,8 @@ src/
 │   ├── screens.ts    — мульти-экраны дашборда
 │   └── gamification.ts, insights.ts, nutrition.ts, activity.ts, ...
 ├── components/     # переиспользуемые компоненты и ui-примитивы
+├── electron/       # оболочка десктопа: протокол app://, трей, напоминания
+├── server/         # sync-сервер Plus (Fastify + Postgres, хранит только шифр-текст)
 ├── pages/          # экраны-маршруты
 └── App.tsx         # роутинг + глобальные оверлеи (мини-плеер, AI, конфетти)
 ```
@@ -127,10 +152,15 @@ src/
 поток данных — [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md),
 дорожная карта — [`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md).
 
+Документация для пользователей живёт в публичном репозитории
+[`thedad-releases/docs`](https://github.com/uyellowline/thedad-releases/tree/main/docs).
+
 ## Данные приватны
 
 Всё хранится в IndexedDB вашего браузера. Сетевых запросов с пользовательскими
-данными нет. AI-ключи лежат только в localStorage устройства, запросы к провайдерам
+данными нет — кроме тех, что пользователь включает сам: копия в его собственный
+Google Диск и синхронизация через свой sync-сервер, и то и другое шифруется на
+устройстве до отправки. AI-ключи лежат только в localStorage устройства, запросы к провайдерам
 идут напрямую (без промежуточных серверов). Встроенный Chrome AI и Ollama работают
 полностью локально. Экспорт БД можно зашифровать паролем (AES-GCM + PBKDF2).
 
