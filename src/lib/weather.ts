@@ -23,26 +23,24 @@ function kindFromCode(code: number): Weather['kind'] {
   return 'cloudy';
 }
 
-/** Координаты: сперва точная геолокация браузера, при отказе — приблизительно по IP (без ключа).
- *  Так погода работает и когда пользователь не дал доступ к геолокации (частый случай в расширении). */
+/** Координаты берём ТОЛЬКО из геолокации браузера — по явному разрешению пользователя.
+ *
+ *  Раньше при отказе стоял запасной вариант: запрос к стороннему IP-геолокатору.
+ *  Он определял местоположение по IP, то есть отправлял адрес пользователя сервису,
+ *  о котором тот не знал, — при том что всё приложение построено на обещании никуда
+ *  ничего не отправлять. Вдобавок он и не работал: браузер блокировал запрос по CORS,
+ *  а в расширении этот хост вообще не разрешён. Без погоды приложение живёт,
+ *  с тихой утечкой IP — нет. */
 async function getCoords(): Promise<{ lat: number; lon: number } | null> {
-  if ('geolocation' in navigator) {
-    try {
-      const pos = await new Promise<GeolocationPosition>((res, rej) =>
-        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, maximumAge: TTL }),
-      );
-      return { lat: pos.coords.latitude, lon: pos.coords.longitude };
-    } catch { /* нет доступа — пробуем по IP ниже */ }
-  }
+  if (!('geolocation' in navigator)) return null;
   try {
-    const r = await fetch('https://ipapi.co/json/');
-    if (!r.ok) return null;
-    const j = await r.json();
-    if (typeof j.latitude === 'number' && typeof j.longitude === 'number') {
-      return { lat: j.latitude, lon: j.longitude };
-    }
-  } catch { /* IP-сервис недоступен */ }
-  return null;
+    const pos = await new Promise<GeolocationPosition>((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, maximumAge: TTL }),
+    );
+    return { lat: pos.coords.latitude, lon: pos.coords.longitude };
+  } catch {
+    return null;
+  }
 }
 
 export interface ForecastHour { time: string; temp: number; kind: Weather['kind'] }

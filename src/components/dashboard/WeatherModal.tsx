@@ -39,11 +39,11 @@ export const WeatherModal: React.FC<{ open: boolean; onClose: () => void }> = ({
           {data === 'loading' && <div className="py-16 text-center text-sm text-text-muted">Загружаю прогноз…</div>}
           {data === null && (
             <div className="py-12 px-4 text-center text-sm text-text-muted space-y-3">
-              <p className="text-text">Не удалось определить местоположение.</p>
+              <p className="text-text">Нужен доступ к геолокации.</p>
               <p className="text-text-muted leading-relaxed">
-                Обычно мы берём город по IP автоматически. Если и это не сработало —
-                разреши геолокацию: нажми на значок 🔒 слева от адреса → «Местоположение» → «Разрешить»,
-                затем обнови страницу.
+                Погода — единственное, ради чего приложение спрашивает местоположение,
+                и определять его окольными путями оно не будет. Разреши геолокацию:
+                значок 🔒 слева от адреса → «Местоположение» → «Разрешить», затем обнови страницу.
               </p>
               <button
                 onClick={() => { setData('loading'); void getForecast(true).then(setData); }}
