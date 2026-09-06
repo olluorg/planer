@@ -1,3 +1,6 @@
+import { syncRemindersToExtension } from './extension';
+import { desktopSetReminders } from './desktop';
+
 // Локальные напоминания: таймеры на переднем плане/в фоне вкладки.
 // Уведомления показываются через Service Worker registration — это системные
 // уведомления (с иконкой приложения), надёжнее, чем new Notification().
@@ -42,6 +45,11 @@ export function loadReminders(): Reminder[] {
 export function saveReminders(r: Reminder[]) {
   localStorage.setItem(STORAGE, JSON.stringify(r));
   scheduleAll();
+  // Дублируем в фон расширения и в main-процесс десктопа: таймеры страницы
+  // живут только пока открыта вкладка, а напоминание нужно как раз тогда,
+  // когда приложение закрыто.
+  syncRemindersToExtension(r);
+  desktopSetReminders(r);
 }
 
 function clearAll() { timers.forEach((t) => window.clearTimeout(t)); timers = []; }

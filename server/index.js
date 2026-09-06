@@ -4,6 +4,7 @@
 //  - email+пароль: сервер хранит хеш пароля и salt; encKey клиент выводит из пароля (PBKDF2).
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import pg from 'pg';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
@@ -22,14 +23,36 @@ async function initDb() {
       updated_at BIGINT DEFAULT 0
     );
   `);
+  // Каждый запрос к vault ищет строку по auth_token — без индекса это
+  // последовательный скан по всей таблице.
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_vaults_auth_token ON vaults (auth_token)');
 }
 
 const token = () => randomBytes(32).toString('base64url');
 const hashPw = (pw, salt) => scryptSync(pw, salt, 64).toString('hex');
+/** Регистр и пробелы не должны плодить разные аккаунты на один адрес. */
+const normEmail = (e) => (typeof e === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.trim()) ? e.trim().toLowerCase() : null);
 const safeEq = (a, b) => { const ab = Buffer.from(a), bb = Buffer.from(b); return ab.length === bb.length && timingSafeEqual(ab, bb); };
 
-const app = Fastify({ bodyLimit: 60 * 1024 * 1024 }); // до 60МБ на блоб БД
-await app.register(cors, { origin: true });
+const app = Fastify({ bodyLimit: 60 * 1024 * 1024, trustProxy: true }); // до 60МБ на блоб БД
+
+// CORS: список доменов через запятую в ALLOWED_ORIGINS. Пусто — разрешаем всё,
+// это режим локальной разработки; в проде список задавать обязательно, иначе
+// чужая страница сможет дёргать API от имени залогиненного пользователя.
+const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+await app.register(cors, { origin: allowed.length ? allowed : true });
+
+// Ограничение частоты. Общий потолок на IP плюс жёсткие лимиты на точки входа
+// ниже: без них /login открыт для перебора паролей, а /vault позволяет одним
+// скриптом создать сколько угодно пустых хранилищ.
+await app.register(rateLimit, {
+  global: true,
+  max: Number(process.env.RATE_LIMIT_MAX) || 120,
+  timeWindow: '1 minute',
+});
+
+/** Лимит для конкретного маршрута. */
+const limit = (max, timeWindow) => ({ config: { rateLimit: { max, timeWindow } } });
 
 // bearer authToken → vault
 async function auth(req, reply) {
@@ -44,7 +67,7 @@ async function auth(req, reply) {
 app.get('/health', async () => ({ ok: true }));
 
 // Аноним (для QR-привязки): создаёт пустой vault
-app.post('/vault', async () => {
+app.post('/vault', limit(5, '1 hour'), async () => {
   const id = randomUUID();
   const authToken = token();
   await pool.query('INSERT INTO vaults (id, auth_token) VALUES ($1, $2)', [id, authToken]);
@@ -52,10 +75,12 @@ app.post('/vault', async () => {
 });
 
 // Регистрация по email+паролю. salt приходит с клиента (для вывода encKey), сервер его лишь хранит.
-app.post('/register', async (req, reply) => {
-  const { email, password, salt } = req.body || {};
+app.post('/register', limit(5, '1 hour'), async (req, reply) => {
+  const { password, salt } = req.body || {};
+  const email = normEmail(req.body?.email);
   if (!email || !password || !salt) return reply.code(400).send({ error: 'email, password, salt required' });
-  const exists = await pool.query('SELECT 1 FROM vaults WHERE email = $1', [email]);
+  if (String(password).length < 8) return reply.code(400).send({ error: 'пароль короче 8 символов' });
+  const exists = await pool.query('SELECT 1 FROM vaults WHERE LOWER(email) = $1', [email]);
   if (exists.rows[0]) return reply.code(409).send({ error: 'email занят' });
   const id = randomUUID();
   const authToken = token();
@@ -64,10 +89,11 @@ app.post('/register', async (req, reply) => {
   return { syncId: id, authToken, salt };
 });
 
-app.post('/login', async (req, reply) => {
-  const { email, password } = req.body || {};
+app.post('/login', limit(10, '15 minutes'), async (req, reply) => {
+  const { password } = req.body || {};
+  const email = normEmail(req.body?.email);
   if (!email || !password) return reply.code(400).send({ error: 'email, password required' });
-  const { rows } = await pool.query('SELECT * FROM vaults WHERE email = $1', [email]);
+  const { rows } = await pool.query('SELECT * FROM vaults WHERE LOWER(email) = $1', [email]);
   const v = rows[0];
   if (!v || !v.pass_hash || !safeEq(v.pass_hash, hashPw(password, v.salt))) return reply.code(401).send({ error: 'неверный email или пароль' });
   return { syncId: v.id, authToken: v.auth_token, salt: v.salt };

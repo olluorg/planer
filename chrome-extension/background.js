@@ -5,44 +5,71 @@ const BLOCKS = {
   night:   { hour: 21, name: 'Ночь'   },
 };
 
+// Календарная дата в поясе пользователя. toISOString() дал бы UTC-день, и
+// восточнее Гринвича утреннее напоминание искало бы задачи вчерашней даты.
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-function scheduleAlarms() {
-  chrome.alarms.clearAll(() => {
-    const now = Date.now();
-    for (const [block, { hour }] of Object.entries(BLOCKS)) {
-      const t = new Date();
-      t.setHours(hour, 0, 0, 0);
-      if (t.getTime() <= now) t.setDate(t.getDate() + 1);
-      chrome.alarms.create(`remind-${block}`, {
-        when: t.getTime(),
-        periodInMinutes: 1440,
-      });
-    }
-  });
+/** Ближайшее наступление времени hh:mm — сегодня, если ещё не прошло, иначе завтра. */
+function nextOccurrence(hh, mm) {
+  const t = new Date();
+  t.setHours(hh, mm, 0, 0);
+  if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1);
+  return t.getTime();
+}
+
+async function scheduleAlarms() {
+  await chrome.alarms.clearAll();
+  for (const [block, { hour }] of Object.entries(BLOCKS)) {
+    chrome.alarms.create(`remind-${block}`, { when: nextOccurrence(hour, 0), periodInMinutes: 1440 });
+  }
+
+  // Личные напоминания пользователя. Страница кладёт их в chrome.storage, а
+  // будильники ставит именно фон: таймеры страницы умирают вместе со вкладкой,
+  // и напоминание, ради которого всё затевалось, не приходит.
+  const { planer_reminders = [] } = await chrome.storage.local.get('planer_reminders');
+  for (const r of planer_reminders) {
+    if (!r?.enabled || typeof r.time !== 'string') continue;
+    const [hh, mm] = r.time.split(':').map(Number);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
+    chrome.alarms.create(`custom-${r.id}`, { when: nextOccurrence(hh, mm), periodInMinutes: 1440 });
+  }
 }
 
 chrome.runtime.onInstalled.addListener(scheduleAlarms);
 chrome.runtime.onStartup.addListener(scheduleAlarms);
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === 'reschedule') scheduleAlarms();
+  if (msg?.type === 'reschedule') void scheduleAlarms();
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  const { planer_notifications_enabled } = await chrome.storage.local.get('planer_notifications_enabled');
+  if (planer_notifications_enabled === false) return;
+
+  if (alarm.name.startsWith('custom-')) {
+    const id = alarm.name.slice('custom-'.length);
+    const { planer_reminders = [] } = await chrome.storage.local.get('planer_reminders');
+    const r = planer_reminders.find((x) => x.id === id);
+    // Напоминание могли выключить или удалить между установкой будильника и его
+    // срабатыванием — тогда просто снимаем будильник.
+    if (!r?.enabled) { chrome.alarms.clear(alarm.name); return; }
+    chrome.notifications.create(`custom-${id}-${todayISO()}`, {
+      type: 'basic', iconUrl: 'icons/icon128.png', title: 'THEDAD', message: r.text, priority: 1,
+    });
+    return;
+  }
+
   if (!alarm.name.startsWith('remind-')) return;
   const block = alarm.name.slice('remind-'.length);
   const info = BLOCKS[block];
   if (!info) return;
 
   const today = todayISO();
-  const data = await chrome.storage.local.get(['planer_tasks', 'planer_notifications_enabled']);
-  const tasks = data.planer_tasks || [];
-  const enabled = data.planer_notifications_enabled !== false;
-
-  if (!enabled) return;
+  const { planer_tasks: tasks = [] } = await chrome.storage.local.get('planer_tasks');
 
   const pending = tasks.filter(
     (t) => t.date === today && t.time_block === block && t.status === 'active'

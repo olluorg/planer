@@ -22,6 +22,16 @@ export async function setExtSetting(key: string, value: unknown): Promise<void> 
   cr().runtime.sendMessage({ type: 'reschedule' }).catch(() => {});
 }
 
+/** Отдаёт личные напоминания фону расширения: только он может показать их,
+ *  когда вкладка закрыта. Вне расширения — no-op. */
+export function syncRemindersToExtension(
+  reminders: Array<{ id: string; text: string; time: string; enabled: boolean }>,
+): void {
+  if (!isExtension) return;
+  void cr().storage.local.set({ planer_reminders: reminders });
+  cr().runtime.sendMessage({ type: 'reschedule' }).catch(() => {});
+}
+
 export function syncTasksToExtension(
   tasks: Array<{ status: string; date: string; time_block: string | null; title: string; id: string }>,
 ): void {

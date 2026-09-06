@@ -1,8 +1,11 @@
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
-// Пока рендереру от нативной части ничего не нужно: данные лежат в IndexedDB.
-// Мост оставлен как точка роста — сюда добавятся экспорт в файл, автозапуск, трей.
+// Данные живут в IndexedDB рендерера, натив нужен только там, где браузерных
+// возможностей не хватает: напоминания при закрытом окне.
 contextBridge.exposeInMainWorld('desktop', {
   platform: process.platform,
   version: process.versions.electron,
+  /** Передать расписание напоминаний main-процессу: он показывает их и тогда,
+   *  когда окно свёрнуто в трей и рендерер не выполняется. */
+  setReminders: (reminders) => ipcRenderer.send('reminders:set', reminders),
 });
