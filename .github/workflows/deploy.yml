@@ -28,6 +28,8 @@ jobs:
           # Actions → Variables: VITE_SYNC_SERVER_URL = https://sync.thedad.ru
           # Не задан → в сборке останется localhost, и синк у тестеров не заработает.
           VITE_SYNC_SERVER_URL: ${{ vars.VITE_SYNC_SERVER_URL }}
+          # OAuth client_id для бэкапа в Google Диск. Не задан → раздел скрыт.
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -46,9 +48,14 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
 
-  # ── Chrome extension → GitHub Releases ──────────────────────────────────
+  # ── Артефакты → публичный репозиторий релизов ───────────────────────────
+  # Код лежит в приватном репозитории, а скачивать сборки и заводить issue
+  # пользователи должны в публичном. RELEASES_TOKEN — PAT с правом contents:write
+  # на uyellowline/thedad-releases (github.token сюда не дотягивается).
   release-extension:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -61,23 +68,59 @@ jobs:
         run: cd dist && zip -r ../planer-extension.zip .
 
       - name: Checksum
-        run: sha256sum planer-extension.zip > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum planer-extension.zip > SHA256SUMS-extension.txt
+
+      - id: meta
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Publish release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          REPO: uyellowline/thedad-releases
+          TAG: ${{ steps.meta.outputs.tag }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="v${VERSION}"
-          NOTES="Установка: \`chrome://extensions\` → Режим разработчика → Загрузить распакованное — или распаковать zip.
+          NOTES="Расширение Chrome: \`chrome://extensions\` → Режим разработчика → Загрузить распакованное (или распаковать zip).
+
+          Десктоп для Windows: файл \`THEDAD Setup\`.
 
           Сборка: \`${{ github.sha }}\`"
 
-          if gh release view "$TAG" &>/dev/null; then
-            gh release upload "$TAG" planer-extension.zip SHA256SUMS --clobber
+          if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
+            gh release upload "$TAG" planer-extension.zip SHA256SUMS-extension.txt --repo "$REPO" --clobber
           else
-            gh release create "$TAG" \
-              --title "THEDAD Extension ${TAG}" \
+            gh release create "$TAG" --repo "$REPO" \
+              --title "THEDAD ${TAG}" \
               --notes "$NOTES" \
-              planer-extension.zip SHA256SUMS
+              planer-extension.zip SHA256SUMS-extension.txt
           fi
+
+  # ── Десктоп (Windows) → тот же релиз ────────────────────────────────────
+  # Идёт после расширения: релиз к этому моменту уже существует, и два задания
+  # не пытаются создать один и тот же тег одновременно.
+  release-desktop:
+    needs: release-extension
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Build desktop installer
+        run: bun run desktop:dist
+        env:
+          VITE_SYNC_SERVER_URL: ${{ vars.VITE_SYNC_SERVER_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          # Публикацию делаем сами через gh — иначе electron-builder полез бы
+          # в приватный репозиторий, откуда пользователи скачать не смогут.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          REPO: uyellowline/thedad-releases
+          TAG: ${{ needs.release-extension.outputs.tag }}
+        run: |
+          # latest.yml обязателен: по нему electron-updater находит обновление.
+          gh release upload "$TAG" --repo "$REPO" --clobber \
+            release/*.exe release/*.blockmap release/latest.yml
