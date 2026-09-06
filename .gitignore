@@ -4,6 +4,8 @@ dist
 *.log
 .DS_Store
 .env*
+# Шаблон переменных — единственный .env, который должен быть в репозитории
+!.env.example
 
 # Ключи и лицензии маркетплейса — приватные, не коммитить
 secrets/
@@ -22,3 +24,6 @@ package-lock.json
 
 # Кэш инкрементальной сборки TypeScript
 *.tsbuildinfo
+
+# Иконка десктопа генерируется из public/logo-dark.png (bun run desktop:icon)
+build/icon.png

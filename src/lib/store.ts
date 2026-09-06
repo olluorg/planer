@@ -134,9 +134,11 @@ export const useStore = create<State>((set, get) => ({
     rollRecurring(); // переносим просроченные активные повторы на сегодня
     get().reload();
     set({ ready: true });
-    // Фоном, после первого рендера: браузер не должен выселить данные, плюс суточный бэкап.
+    // Фоном, после первого рендера: браузер не должен выселить данные, плюс
+    // суточные копии — локальная и, если подключена, в Google Диск.
     void requestPersistentStorage();
     void autoBackup();
+    void import('./driveBackup').then((m) => m.autoDriveBackup(m.getDrivePassphrase()));
   },
 
   reload: () => {

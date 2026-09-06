@@ -21,6 +21,7 @@ import { getAiConfig, setAiConfig, askAI, AI_PROVIDERS, type AiConfig } from "@/
 import { parseIcs } from "@/lib/ics";
 import { SyncSettings } from "@/components/SyncSettings";
 import { BackupRestore } from "@/components/BackupRestore";
+import { DriveBackupSettings } from "@/components/DriveBackupSettings";
 import { FEATURE_PLUS } from "@/lib/features";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
@@ -333,6 +334,11 @@ export const SettingsPage = () => {
       <Card>
         <CardTitle>AI-коуч</CardTitle>
         <AiSettings />
+      </Card>
+
+      <Card>
+        <CardTitle>Копия в Google Диск</CardTitle>
+        <DriveBackupSettings />
       </Card>
 
       <Card>

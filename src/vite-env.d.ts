@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_SYNC_SERVER_URL?: string;
   /** '1' — включить платные функции (синк через наш сервер). По умолчанию выключено. */
   readonly VITE_FEATURE_PLUS?: string;
+  /** OAuth client_id для бэкапа в Google Диск. Пусто — раздел скрыт. */
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;
