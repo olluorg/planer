@@ -1,28 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
-import fs from 'node:fs';
-import pkg from './package.json' with { type: 'json' };
+import { appDefine, cspMeta, swVersion, spaFallback } from './vite.shared';
 
-/** Подставляет версию сборки в кэш service worker'а: без этого имя кэша
- *  захардкожено и старые ассеты живут вечно. */
-function swVersion(version: string) {
-  return {
-    name: 'sw-version',
-    closeBundle() {
-      const out = path.resolve(__dirname, 'dist/sw.js');
-      if (!fs.existsSync(out)) return;
-      const src = fs.readFileSync(out, 'utf-8');
-      fs.writeFileSync(out, src.replace(/__SW_VERSION__/g, `${version}-${Date.now().toString(36)}`));
-    },
-  };
-}
+const outDir = path.resolve(__dirname, 'dist');
 
 export default defineConfig({
   base: '/',
   // Версия из package.json доступна в коде — нужна в отчётах об ошибках и в About.
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
-  plugins: [react(), swVersion(pkg.version)],
+  define: appDefine,
+  plugins: [react(), cspMeta(), swVersion(outDir), spaFallback(outDir)],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },

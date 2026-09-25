@@ -27,3 +27,7 @@ package-lock.json
 
 # Иконка десктопа генерируется из public/logo-dark.png (bun run desktop:icon)
 build/icon.png
+
+# Артефакты Playwright
+test-results/
+playwright-report/

@@ -310,15 +310,24 @@ export async function persist() {
   await set(DB_KEY, data);
 }
 
+/** Запись на диск сразу после текущей задачи.
+ *
+ *  Раньше здесь был debounce на 250 мс, а правки из этого окна должен был
+ *  спасать flush на pagehide. Не спасал: запись в IndexedDB, начатая во время
+ *  выгрузки страницы, обрывается вместе с документом, и отметка, сделанная
+ *  прямо перед закрытием вкладки или обновлением, пропадала (e2e-тест ловит
+ *  это стабильно). Теперь окна нет: все exec() одного обработчика склеиваются
+ *  в один экспорт, который уходит в IndexedDB, как только обработчик отработал
+ *  и интерфейс отрисовался. */
 export function schedulePersist() {
-  if (saveTimer) window.clearTimeout(saveTimer);
+  if (saveTimer) return; // экспорт уже запланирован — он заберёт и эту правку
   saveTimer = window.setTimeout(() => {
-    void persist();
     saveTimer = null;
-  }, 250);
+    void persist();
+  }, 0);
 }
 
-/** Сбрасывает отложенную запись немедленно — на уходе со вкладки. */
+/** Сбрасывает запланированную запись немедленно — страховка на уходе со вкладки. */
 export function flushPersist() {
   if (!saveTimer) return;
   window.clearTimeout(saveTimer);
@@ -327,7 +336,9 @@ export function flushPersist() {
 }
 
 let flushBound = false;
-/** Вешает flush на уход со вкладки: иначе правки последних 250 мс теряются. */
+/** Вешает flush на уход со вкладки. Основную защиту даёт немедленная запись
+ *  в schedulePersist; это лишь подстраховка на случай, если выгрузка началась
+ *  в ту же миллисекунду. */
 export function bindPersistFlush() {
   if (flushBound) return;
   flushBound = true;

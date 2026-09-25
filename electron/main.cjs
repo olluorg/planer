@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, session, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -153,6 +153,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Явно, а не по умолчанию: preload нужен только contextBridge и ipcRenderer,
+      // а песочница отрезает рендерер от Node даже при ошибке в preload.
+      sandbox: true,
     },
   });
 
@@ -192,6 +195,15 @@ function createWindow() {
     return { action: 'deny' };
   });
 
+  // Окно с мостом в main-процесс не должно уходить на чужой сайт: ссылка без
+  // target=_blank или редирект увели бы его туда вместе с window.desktop.
+  // Своё приложение — пропускаем, внешнее — в системный браузер.
+  win.webContents.on('will-navigate', (e, url) => {
+    if (isAppUrl(url)) return;
+    e.preventDefault();
+    if (/^https?:/.test(url)) shell.openExternal(url);
+  });
+
   if (DEV_URL) {
     win.loadURL(DEV_URL);
   } else {
@@ -216,7 +228,21 @@ function setupAutoUpdate() {
   }
 }
 
+/** Адрес принадлежит самому приложению (упакованному или dev-серверу). */
+function isAppUrl(url) {
+  if (url.startsWith('app://planer/')) return true;
+  return Boolean(DEV_URL) && url.startsWith(DEV_URL);
+}
+
+/** Из всех разрешений браузера приложению нужны три: уведомления, геолокация
+ *  для погоды и запись в буфер обмена для «Скопировать отчёт». Камера,
+ *  микрофон, MIDI и прочее — отказ без вопросов. */
+const ALLOWED_PERMISSIONS = new Set(['notifications', 'geolocation', 'clipboard-sanitized-write']);
+
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
+    cb(ALLOWED_PERMISSIONS.has(permission) && isAppUrl(wc.getURL()));
+  });
   if (!DEV_URL) serveRenderer();
   createWindow();
   createTray();

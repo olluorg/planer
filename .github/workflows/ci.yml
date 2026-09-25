@@ -19,6 +19,12 @@ jobs:
         run: bun run test
       - name: Build
         run: bun run build
+      - name: E2E (Playwright, по продакшен-сборке)
+        # Ловит то, чего не видно в dev: CSP, потерю данных при перезагрузке,
+        # схлопывание вёрстки на узких экранах.
+        run: |
+          bunx playwright install --with-deps chromium
+          bunx playwright test
       - name: Bundle size guard
         # Меряем только код и его ассеты (dist/assets): обои и контент-паки лежат
         # рядом статикой и к весу JS отношения не имеют. Порог ловит незаметный
