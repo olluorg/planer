@@ -119,7 +119,7 @@ export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onPalette,
           <Logo size={30} className="shrink-0" />
           <span className="hidden md:block text-[15px] font-bold text-text">THEDAD</span>
         </button>
-        <Button variant="soft" size="sm" onClick={onFocusMode} className="shrink-0 gap-1.5" title="Focus Mode (Ctrl+Shift+F)">
+        <Button variant="soft" size="sm" onClick={onFocusMode} className="shrink-0 gap-1.5" title="Фокус-режим (Ctrl+Shift+F)">
           <Crosshair className="h-4 w-4" /> <span className="hidden sm:inline">Фокус</span>
         </Button>
 

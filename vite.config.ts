@@ -21,6 +21,10 @@ export default defineConfig({
       output: {
         manualChunks: (id) => {
           if (!id.includes('node_modules')) return undefined;
+          // Пакеты, которые грузятся только динамическим import(): отдаём решение
+          // Rollup'у. Иначе правило ниже загоняет их в стартовый vendor и
+          // ленивая загрузка молча перестаёт быть ленивой.
+          if (id.includes('@noble/') || id.includes('/qrcode/')) return undefined;
           if (id.includes('echarts') || id.includes('zrender')) return 'charts';
           if (id.includes('react-grid-layout') || id.includes('react-resizable') || id.includes('react-draggable')) return 'grid';
           if (id.includes('sql.js')) return 'sqlite';

@@ -57,9 +57,7 @@ import { ScreenTabs } from '@/components/dashboard/ScreenTabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { WIDGET_CATALOG, type WidgetMeta } from '@/lib/widgetCatalog';
 import { getInstalledPlugins, PLUGINS_EVENT, type PluginWidgetDef } from '@/lib/plugins';
-import { WidgetPicker } from '@/components/dashboard/WidgetPicker';
 import { PluginWidget, PLUGIN_ICONS } from '@/components/dashboard/PluginWidget';
-import { ProgramWidget } from '@/components/dashboard/ProgramWidget';
 import { installedPrograms, PROGRAMS_EVENT, type InstalledProgram } from '@/lib/marketplace';
 import { Puzzle } from 'lucide-react';
 import { TodayFocus } from '@/components/dashboard/TodayFocus';
@@ -67,21 +65,28 @@ import { DayBrief } from '@/components/dashboard/DayBrief';
 import { TodayPlanList } from '@/components/dashboard/TodayPlanList';
 import { HabitDots } from '@/components/dashboard/HabitDots';
 import { WeeklyConsistency } from '@/components/dashboard/WeeklyConsistency';
-import { TimeAllocation } from '@/components/dashboard/TimeAllocation';
-import { WeekProgressChart } from '@/components/dashboard/WeekProgressChart';
 import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
-import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
-import { HealthWidget } from '@/components/dashboard/HealthWidget';
-import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
-import { WorkoutWidget } from '@/components/dashboard/WorkoutWidget';
-import { CaloriesWidget } from '@/components/dashboard/CaloriesWidget';
-import { ActivityWidget } from '@/components/dashboard/ActivityWidget';
-import { SoundscapeWidget } from '@/components/dashboard/SoundscapeWidget';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
-import { CoachPanel } from '@/components/dashboard/CoachPanel';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
+import { lazyNamed, WidgetSkeleton } from '@/components/lazy';
+
+// Виджеты, которых может не быть на экране, грузятся по требованию: иначе их код
+// (вместе с базой продуктов калорий, звуками, тренировками) тянулся до первой
+// отрисовки у всех, даже у тех, кто эти виджеты не включал.
+const WeekProgressChart = lazyNamed(() => import('@/components/dashboard/WeekProgressChart').then((m) => m.WeekProgressChart), <WidgetSkeleton />);
+const TimeAllocation = lazyNamed(() => import('@/components/dashboard/TimeAllocation').then((m) => m.TimeAllocation), <WidgetSkeleton />);
+const UpcomingEvents = lazyNamed(() => import('@/components/dashboard/UpcomingEvents').then((m) => m.UpcomingEvents), <WidgetSkeleton />);
+const HealthWidget = lazyNamed(() => import('@/components/dashboard/HealthWidget').then((m) => m.HealthWidget), <WidgetSkeleton />);
+const CalendarWidget = lazyNamed(() => import('@/components/dashboard/CalendarWidget').then((m) => m.CalendarWidget), <WidgetSkeleton />);
+const WorkoutWidget = lazyNamed(() => import('@/components/dashboard/WorkoutWidget').then((m) => m.WorkoutWidget), <WidgetSkeleton />);
+const CaloriesWidget = lazyNamed(() => import('@/components/dashboard/CaloriesWidget').then((m) => m.CaloriesWidget), <WidgetSkeleton />);
+const ActivityWidget = lazyNamed(() => import('@/components/dashboard/ActivityWidget').then((m) => m.ActivityWidget), <WidgetSkeleton />);
+const SoundscapeWidget = lazyNamed(() => import('@/components/dashboard/SoundscapeWidget').then((m) => m.SoundscapeWidget), <WidgetSkeleton />);
+const CoachPanel = lazyNamed(() => import('@/components/dashboard/CoachPanel').then((m) => m.CoachPanel), <WidgetSkeleton />);
+const WidgetPicker = lazyNamed(() => import('@/components/dashboard/WidgetPicker').then((m) => m.WidgetPicker), null);
+const ProgramWidget = lazyNamed(() => import('@/components/dashboard/ProgramWidget').then((m) => m.ProgramWidget), <WidgetSkeleton />);
 import { Sparkles } from 'lucide-react';
 
 const BLOCKS = [

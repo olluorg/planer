@@ -12,6 +12,7 @@
 import { get, set } from 'idb-keyval';
 import { DB_KEY, persist, saveBackup } from './db';
 import { encryptBytes, decryptBytes } from './cryptoExport';
+import { isExtension } from './extension';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -106,6 +107,38 @@ function loadGis(): Promise<void> {
 async function getToken(interactive: boolean): Promise<string> {
   if (!CLIENT_ID) throw new Error('Google-бэкап не настроен в этой сборке');
   if (accessToken && Date.now() < tokenExpiresAt - 60_000) return accessToken;
+  return isExtension ? getTokenExtension(interactive) : getTokenWeb(interactive);
+}
+
+/** Расширение: скрипт Google Identity туда не загрузить — CSP расширения
+ *  разрешает только собственный код. Зато у Chrome есть свой механизм входа:
+ *  chrome.identity открывает окно Google и возвращает токен в адресе
+ *  перенаправления. Адрес вида https://<id>.chromiumapp.org/ должен быть в
+ *  списке разрешённых у того же OAuth-клиента (см. DEPLOY.md). */
+async function getTokenExtension(interactive: boolean): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const identity = (globalThis as any).chrome?.identity;
+  if (!identity?.launchWebAuthFlow) throw new Error('В этой версии Chrome вход через Google недоступен');
+  const redirect = identity.getRedirectURL() as string;
+  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('client_id', CLIENT_ID);
+  url.searchParams.set('response_type', 'token');
+  url.searchParams.set('redirect_uri', redirect);
+  url.searchParams.set('scope', SCOPE);
+  if (interactive) url.searchParams.set('prompt', 'consent');
+
+  const back: string | undefined = await identity.launchWebAuthFlow({ url: url.toString(), interactive });
+  if (!back) throw new Error('Окно доступа закрыто');
+  const params = new URLSearchParams(new URL(back).hash.slice(1));
+  const token = params.get('access_token');
+  if (!token) throw new Error(params.get('error_description') || params.get('error') || 'Доступ к Google Диску не выдан');
+  accessToken = token;
+  tokenExpiresAt = Date.now() + Number(params.get('expires_in') ?? 3600) * 1000;
+  return token;
+}
+
+/** Веб и десктоп: Google Identity Services, токен без client secret. */
+async function getTokenWeb(interactive: boolean): Promise<string> {
   await loadGis();
   const oauth2 = gis();
   if (!oauth2) throw new Error('Google Identity недоступен');

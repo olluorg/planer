@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Cloud, CloudOff, RefreshCw, Download } from 'lucide-react';
 import { toast } from '@/lib/toast';
-import { isExtension } from '@/lib/extension';
 import {
   driveConfigured, getDriveState, onDriveChange, listDriveBackups, uploadBackup,
   restoreFromDrive, disableDriveBackup, getDrivePassphrase, setDrivePassphrase, type DriveBackup,
@@ -26,17 +25,6 @@ export function DriveBackupSettings() {
     return (
       <div className="text-sm text-text-muted">
         Резервная копия в Google Диск не настроена в этой сборке.
-      </div>
-    );
-  }
-
-  // CSP расширения (script-src 'self') не пускает скрипт Google Identity, а
-  // подменять его на chrome.identity — отдельная работа. Не делаем вид, что работает.
-  if (isExtension) {
-    return (
-      <div className="text-sm text-text-muted">
-        В расширении копия в Google Диск пока недоступна. Используйте веб-версию
-        на thedad.ru или экспорт в файл ниже.
       </div>
     );
   }

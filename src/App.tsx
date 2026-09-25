@@ -9,7 +9,6 @@ import { QuickAddDialog } from './components/QuickAddDialog';
 import { CommandPalette } from './components/CommandPalette';
 import { WidgetExpandModal } from './components/WidgetExpandModal';
 import { Confetti } from './components/Confetti';
-import { FocusMode } from './components/FocusMode';
 import { Onboarding } from './components/Onboarding';
 import { isOnboardingDone } from './lib/onboarding';
 import { focusShouldResume } from './lib/focusSession';
@@ -25,11 +24,16 @@ import { useHealthSync } from './lib/healthSync';
 import { AppLiveWallpaper } from './components/AppLiveWallpaper';
 import { Celebration } from './components/Celebration';
 import { MiniPlayer } from './components/MiniPlayer';
-import { AiGenerateModal } from './components/AiGenerateModal';
-import { MarketplaceModal } from './components/marketplace/MarketplaceModal';
-import { ProgramRunner } from './components/marketplace/ProgramRunner';
-import { WorkoutHub } from './components/marketplace/WorkoutHub';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { lazyNamed, MountOnce } from './components/lazy';
+
+// Окна, которые открываются по требованию, грузятся при первом открытии —
+// вместе ~2100 строк кода, которые раньше шли до первой отрисовки у всех.
+const FocusMode = lazyNamed(() => import('./components/FocusMode').then((m) => m.FocusMode));
+const AiGenerateModal = lazyNamed(() => import('./components/AiGenerateModal').then((m) => m.AiGenerateModal));
+const MarketplaceModal = lazyNamed(() => import('./components/marketplace/MarketplaceModal').then((m) => m.MarketplaceModal));
+const ProgramRunner = lazyNamed(() => import('./components/marketplace/ProgramRunner').then((m) => m.ProgramRunner));
+const WorkoutHub = lazyNamed(() => import('./components/marketplace/WorkoutHub').then((m) => m.WorkoutHub));
 import { MARKETPLACE_EVENT, PROGRAM_OPEN_EVENT, PROGRAM_HUB_EVENT } from './lib/marketplace';
 
 const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
@@ -342,17 +346,19 @@ export default function App() {
           {expandPage === 'settings' && <SettingsPage />}
         </Suspense>
       </WidgetExpandModal>
-      <FocusMode open={focusOpen} initialTaskId={focusTaskId} onClose={() => { setFocusOpen(false); setFocusTaskId(null); }} />
+      <MountOnce on={focusOpen}>
+        <FocusMode open={focusOpen} initialTaskId={focusTaskId} onClose={() => { setFocusOpen(false); setFocusTaskId(null); }} />
+      </MountOnce>
       <Onboarding open={onboardOpen} onClose={() => setOnboardOpen(false)} />
       <InboxPopover open={inboxOpen} onClose={() => setInboxOpen(false)} initialTab={inboxTab} />
       <Confetti trigger={confettiTrigger} />
       <Celebration />
       <AppLiveWallpaper suspended={focusOpen} />
       <MiniPlayer />
-      <AiGenerateModal open={aiGenOpen} onOpenChange={setAiGenOpen} />
-      <MarketplaceModal open={marketOpen} onClose={() => setMarketOpen(false)} />
-      <ProgramRunner programId={programId} onClose={() => setProgramId(null)} />
-      <WorkoutHub programId={hubId} onClose={() => setHubId(null)} />
+      <MountOnce on={aiGenOpen}><AiGenerateModal open={aiGenOpen} onOpenChange={setAiGenOpen} /></MountOnce>
+      <MountOnce on={marketOpen}><MarketplaceModal open={marketOpen} onClose={() => setMarketOpen(false)} /></MountOnce>
+      <MountOnce on={!!programId}><ProgramRunner programId={programId} onClose={() => setProgramId(null)} /></MountOnce>
+      <MountOnce on={!!hubId}><WorkoutHub programId={hubId} onClose={() => setHubId(null)} /></MountOnce>
       <ShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <Toaster />
     </div>

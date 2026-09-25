@@ -12,7 +12,6 @@
  * Ничего не исполняется: расшифрованный пак — это декларативные данные (как шаблоны/плагины),
  * которые проходят через addGoal/addTask/addHabit и валидацию плагинов.
  */
-import * as ed from '@noble/ed25519';
 import { todayISO } from './utils';
 import type { GoalTpl, HabitTpl, TaskTpl } from './templates';
 import type { TimeBlock } from './types';
@@ -254,6 +253,9 @@ export async function redeemLicense(raw: string, publicKeyB64: string = MARKETPL
   }
   const { payloadBytes, payload, sig } = parseLicense(raw);
   const pub = fromB64(publicKeyB64);
+  // Библиотека подписи нужна только здесь — при вводе ключа. Статический
+  // импорт тянул её в стартовый бандл каждому пользователю.
+  const ed = await import('@noble/ed25519');
   let ok = false;
   try {
     ok = await ed.verifyAsync(sig, payloadBytes, pub);

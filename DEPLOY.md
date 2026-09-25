@@ -77,6 +77,10 @@ Actions → **Secrets** → New repository secret: имя `RELEASES_TOKEN`.
    scope — `.../auth/drive.appdata`.
 4. Credentials → Create credentials → **OAuth client ID** → Web application →
    Authorized JavaScript origins: `https://thedad.ru`.
+   Для расширения — в тот же клиент, в **Authorized redirect URIs**, добавить
+   `https://<ID расширения>.chromiumapp.org/` (ID — после публикации в Chrome
+   Web Store, в адресе его страницы). Без этого вход в расширении ответит
+   «redirect_uri_mismatch».
 5. Скопировать Client ID → `planer` → Settings → Secrets and variables → Actions →
    **Variables** → `VITE_GOOGLE_CLIENT_ID`.
 
@@ -136,7 +140,8 @@ Actions → **Secrets** → New repository secret: имя `RELEASES_TOKEN`.
 - [ ] Загрузить `planer-extension.zip`, описание, скриншоты.
 - [ ] Privacy practices: ссылка на `PRIVACY.md`, обоснование разрешений:
       `alarms`/`notifications` — напоминания, `storage` — настройки,
-      `tabs` — открыть уже открытую вкладку приложения вместо новой.
+      `tabs` — открыть уже открытую вкладку приложения вместо новой,
+      `identity` — вход в Google для копии в Диск.
 - [ ] После публикации: ID расширения — в `ALLOWED_ORIGINS` сервера (когда он будет).
 
 ## 8. Прибрать
