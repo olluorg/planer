@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { isoDate } from '@/lib/utils';
+import { isoDate, dayLabel } from '@/lib/utils';
 import { addDays, startOfWeek } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,8 @@ export const HabitDots: React.FC<{ date: Date }> = ({ date }) => {
                       key={j}
                       onClick={() => !future && toggleHabitLog(h.id, weekDates[j])}
                       disabled={future}
+                      aria-label={`${h.title}, ${dayLabel(weekDates[j])}`}
+                      aria-pressed={!!m}
                       className="h-4 w-4 rounded-full border flex items-center justify-center transition-all hover:scale-110 disabled:opacity-40"
                       style={{
                         background: m ? color : 'var(--bg-soft)',

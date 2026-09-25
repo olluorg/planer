@@ -50,6 +50,9 @@ export const TodayPlanList: React.FC<{ date: Date }> = ({ date }) => {
           >
             <button
               onClick={() => toggleTask(t.id)}
+              role="checkbox"
+              aria-checked={t.status === 'done'}
+              aria-label={t.title}
               className={`h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
                 t.status === 'done' ? 'border-accent bg-accent text-white' : 'border-border'
               }`}

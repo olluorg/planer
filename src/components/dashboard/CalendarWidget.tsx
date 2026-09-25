@@ -102,7 +102,7 @@ export const CalendarWidget: React.FC<{ date: Date }> = ({ date }) => {
             )}
             {dayTasks.map((t) => (
               <label key={t.id} className="flex items-center gap-2 px-1.5 py-1.5 rounded-lg hover:bg-bg-soft cursor-pointer">
-                <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                <Checkbox aria-label={t.title} checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
                 {t.start_time && <span className="text-[10px] text-text-dim tabular-nums shrink-0">{t.start_time}</span>}
                 <span className={`text-xs flex-1 min-w-0 truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>{t.title}</span>
               </label>

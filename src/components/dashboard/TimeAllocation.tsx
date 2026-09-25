@@ -90,7 +90,7 @@ export const TimeAllocation: React.FC<{ date: Date }> = ({ date }) => {
             <div className="mt-2.5 rounded-lg border border-border-soft bg-bg-soft/40 p-2 max-h-32 overflow-y-auto shrink-0 space-y-0.5 animate-[slide-up_140ms_ease-out]">
               {selTasks.map((t) => (
                 <label key={t.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-bg-soft cursor-pointer">
-                  <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                  <Checkbox aria-label={t.title} checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
                   <span className="text-[10px] text-text-dim tabular-nums shrink-0 w-9">{format(new Date(`${t.date}T00:00:00`), 'EEE', { locale: ru })}</span>
                   <span className={`text-xs flex-1 min-w-0 truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>{t.title}</span>
                 </label>

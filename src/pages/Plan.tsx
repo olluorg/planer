@@ -195,7 +195,7 @@ const TimelineEvent: React.FC<{ task: any; onToggle: (id: string) => void; top: 
       }}
     >
       <div className="flex items-start gap-1.5">
-        <Checkbox checked={done} onCheckedChange={() => onToggle(task.id)} />
+        <Checkbox aria-label={task.title} checked={done} onCheckedChange={() => onToggle(task.id)} />
         <div className="min-w-0 flex-1 cursor-grab active:cursor-grabbing" {...listeners} {...attributes}>
           <div className="text-[10px] font-semibold tabular-nums" style={{ color }}>
             {task.start_time}{task.estimate_min ? ` · ${task.estimate_min}м` : ''}
@@ -309,7 +309,7 @@ const DraggableTask: React.FC<{ task: any; onToggle: (id: string) => void; compa
       style={style}
       className={`flex items-start gap-2 rounded-md border border-border bg-bg-soft p-2 ${chip ? 'max-w-[260px]' : ''} ${isDragging ? 'opacity-50' : ''} hover:border-accent/40 transition-colors`}
     >
-      <Checkbox checked={task.status === 'done'} onCheckedChange={() => onToggle(task.id)} />
+      <Checkbox aria-label={task.title} checked={task.status === 'done'} onCheckedChange={() => onToggle(task.id)} />
       <div className="flex-1 cursor-grab active:cursor-grabbing" {...listeners} {...attributes}>
         <div className={task.status === 'done' ? 'line-through text-text-muted' : ''}>{task.title}</div>
         {!compact && task.priority === 1 && <Badge tone="danger" className="mt-1">высокий</Badge>}

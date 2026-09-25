@@ -20,6 +20,13 @@ export function isoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Дата для скринридера: «пн, 22 сент.». Разбираем ISO как ЛОКАЛЬНУЮ дату —
+ *  new Date('2026-09-22') дал бы UTC-полночь и западнее Гринвича предыдущий день. */
+export function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
 export function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }

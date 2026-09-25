@@ -53,11 +53,11 @@ export const CalendarPage = () => {
             </TabsList>
           </Tabs>
           <div className="flex items-center gap-1 rounded-xl bg-bg-soft p-0.5">
-            <button onClick={goPrev} className="h-8 w-8 rounded-lg hover:bg-bg-hover flex items-center justify-center">
+            <button onClick={goPrev} aria-label="Назад" className="h-8 w-8 rounded-lg hover:bg-bg-hover flex items-center justify-center">
               <ChevronLeft className="h-4 w-4 text-text-muted" />
             </button>
             <button onClick={goToday} className="px-3 h-8 rounded-lg text-xs font-medium hover:bg-bg-hover text-text">Сегодня</button>
-            <button onClick={goNext} className="h-8 w-8 rounded-lg hover:bg-bg-hover flex items-center justify-center">
+            <button onClick={goNext} aria-label="Вперёд" className="h-8 w-8 rounded-lg hover:bg-bg-hover flex items-center justify-center">
               <ChevronRight className="h-4 w-4 text-text-muted" />
             </button>
           </div>

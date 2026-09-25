@@ -8,7 +8,7 @@ import { Plus, Trash2, Check, Flame, Droplet, Dumbbell, BookOpen, Brain, Moon, S
 import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useStore } from '@/lib/store';
-import { isoDate } from '@/lib/utils';
+import { isoDate, dayLabel } from '@/lib/utils';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const HABIT_PALETTE = ['#6366f1', '#8b5cf6', '#3b82f6', '#ec4899', '#06b6d4', '#f59e0b'];
@@ -131,6 +131,8 @@ export const HabitsPage = () => {
                         <button
                           onClick={() => !future && toggleHabitLog(h.id, d)}
                           disabled={future}
+                          aria-label={`${h.title}, ${dayLabel(d)}`}
+                          aria-pressed={done}
                           className="h-7 w-7 rounded-full border flex items-center justify-center transition-all disabled:opacity-40 hover:scale-110"
                           style={{
                             background: done ? 'var(--accent)' : 'var(--bg-soft)',
@@ -143,7 +145,7 @@ export const HabitsPage = () => {
                     );
                   })}
                   <div className="flex justify-center">
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={() => removeHabit(h.id)}>
+                    <Button variant="ghost" size="icon" aria-label={`Удалить привычку: ${h.title}`} className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={() => removeHabit(h.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-text-muted" />
                     </Button>
                   </div>
@@ -188,7 +190,7 @@ export const HabitsPage = () => {
                     );
                   })}
                   <td className="p-3">
-                    <Button variant="ghost" size="icon" onClick={() => removeHabit(h.id)}>
+                    <Button variant="ghost" size="icon" aria-label={`Удалить привычку: ${h.title}`} onClick={() => removeHabit(h.id)}>
                       <Trash2 className="h-4 w-4 text-text-muted" />
                     </Button>
                   </td>

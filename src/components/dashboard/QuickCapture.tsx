@@ -50,6 +50,7 @@ export const QuickCapture: React.FC<{ date: Date }> = ({ date }) => {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
           placeholder={mode === 'note' ? 'Что на уме?' : mode === 'habit' ? 'Новая привычка…' : 'Что нужно сделать?'}
+          aria-label="Быстрая запись"
           className="w-full h-20 rounded-lg border border-border-soft bg-bg-soft px-3 py-2 text-sm resize-none outline-none focus:border-accent transition-colors"
         />
       </div>

@@ -133,7 +133,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
           ) : (
             <div className="w-3.5 shrink-0" />
           )}
-          <Checkbox checked={task.status === 'done'} onCheckedChange={() => toggleTask(task.id)} />
+          <Checkbox aria-label={task.title} checked={task.status === 'done'} onCheckedChange={() => toggleTask(task.id)} />
           {/* Кружок важности — клик открывает палитру (задача редактируется прямо здесь) */}
           <PriorityDot priority={task.priority} onChange={(p) => updateTask(task.id, { priority: p })} size={11} />
           <div className="flex-1 min-w-0">
@@ -181,7 +181,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
             }}>
               <Plus className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => removeTask(task.id)}>
+            <Button variant="ghost" size="icon" aria-label={`Удалить задачу: ${task.title}`} onClick={() => removeTask(task.id)}>
               <Trash2 className="h-4 w-4 text-text-muted" />
             </Button>
           </div>
@@ -336,7 +336,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
                       <DraggableCard key={t.id} task={t} title={t.title}>
                         <div className="flex items-start gap-2">
                           <span onClick={(ev) => ev.stopPropagation()}>
-                            <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                            <Checkbox aria-label={t.title} checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className={`text-sm font-medium leading-snug ${t.status === 'done' ? 'line-through text-text-muted' : ''}`}>
@@ -392,7 +392,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
                       <DraggableCard key={t.id} task={t} title={t.title}>
                         <div className="flex items-start gap-2">
                           <span onClick={(ev) => ev.stopPropagation()}>
-                            <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+                            <Checkbox aria-label={t.title} checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className={`text-sm font-medium leading-snug ${t.status === 'done' ? 'line-through text-text-muted' : ''}`}>

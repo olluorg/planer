@@ -467,7 +467,7 @@ export const SettingsPage = () => {
         <div className="flex gap-2 flex-wrap mb-3">
           <Input className="flex-1 min-w-[160px]" placeholder="Текст напоминания" value={reminderText}
             onChange={(e) => setReminderText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addReminder()} />
-          <Input type="time" className="w-32" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} />
+          <Input type="time" aria-label="Время напоминания" className="w-32" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} />
           <Button onClick={addReminder} size="sm"><Bell /> Добавить</Button>
         </div>
         <div className="space-y-1">
@@ -492,6 +492,7 @@ export const SettingsPage = () => {
           <button
             type="button"
             role="switch"
+            aria-label="Утренние и вечерние уведомления"
             aria-checked={heartbeat}
             onClick={() => toggleHeartbeat(!heartbeat)}
             className={`relative w-10 h-6 shrink-0 rounded-full transition-colors ${heartbeat ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
@@ -509,6 +510,7 @@ export const SettingsPage = () => {
           <button
             type="button"
             role="switch"
+            aria-label="Звук при выполнении"
             aria-checked={sound}
             onClick={() => toggleSound(!sound)}
             className={`relative w-10 h-6 shrink-0 rounded-full transition-colors ${sound ? 'bg-accent' : 'bg-bg-soft border border-border'}`}
@@ -796,6 +798,7 @@ const BuiltInAiControls: React.FC = () => {
           onClick={() => { const v = !on; setOn(v); setChromePreferred(v); }}
           disabled={!present}
           role="switch"
+          aria-label="Встроенный AI Chrome"
           aria-checked={on && present}
           className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-40 ${on && present ? 'bg-success' : 'bg-border'}`}
         >

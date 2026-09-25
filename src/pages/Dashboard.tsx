@@ -557,7 +557,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                     <span className="text-text-dim w-3 shrink-0">{i + 1}</span>
                     <span className="flex-1 truncate">{g.title}</span>
                     <span onClick={(e) => e.stopPropagation()}>
-                      <Checkbox checked={done} onCheckedChange={() => toggleGoalDone(g.id)} />
+                      <Checkbox aria-label={g.title} checked={done} onCheckedChange={() => toggleGoalDone(g.id)} />
                     </span>
                   </li>
                 );
@@ -647,7 +647,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                       key={t.id}
                       className={`task-row${t.status === 'done' ? ' task-done' : ''}`}
                     >
-                      <Checkbox
+                      <Checkbox aria-label={t.title}
                         checked={t.status === 'done'}
                         onCheckedChange={() => toggleTask(t.id)}
                       />
@@ -873,7 +873,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                           </div>
                         </div>
                         <span onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={false} onCheckedChange={() => toggleTask(t.id)} />
+                          <Checkbox aria-label={t.title} checked={false} onCheckedChange={() => toggleTask(t.id)} />
                         </span>
                       </div>
                       {subs.length > 0 && (
@@ -881,7 +881,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                           {subs.slice(0, 3).map((s) => (
                             <li key={s.id} className="flex items-center gap-2 text-xs">
                               <span onClick={(e) => e.stopPropagation()}>
-                                <Checkbox checked={s.status === 'done'} onCheckedChange={() => toggleTask(s.id)} />
+                                <Checkbox aria-label={s.title} checked={s.status === 'done'} onCheckedChange={() => toggleTask(s.id)} />
                               </span>
                               <span className={s.status === 'done' ? 'line-through text-text-muted' : 'text-text-muted'}>{s.title}</span>
                             </li>
@@ -1203,6 +1203,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             {reminders.map((r) => (
               <div key={r.id} className="flex items-center gap-2 group">
                 <Checkbox
+                  aria-label={r.text}
                   checked={r.done}
                   onCheckedChange={() => setReminders((rs) => rs.map((x) => x.id === r.id ? { ...x, done: !x.done } : x))}
                 />
@@ -1210,6 +1211,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
                 <button
                   className="opacity-0 group-hover:opacity-100 text-text-dim hover:text-danger transition-opacity"
                   onClick={() => setReminders((rs) => rs.filter((x) => x.id !== r.id))}
+                  aria-label={`Удалить напоминание: ${r.text}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

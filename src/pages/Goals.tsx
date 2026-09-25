@@ -299,7 +299,7 @@ export const GoalsPage = () => {
                     {g.metric || `${fmtNum(g.current_value, 1)} → ${fmtNum(g.target_value, 0)}${g.unit ? ` ${g.unit}` : ''}`}
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" className="shrink-0 text-text-dim hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeGoal(g.id)}>
+                <Button variant="ghost" size="icon" aria-label={`Удалить цель: ${g.title}`} className="shrink-0 text-text-dim hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeGoal(g.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -755,7 +755,7 @@ const GoalToday: React.FC<{ goal: Goal; accent: string }> = ({ goal, accent }) =
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
         {todayTasks.map((t) => (
           <label key={t.id} className="flex items-center gap-2.5 text-small cursor-pointer group/td">
-            <Checkbox checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
+            <Checkbox aria-label={t.title} checked={t.status === 'done'} onCheckedChange={() => toggleTask(t.id)} />
             <span className={`truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>{t.title}</span>
             {t.start_time && <span className="ml-auto text-caption text-text-dim tabular-nums shrink-0">{t.start_time}</span>}
           </label>
@@ -767,6 +767,8 @@ const GoalToday: React.FC<{ goal: Goal; accent: string }> = ({ goal, accent }) =
             <label key={h.id} className="flex items-center gap-2.5 text-small cursor-pointer">
               <button
                 onClick={() => toggleHabitLog(h.id, today)}
+                aria-label={`${h.title}, сегодня`}
+                aria-pressed={done}
                 className="h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-all hover:scale-110"
                 style={{ background: done ? color : 'transparent', borderColor: color }}
               >
@@ -931,7 +933,7 @@ const GoalsTree: React.FC<{ goals: Goal[] }> = ({ goals }) => {
                 <TreeSection label={`Задачи · ${doneCount}/${linkedTasks.length} выполнено`}>
                   {activeTasks.map((t) => (
                     <li key={t.id} className="flex items-center gap-2.5 text-small">
-                      <Checkbox checked={false} onCheckedChange={() => toggleTask(t.id)} />
+                      <Checkbox aria-label={t.title} checked={false} onCheckedChange={() => toggleTask(t.id)} />
                       <span className="flex-1 truncate">{t.title}</span>
                       <span className="text-caption text-text-dim tabular-nums shrink-0">{t.date === today ? 'сегодня' : fmtDate(t.date)}</span>
                     </li>

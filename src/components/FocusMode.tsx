@@ -38,9 +38,10 @@ const WP_KEY = 'focus.wallpaper.v1';
 const glass = 'rounded-xl bg-white/[0.05] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
 
 /* Аккуратный тумблер */
-const Toggle: React.FC<{ on: boolean; onToggle: () => void }> = ({ on, onToggle }) => (
+const Toggle: React.FC<{ on: boolean; onToggle: () => void; label: string }> = ({ on, onToggle, label }) => (
   <button
     onClick={onToggle}
+    aria-label={label}
     className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? 'bg-emerald-400/80' : 'bg-white/15'}`}
     role="switch"
     aria-checked={on}
@@ -833,7 +834,7 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                     >
                       <Clapperboard className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => removeYt(v.id)} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity shrink-0">
+                    <button onClick={() => removeYt(v.id)} aria-label="Удалить видео" className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-opacity shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </li>
@@ -886,12 +887,12 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                 <div className="flex items-center gap-3">
                   <BellOff className="h-4 w-4 text-white/40 shrink-0" />
                   <span className="flex-1 min-w-0 text-sm text-white/70">Уведомления приложения</span>
-                  <Toggle on={blockNotifs} onToggle={() => setBlockNotifs((v) => !v)} />
+                  <Toggle on={blockNotifs} onToggle={() => setBlockNotifs((v) => !v)} label="Не беспокоить" />
                 </div>
                 <div className="flex items-center gap-3">
                   <Maximize className="h-4 w-4 text-white/40 shrink-0" />
                   <span className="flex-1 min-w-0 text-sm text-white/70">Полноэкранный режим</span>
-                  <Toggle on={fullscreen} onToggle={toggleFullscreen} />
+                  <Toggle on={fullscreen} onToggle={toggleFullscreen} label="Полноэкранный режим" />
                 </div>
               </div>
               <p className="text-[11px] text-white/25 mt-3 leading-relaxed">Браузер не может блокировать другие приложения — включи «Не беспокоить» в системе для полного эффекта.</p>
