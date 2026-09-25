@@ -91,4 +91,24 @@ describe('стор: цели, задачи, привычки', () => {
     expect(again.getState().goals.map((g) => g.title)).toEqual(['Цель']);
     expect(again.getState().tasks.map((t) => t.title)).toEqual(['Задача']);
   });
+
+  it('пакетный импорт тысячи задач укладывается в секунду', () => {
+    // Регрессия: без batch стор перечитывал все таблицы после каждой задачи,
+    // и 1000 задач занимали ~16 секунд замороженного интерфейса.
+    const t0 = performance.now();
+    st().batch(() => {
+      for (let i = 0; i < 1000; i++) st().addTask({ title: `t${i}`, date: '2026-09-25' });
+    });
+    expect(performance.now() - t0).toBeLessThan(1000);
+    expect(st().tasks).toHaveLength(1000);
+  });
+
+  it('ошибка посреди пакета откатывает его целиком', () => {
+    st().addTask({ title: 'была до импорта', date: '2026-09-25' });
+    expect(() => st().batch(() => {
+      st().addTask({ title: 'первая из импорта', date: '2026-09-25' });
+      throw new Error('битая строка');
+    })).toThrow('битая строка');
+    expect(st().tasks.map((t) => t.title)).toEqual(['была до импорта']);
+  });
 });

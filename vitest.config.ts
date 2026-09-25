@@ -7,5 +7,8 @@ export default defineConfig({
     // Чистая логика — окружение браузера не нужно; Web Crypto есть в node >= 20.
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Москва (UTC+3), а не UTC сервера CI: три бага с датами в этом проекте
+    // жили только восточнее Гринвича, и в UTC тесты их бы не увидели.
+    env: { TZ: 'Europe/Moscow' },
   },
 });

@@ -10,6 +10,7 @@ const LEGACY_KEYS = ['reform.sqlite.v1'];
 export const SCHEMA_VERSION = 1;
 
 const BACKUP_PREFIX = 'thedad.backup.';
+export const BACKUPS_EVENT = 'thedad-backups-changed';
 const BACKUP_KEEP = 3;
 const BACKUP_EVERY_MS = 24 * 60 * 60 * 1000;
 const LAST_BACKUP_KEY = 'thedad.backup.last';
@@ -229,6 +230,8 @@ export async function saveBackup(data: Uint8Array, reason: string) {
     const all = (await keys()).filter((k): k is string => typeof k === 'string' && k.startsWith(BACKUP_PREFIX));
     const stale = all.sort().slice(0, Math.max(0, all.length - BACKUP_KEEP));
     for (const k of stale) await del(k);
+    // Список снимков в настройках обновляется сам, где бы снимок ни сделали.
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(BACKUPS_EVENT));
   } catch {
     // Бэкап — лучшее усилие: нехватка места не должна ломать запуск приложения.
   }

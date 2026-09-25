@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { listBackups, restoreBackup, saveBackup, persist, DB_KEY, type BackupEntry } from '@/lib/db';
+import { listBackups, restoreBackup, saveBackup, persist, DB_KEY, BACKUPS_EVENT, type BackupEntry } from '@/lib/db';
 import { toast } from '@/lib/toast';
 import { get } from 'idb-keyval';
 import { History } from 'lucide-react';
@@ -21,7 +21,12 @@ export function BackupRestore() {
   const [items, setItems] = useState<BackupEntry[]>([]);
   const refresh = () => listBackups().then(setItems);
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    const on = () => void refresh();
+    window.addEventListener(BACKUPS_EVENT, on);
+    return () => window.removeEventListener(BACKUPS_EVENT, on);
+  }, []);
 
   const makeNow = async () => {
     await persist();

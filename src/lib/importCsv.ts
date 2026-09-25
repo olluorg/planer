@@ -1,5 +1,20 @@
 // Tiny CSV parser supporting quoted fields and escaped quotes.
 export function parseCsv(text: string): Record<string, string>[] {
+  const rows = parseCsvRows(text);
+  if (rows.length === 0) return [];
+  const headers = rows.shift()!.map((h) => h.trim());
+  return rows.filter((r) => r.some((c) => c !== '')).map((r) => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => { obj[h] = (r[i] ?? '').trim(); });
+    return obj;
+  });
+}
+
+/** Строки CSV без интерпретации заголовка: у TickTick перед заголовком идут
+ *  служебные строки, и искать заголовок должен вызывающий. BOM срезается —
+ *  с ним первое имя колонки не совпало бы ни с чем. */
+export function parseCsvRows(text: string): string[][] {
+  text = text.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
   let cur: string[] = [];
   let field = '';
@@ -20,13 +35,7 @@ export function parseCsv(text: string): Record<string, string>[] {
     }
   }
   if (field.length || cur.length) { cur.push(field); rows.push(cur); }
-  if (rows.length === 0) return [];
-  const headers = rows.shift()!.map((h) => h.trim());
-  return rows.filter((r) => r.some((c) => c !== '')).map((r) => {
-    const obj: Record<string, string> = {};
-    headers.forEach((h, i) => { obj[h] = (r[i] ?? '').trim(); });
-    return obj;
-  });
+  return rows;
 }
 
 export async function readFileText(file: File): Promise<string> {

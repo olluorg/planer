@@ -33,6 +33,7 @@ const FocusMode = lazyNamed(() => import('./components/FocusMode').then((m) => m
 const AiGenerateModal = lazyNamed(() => import('./components/AiGenerateModal').then((m) => m.AiGenerateModal));
 const MarketplaceModal = lazyNamed(() => import('./components/marketplace/MarketplaceModal').then((m) => m.MarketplaceModal));
 const ProgramRunner = lazyNamed(() => import('./components/marketplace/ProgramRunner').then((m) => m.ProgramRunner));
+const WeeklyReview = lazyNamed(() => import('./components/WeeklyReview').then((m) => m.WeeklyReview));
 const WorkoutHub = lazyNamed(() => import('./components/marketplace/WorkoutHub').then((m) => m.WorkoutHub));
 import { MARKETPLACE_EVENT, PROGRAM_OPEN_EVENT, PROGRAM_HUB_EVENT } from './lib/marketplace';
 
@@ -82,6 +83,7 @@ export default function App() {
   const [marketOpen, setMarketOpen] = useState(false);
   const [programId, setProgramId] = useState<string | null>(null);
   const [hubId, setHubId] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
   // Фокус-сессия ещё идёт (перезагрузили страницу / открыли в новой вкладке) — продолжаем с того же места
   useEffect(() => { if (ready && focusShouldResume()) setFocusOpen(true); }, [ready]);
@@ -138,6 +140,26 @@ export default function App() {
     let unsub = () => {};
     void import('./lib/extension').then((m) => { unsub = m.onExtensionInbox(pull); });
     return () => { stop(); unsub(); };
+  }, [ready]);
+
+  // Недельный обзор: ссылка /review (из уведомления) открывает окно, а в
+  // воскресенье, если обзор ещё не пройден, — приглашение в уведомлениях.
+  useEffect(() => {
+    if (location.pathname !== '/review') return;
+    setReviewOpen(true);
+    nav('/', { replace: true });
+  }, [location.pathname, nav]);
+  useEffect(() => {
+    if (!ready) return;
+    void import('./lib/weeklyReview').then(({ reviewDue }) => {
+      if (!reviewDue()) return;
+      const key = 'thedad.weekly-review.invited';
+      const today = todayISO();
+      if (localStorage.getItem(key) === today) return;
+      localStorage.setItem(key, today);
+      addInbox({ kind: 'weekly_win', title: 'Время обзора недели', body: 'Пять минут: что сдвинулось по целям, что перенести, что главное дальше.', icon: '🗓️', link: '/review' });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
   // «Не успеваете»: при запуске и после каждой отметки прогресса. Не чаще раза
@@ -224,6 +246,7 @@ export default function App() {
     const onCelebrate = () => setConfettiTrigger((v) => v + 1);
     const onAiGenerate = () => setAiGenOpen(true);
     const onMarket = () => setMarketOpen(true);
+    const onReview = () => setReviewOpen(true);
     const onProgram = (e: Event) => setProgramId((e as CustomEvent<{ id?: string }>).detail?.id ?? null);
     const onHub = (e: Event) => setHubId((e as CustomEvent<{ id?: string }>).detail?.id ?? null);
     // Открыть палитру поиска из любого места (в т.ч. из Focus Mode — палитра поверх него)
@@ -236,6 +259,7 @@ export default function App() {
     window.addEventListener('thedad:celebrate', onCelebrate);
     window.addEventListener('thedad:ai-generate', onAiGenerate);
     window.addEventListener(MARKETPLACE_EVENT, onMarket);
+    window.addEventListener('thedad:weekly-review', onReview);
     window.addEventListener(PROGRAM_OPEN_EVENT, onProgram);
     window.addEventListener(PROGRAM_HUB_EVENT, onHub);
     return () => {
@@ -247,6 +271,7 @@ export default function App() {
       window.removeEventListener('thedad:celebrate', onCelebrate);
       window.removeEventListener('thedad:ai-generate', onAiGenerate);
       window.removeEventListener(MARKETPLACE_EVENT, onMarket);
+      window.removeEventListener('thedad:weekly-review', onReview);
       window.removeEventListener(PROGRAM_OPEN_EVENT, onProgram);
       window.removeEventListener(PROGRAM_HUB_EVENT, onHub);
     };
@@ -395,6 +420,7 @@ export default function App() {
       <MountOnce on={marketOpen}><MarketplaceModal open={marketOpen} onClose={() => setMarketOpen(false)} /></MountOnce>
       <MountOnce on={!!programId}><ProgramRunner programId={programId} onClose={() => setProgramId(null)} /></MountOnce>
       <MountOnce on={!!hubId}><WorkoutHub programId={hubId} onClose={() => setHubId(null)} /></MountOnce>
+      <MountOnce on={reviewOpen}><WeeklyReview open={reviewOpen} onClose={() => setReviewOpen(false)} /></MountOnce>
       <ShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <Toaster />
     </div>

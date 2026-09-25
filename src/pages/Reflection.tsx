@@ -93,7 +93,12 @@ export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   return (
     <div className="page py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
       <Card className="lg:col-span-7">
-        <CardTitle>Рефлексия · {format(date, 'd MMMM yyyy', { locale: ru })}</CardTitle>
+        <div className="flex items-start justify-between gap-3">
+          <CardTitle>Рефлексия · {format(date, 'd MMMM yyyy', { locale: ru })}</CardTitle>
+          <Button variant="soft" size="sm" className="shrink-0" onClick={() => window.dispatchEvent(new CustomEvent('thedad:weekly-review'))}>
+            Обзор недели
+          </Button>
+        </div>
 
         {/* Итог дня: факты перед глазами, чтобы не рефлексировать вслепую */}
         <div className="rounded-xl bg-bg-soft p-3.5 mb-5">

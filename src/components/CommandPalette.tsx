@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Target, CheckSquare, Repeat, Calendar, BarChart3, NotebookPen, Settings,
   Plus, Search, Moon, Sun, Download, Crosshair, Keyboard, Wand2,
+  CalendarCheck,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTheme, isDarkMode } from '@/lib/theme';
@@ -76,8 +77,9 @@ export const CommandPalette: React.FC<{
           <Item icon={Plus} label="Новая привычка" shortcut="H" onSelect={() => { close(); onAddHabit(); }} />
           <Item icon={Plus} label="Новая цель" shortcut="G" onSelect={() => { close(); onAddGoal(); }} />
           <Item icon={Plus} label="Записать показатель" shortcut="P" onSelect={() => { close(); onAddProgress(); }} />
+          <Item icon={CalendarCheck} label="Обзор недели" onSelect={() => { close(); window.dispatchEvent(new CustomEvent('thedad:weekly-review')); }} />
           <Item icon={Wand2} label="Составить план с AI" onSelect={() => { close(); window.dispatchEvent(new CustomEvent('thedad:ai-generate')); }} />
-          {onFocusMode && <Item icon={Crosshair} label="Focus Mode (Deep Work)" shortcut="⇧F" onSelect={() => { close(); onFocusMode(); }} />}
+          {onFocusMode && <Item icon={Crosshair} label="Фокус-режим" shortcut="⇧F" onSelect={() => { close(); onFocusMode(); }} />}
           {onShortcuts && <Item icon={Keyboard} label="Горячие клавиши" shortcut="?" onSelect={() => { close(); onShortcuts(); }} />}
           <Item icon={isDarkMode(theme) ? Sun : Moon} label={isDarkMode(theme) ? 'Светлый режим' : 'Тёмный режим'} onSelect={() => { toggle(); close(); }} />
         </Command.Group>

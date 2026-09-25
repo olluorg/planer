@@ -1,0 +1,31 @@
+{
+ "kind": "tasks#taskLists",
+ "items": [
+  {
+   "kind": "tasks#taskList",
+   "id": "L1",
+   "title": "Мои задачи",
+   "items": [
+    {
+     "kind": "tasks#task",
+     "id": "a",
+     "title": "Позвонить маме",
+     "status": "needsAction"
+    },
+    {
+     "kind": "tasks#task",
+     "id": "b",
+     "title": "Взять подарок",
+     "status": "needsAction",
+     "parent": "a"
+    },
+    {
+     "kind": "tasks#task",
+     "id": "c",
+     "title": "Сделано давно",
+     "status": "completed"
+    }
+   ]
+  }
+ ]
+}

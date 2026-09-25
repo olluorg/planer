@@ -33,11 +33,18 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       // контроллер, — и без этого флага каждый новый пользователь получал
       // внезапную перезагрузку через секунду после открытия, посреди мастера.
       let updateRequested = false;
-      const offerUpdate = (worker: ServiceWorker) => {
+      // Один тост на страницу: пока он висел, мог прийти воркер ещё новее, и
+      // пользователь видел два одинаковых предложения. Кнопка обращается к
+      // тому воркеру, который ждёт В МОМЕНТ НАЖАТИЯ, — иначе сообщение уходило
+      // уже вытесненному, и «Обновить» ничего не делало.
+      let offered = false;
+      const offerUpdate = (_worker: ServiceWorker) => {
+        if (offered) return;
+        offered = true;
         import('@/lib/toast').then(({ toast }) =>
           toast.action('Доступно обновление', {
             label: 'Обновить',
-            onClick: () => { updateRequested = true; worker.postMessage({ type: 'SKIP_WAITING' }); },
+            onClick: () => { updateRequested = true; reg.waiting?.postMessage({ type: 'SKIP_WAITING' }); },
           }, { description: 'Новая версия загружена и готова к установке.', duration: 0 }),
         );
       };

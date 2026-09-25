@@ -21,6 +21,7 @@ import { getAiConfig, setAiConfig, askAI, AI_PROVIDERS, type AiConfig } from "@/
 import { parseIcs } from "@/lib/ics";
 import { SyncSettings } from "@/components/SyncSettings";
 import { BackupRestore } from "@/components/BackupRestore";
+import { ImportFromServices } from "@/components/ImportFromServices";
 import { DriveBackupSettings } from "@/components/DriveBackupSettings";
 import { FEATURE_PLUS } from "@/lib/features";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
@@ -412,6 +413,11 @@ export const SettingsPage = () => {
             <RefreshCw /> Сбросить
           </Button>
         </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Переезд из другого планера</CardTitle>
+        <ImportFromServices />
       </Card>
 
       <Card>

@@ -62,6 +62,9 @@ interface State {
   reload: () => void;
   /** Загрузить демо-примеры (по кнопке). Работает только если данных ещё нет. */
   seedDemoData: () => boolean;
+  /** Массовые правки (импорт): одна транзакция и одно перечитывание стора в
+   *  конце вместо перечитывания после каждой строки. */
+  batch: (fn: () => void) => void;
   // time entries
   startTimeEntry: (taskId: string | null, type?: 'pomodoro' | 'free') => TimeEntry;
   finishTimeEntry: (id: string, duration: number) => void;
@@ -101,6 +104,9 @@ interface State {
 }
 
 const now = () => new Date().toISOString();
+
+/** Идёт ли массовая правка (см. batch): тогда addTask не перечитывает стор. */
+let batching = false;
 
 export const useStore = create<State>((set, get) => ({
   ready: false,
@@ -158,6 +164,22 @@ export const useStore = create<State>((set, get) => ({
       achievements: query<Achievement>('SELECT * FROM achievements ORDER BY unlocked_at DESC'),
     });
     syncTasksToExtension(tasks);
+  },
+
+  batch: (fn) => {
+    if (batching) { fn(); return; } // вложенный batch — просто часть внешнего
+    batching = true;
+    exec('BEGIN');
+    try {
+      fn();
+      exec('COMMIT');
+    } catch (e) {
+      exec('ROLLBACK'); // импорт либо целиком, либо никак
+      throw e;
+    } finally {
+      batching = false;
+      get().reload();
+    }
   },
 
   seedDemoData: () => {
@@ -261,8 +283,10 @@ export const useStore = create<State>((set, get) => ({
       `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, stage, tags, estimate_min, start_time, recurrence, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.stage, task.tags, task.estimate_min, task.start_time, task.recurrence, task.completed_at, task.created_at, task.updated_at],
     );
-    get().logChange('task', task.id, 'created', null, task.title);
-    get().reload();
+    if (!batching) {
+      get().logChange('task', task.id, 'created', null, task.title);
+      get().reload();
+    }
     return task;
   },
 

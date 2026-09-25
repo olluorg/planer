@@ -1,6 +1,7 @@
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { Goal, Habit, HabitLog, ProgressRecord, Reflection, Task } from './types';
+import { isoDate } from './utils';
 
 interface State {
   goals: Goal[];
@@ -11,7 +12,9 @@ interface State {
   reflections: Reflection[];
 }
 
-function dayISO(d: Date) { return d.toISOString().slice(0, 10); }
+// Локальная дата: toISOString() переводил полночь понедельника в UTC, и
+// восточнее Гринвича вся неделя отчёта съезжала на день назад.
+const dayISO = isoDate;
 
 export function buildWeeklyMarkdown(date: Date, s: State): string {
   const start = startOfWeek(date, { weekStartsOn: 1 });
