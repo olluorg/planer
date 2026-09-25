@@ -1,7 +1,7 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { todayISO } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
-import { resetDB, persist, DB_KEY, saveBackup } from "@/lib/db";
+import { resetDB, persist, DB_KEY, replaceDatabase } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme, isGlass } from "@/lib/theme";
 import {
@@ -95,12 +95,15 @@ export const SettingsPage = () => {
   };
 
   const importDb = async (file: File) => {
-    const buf = new Uint8Array(await file.arrayBuffer());
-    // Текущая база уходит в бэкап: импорт чужого файла не должен быть необратим.
-    const current = await get<Uint8Array>(DB_KEY);
-    if (current) await saveBackup(current, "pre-import");
-    await set(DB_KEY, buf);
-    location.reload();
+    try {
+      // replaceDatabase проверяет, что это SQLite, снимает бэкап текущей базы
+      // и меняет её и на диске, и в памяти — случайный файл больше не ломает
+      // приложение, а открытая база не затирает импортированную.
+      await replaceDatabase(new Uint8Array(await file.arrayBuffer()), "pre-import");
+      location.reload();
+    } catch (e: any) {
+      toast.error("Не удалось импортировать", String(e?.message ?? e));
+    }
   };
 
   const reset = async () => {
@@ -214,7 +217,7 @@ export const SettingsPage = () => {
     try {
       const buf = new Uint8Array(await file.arrayBuffer());
       const dec = await decryptBytes(buf, pass);
-      await set(DB_KEY, dec);
+      await replaceDatabase(dec, 'pre-import');
       location.reload();
     } catch (e: any) {
       alert('Не удалось расшифровать: ' + (e?.message ?? e));

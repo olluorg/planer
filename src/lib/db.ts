@@ -251,10 +251,29 @@ export async function listBackups(): Promise<BackupEntry[]> {
 export async function restoreBackup(key: string) {
   const data = await get<Uint8Array>(key);
   if (!data) throw new Error('Бэкап не найден');
-  if (db) await saveBackup(db.export(), 'pre-restore');
-  await set(DB_KEY, data);
-  db = null;
-  await getDB();
+  await replaceDatabase(data, 'pre-restore');
+}
+
+const SQLITE_MAGIC = 'SQLite format 3\u0000';
+
+/** Заменяет базу целиком: и на диске, и открытую в памяти.
+ *
+ *  Класть новые байты только в IndexedDB нельзя: открытая база в памяти
+ *  остаётся старой, и первая же правка пользователя записывает её поверх
+ *  новой. Так терялись данные после входа в синхронизацию на новом
+ *  устройстве — а ближайший синк заливал пустую базу на сервер.
+ *  Текущее состояние перед заменой уходит в бэкап с меткой reason. */
+export async function replaceDatabase(bytes: Uint8Array, reason: string) {
+  const head = new TextDecoder().decode(bytes.slice(0, 16));
+  if (head !== SQLITE_MAGIC) throw new Error('Это не файл базы данных SQLite');
+  if (saveTimer) { window.clearTimeout(saveTimer); saveTimer = null; }
+  if (db) {
+    await saveBackup(db.export(), reason);
+    db.close();
+    db = null;
+  }
+  await set(DB_KEY, bytes);
+  await getDB(); // тут же прогоняются миграции, если база старая
 }
 
 /** Раз в сутки снимает бэкап текущей БД. Вызывается после старта приложения. */

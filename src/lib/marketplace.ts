@@ -246,12 +246,14 @@ function parseLicense(raw: string): { payloadBytes: Uint8Array; payload: License
 
 /** Проверить и активировать лиценз-ключ. Возвращает id разблокированных паков.
  *  Бросает Error с понятным текстом, если подпись неверна или ключ повреждён. */
-export async function redeemLicense(raw: string): Promise<string[]> {
-  if (MARKETPLACE_PUBLIC_KEY.startsWith('REPLACE_')) {
+export async function redeemLicense(raw: string, publicKeyB64: string = MARKETPLACE_PUBLIC_KEY): Promise<string[]> {
+  // Ключ параметром — только ради тестов: боевой приватный ключ в тесты не
+  // попадает, там подписываем временной парой. В приложении всегда боевой.
+  if (publicKeyB64.startsWith('REPLACE_')) {
     throw new Error('Маркетплейс ещё не настроен (нет публичного ключа)');
   }
   const { payloadBytes, payload, sig } = parseLicense(raw);
-  const pub = fromB64(MARKETPLACE_PUBLIC_KEY);
+  const pub = fromB64(publicKeyB64);
   let ok = false;
   try {
     ok = await ed.verifyAsync(sig, payloadBytes, pub);

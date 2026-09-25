@@ -1,8 +1,8 @@
 // Клиент E2E-синхронизации. Дамп SQLite шифруется НА КЛИЕНТЕ (AES-GCM) и
 // заливается на sync-сервер как непрозрачный блоб. Сервер не знает ключ.
 // encKey: из пароля (PBKDF2) для email-входа, либо случайный для QR-привязки.
-import { get, set } from 'idb-keyval';
-import { DB_KEY, persist } from './db';
+import { get } from 'idb-keyval';
+import { DB_KEY, persist, replaceDatabase } from './db';
 import { encryptBytes, decryptBytes } from './cryptoExport';
 
 export interface SyncConfig {
@@ -134,7 +134,9 @@ export async function pullNow(): Promise<boolean> {
   const { ciphertext, updatedAt } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
   if (!ciphertext) return false; // на сервере пусто
   const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
-  await set(DB_KEY, bytes);
+  // Не просто set(DB_KEY): открытая в памяти база иначе затёрла бы скачанную
+  // первой же правкой. Текущее состояние уходит в локальный снимок.
+  await replaceDatabase(bytes, 'pre-sync-pull');
   saveSync({ ...c, lastSync: updatedAt });
   return true;
 }
