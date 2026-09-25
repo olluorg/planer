@@ -28,11 +28,16 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
       // Новый воркер активируется только по согласию пользователя: иначе ассеты
       // подменяются под открытым приложением посреди работы.
+      // Перезагружаемся только по кнопке. controllerchange приходит и на самом
+      // первом визите — activate зовёт clients.claim(), у страницы появляется
+      // контроллер, — и без этого флага каждый новый пользователь получал
+      // внезапную перезагрузку через секунду после открытия, посреди мастера.
+      let updateRequested = false;
       const offerUpdate = (worker: ServiceWorker) => {
         import('@/lib/toast').then(({ toast }) =>
           toast.action('Доступно обновление', {
             label: 'Обновить',
-            onClick: () => worker.postMessage({ type: 'SKIP_WAITING' }),
+            onClick: () => { updateRequested = true; worker.postMessage({ type: 'SKIP_WAITING' }); },
           }, { description: 'Новая версия загружена и готова к установке.', duration: 0 }),
         );
       };
@@ -49,7 +54,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
       let reloading = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloading) return;
+        if (!updateRequested || reloading) return;
         reloading = true;
         window.location.reload();
       });

@@ -16,6 +16,7 @@ function watchErrors(page: Page) {
 }
 
 test('все разделы открываются без ошибок и нарушений CSP', async ({ page }) => {
+  test.setTimeout(90_000); // 13 переходов с полной загрузкой каждого
   await freshApp(page);
   const errors = watchErrors(page);
   const pages = ['/', '/goals', '/tasks', '/plan', '/habits', '/calendar', '/analytics',
@@ -78,4 +79,23 @@ test('в сборке есть 404.html для GitHub Pages', () => {
   const dist = path.resolve(process.cwd(), 'dist');
   expect(fs.readFileSync(path.join(dist, '404.html'), 'utf-8'))
     .toBe(fs.readFileSync(path.join(dist, 'index.html'), 'utf-8'));
+});
+
+test.describe('service worker', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('первый визит не перезагружает страницу сам', async ({ page }) => {
+    // Регрессия: activate service worker'а вызывает clients.claim(), страница
+    // получала controllerchange и перезагружалась у каждого нового пользователя.
+    await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+    await page.goto('/');
+    // Метка в window живёт ровно до перезагрузки документа. Смена адреса
+    // роутером (history.pushState) её не трогает — считаем только настоящие
+    // перезагрузки, а не переходы внутри приложения.
+    await page.evaluate(() => { (window as unknown as { __alive: number }).__alive = 1; });
+    // Даём service worker'у установиться и активироваться.
+    await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 15_000 });
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => (window as unknown as { __alive?: number }).__alive)).toBe(1);
+  });
 });

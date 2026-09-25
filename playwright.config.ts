@@ -12,6 +12,10 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4174',
     trace: 'retain-on-failure',
+    // Service worker перехватывает запросы: Playwright перестаёт их видеть, а
+    // кэш между переходами делает прогоны неповторяемыми. Выключен везде, кроме
+    // теста, который проверяет сам service worker (там включается явно).
+    serviceWorkers: 'block',
   },
   projects: [
     // 1100px — уже брейкпоинта xl: на этой ширине страница «Цели» когда-то

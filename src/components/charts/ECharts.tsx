@@ -1,50 +1,17 @@
-import ReactEChartsCore from 'echarts-for-react/lib/core';
-import * as echarts from 'echarts/core';
-import { BarChart, LineChart, HeatmapChart, PieChart, RadarChart } from 'echarts/charts';
-import {
-  GridComponent, TooltipComponent, LegendComponent, DatasetComponent,
-  TitleComponent, MarkLineComponent, MarkAreaComponent, VisualMapComponent, CalendarComponent,
-  RadarComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
+import { lazy, Suspense } from 'react';
+import type { EChartsProps } from './EChartsImpl';
 
-echarts.use([
-  BarChart, LineChart, HeatmapChart, PieChart, RadarChart,
-  GridComponent, TooltipComponent, LegendComponent, DatasetComponent,
-  TitleComponent, MarkLineComponent, MarkAreaComponent, VisualMapComponent, CalendarComponent,
-  RadarComponent,
-  CanvasRenderer,
-]);
+/** Графики грузятся по требованию.
+ *
+ *  ECharts — 616 КБ, треть всего JavaScript приложения. Раньше этот чанк
+ *  стоял в предзагрузке index.html и тянулся до первой отрисовки, даже если
+ *  на экране ни одного графика. Теперь он приезжает, когда график впервые
+ *  появляется, а до того на его месте заглушка той же высоты — без сдвига
+ *  вёрстки. Все места использования импортируют ECharts отсюда, как и раньше. */
+const Impl = lazy(() => import('./EChartsImpl'));
 
-interface Props {
-  option: any;
-  height?: number | string;
-  className?: string;
-}
-
-import { useTheme } from '@/lib/theme';
-
-export const ECharts: React.FC<Props> = ({ option, height = 240, className }) => {
-  const { theme } = useTheme();
-  // Безопасность: тултипы рисуем через richText (canvas), а не HTML — чтобы
-  // пользовательские/импортированные названия (цели, привычки) не могли внедрить
-  // разметку в тултип (закрывает класс echarts XSS независимо от версии).
-  const safe = { backgroundColor: 'transparent', ...option };
-  if (safe.tooltip) {
-    safe.tooltip = Array.isArray(safe.tooltip)
-      ? safe.tooltip.map((t: any) => ({ renderMode: 'richText', ...t }))
-      : { renderMode: 'richText', ...safe.tooltip };
-  }
-  return (
-    <ReactEChartsCore
-      key={theme}
-      echarts={echarts}
-      option={safe}
-      style={{ height, width: '100%' }}
-      className={className}
-      notMerge
-      lazyUpdate
-      theme={theme === 'dark' ? 'dark' : undefined}
-    />
-  );
-};
+export const ECharts: React.FC<EChartsProps> = (props) => (
+  <Suspense fallback={<div className="skeleton rounded-lg" style={{ height: props.height ?? 240, width: '100%' }} />}>
+    <Impl {...props} />
+  </Suspense>
+);
