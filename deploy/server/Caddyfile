@@ -1,0 +1,33 @@
+# Caddy сам получает и продлевает сертификат Let's Encrypt для SYNC_DOMAIN.
+{
+	email {$ACME_EMAIL}
+}
+
+{$SYNC_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# Только HTTPS на год вперёд, включая поддомены.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		# API не отдаёт HTML — встраивать его во фреймы незачем.
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	# Блоб базы у активного пользователя — единицы мегабайт; 60 МБ — с запасом,
+	# совпадает с bodyLimit в самом сервере.
+	request_body {
+		max_size 60MB
+	}
+
+	reverse_proxy sync:8787
+
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

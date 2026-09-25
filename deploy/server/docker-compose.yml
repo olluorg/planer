@@ -1,0 +1,55 @@
+# Прод-стек THEDAD: Postgres + sync-сервер + Caddy (HTTPS с автосертификатами).
+# Одинаково работает на домашнем сервере со статическим IP и на любом VPS.
+# Запуск: docker compose up -d   (переменные — в .env рядом, см. .env.example)
+name: thedad
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thedad
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: thedad
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thedad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Наружу порт не публикуется: база доступна только внутри сети compose.
+
+  sync:
+    build: ../../server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://thedad:${POSTGRES_PASSWORD}@db:5432/thedad
+      PORT: 8787
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?задайте ALLOWED_ORIGINS в .env}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-120}
+    expose:
+      - "8787"   # только внутрь сети; снаружи — через Caddy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [sync]
+    environment:
+      SYNC_DOMAIN: ${SYNC_DOMAIN:?задайте SYNC_DOMAIN в .env}
+      ACME_EMAIL: ${ACME_EMAIL:?задайте ACME_EMAIL в .env — без почты Caddyfile не разберётся}
+    ports:
+      - "80:80"      # нужен Let's Encrypt для выпуска сертификата и редирект на https
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # сертификаты — не терять, иначе упрётесь в лимиты LE
+      - caddy_config:/config
+
+volumes:
+  db:
+  caddy_data:
+  caddy_config:

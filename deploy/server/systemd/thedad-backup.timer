@@ -1,0 +1,11 @@
+[Unit]
+Description=THEDAD: ежедневный дамп базы
+
+[Timer]
+OnCalendar=*-*-* 03:30
+# Если машина была выключена в 03:30 — бэкап выполнится при следующем включении.
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

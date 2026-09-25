@@ -31,3 +31,6 @@ build/icon.png
 # Артефакты Playwright
 test-results/
 playwright-report/
+
+# Дампы базы пользователей — никогда не в git
+deploy/server/backups/

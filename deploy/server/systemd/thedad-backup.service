@@ -1,0 +1,12 @@
+[Unit]
+Description=THEDAD: дамп базы sync-сервера
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__DIR__
+ExecStart=__DIR__/scripts/backup.sh
+# Бэкап не должен мешать серверу обслуживать пользователей.
+Nice=10
+IOSchedulingClass=idle

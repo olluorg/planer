@@ -10,6 +10,11 @@ import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL || 'postgres://thedad:thedad@localhost:5432/thedad' });
+// Без обработчика обрыв простаивающего соединения (перезапуск Postgres,
+// обновление образа) — это необработанное событие 'error', и процесс падает
+// целиком. Пул сам заменит соединение; запросы в это время получат ошибку,
+// а /health честно ответит 503.
+pool.on('error', (err) => console.error('[pg] соединение оборвалось:', err.message));
 
 async function initDb() {
   await pool.query(`
@@ -64,7 +69,16 @@ async function auth(req, reply) {
   return rows[0];
 }
 
-app.get('/health', async () => ({ ok: true }));
+// Проверяет и базу: без этого /health отвечал «ок», даже когда Postgres лежал,
+// и внешний мониторинг не видел, что синк на самом деле не работает.
+app.get('/health', { config: { rateLimit: false } }, async (_req, reply) => {
+  try {
+    await pool.query('SELECT 1');
+    return { ok: true };
+  } catch {
+    return reply.code(503).send({ ok: false, error: 'db unavailable' });
+  }
+});
 
 // Аноним (для QR-привязки): создаёт пустой vault
 app.post('/vault', limit(5, '1 hour'), async () => {
@@ -118,6 +132,30 @@ app.get('/vault/:id', async (req, reply) => {
 });
 
 const port = Number(process.env.PORT) || 8787;
-await initDb();
+// База может подниматься дольше сервера (перезагрузка машины, восстановление
+// из дампа) — ждём её, а не падаем в цикл перезапусков.
+for (let attempt = 1; ; attempt++) {
+  try {
+    await initDb();
+    break;
+  } catch (e) {
+    if (attempt >= 30) throw e;
+    console.error(`[pg] база недоступна (${e.message}), попытка ${attempt}/30`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
 await app.listen({ host: '0.0.0.0', port });
 console.log(`THEDAD sync-сервер на :${port}`);
+
+// docker stop шлёт SIGTERM. Без обработчика процесс убивается через 10 секунд
+// посреди запроса — а PUT /vault как раз пишет блоб пользователя.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, async () => {
+    try {
+      await app.close(); // дожидается текущих запросов
+      await pool.end();
+    } finally {
+      process.exit(0);
+    }
+  });
+}

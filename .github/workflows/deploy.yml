@@ -6,47 +6,50 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
-  # ── Web app → GitHub Pages ──────────────────────────────────────────────
-  build-pages:
+  # ── Сайт thedad.ru → GitHub Pages публичного репозитория ─────────────────
+  # Pages на бесплатном плане работает только у ПУБЛИЧНЫХ репозиториев. Код
+  # живёт в приватном planer, поэтому собранный сайт кладётся в ветку gh-pages
+  # публичного thedad-releases. Туда уходит только dist — то же самое, что и так
+  # скачивает браузер любого посетителя, исходников там нет.
+  publish-site:
     runs-on: ubuntu-latest
     concurrency:
-      group: pages
+      group: site
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run build
-        name: Build (GitHub Pages)
+      - name: Build
+        run: bun run build
         env:
-          # Адрес прод sync-сервера. Задать в Settings → Secrets and variables →
-          # Actions → Variables: VITE_SYNC_SERVER_URL = https://sync.thedad.ru
-          # Не задан → в сборке останется localhost, и синк у тестеров не заработает.
+          # Адрес sync-сервера (Plus). Пока Plus скрыт флагом — можно не задавать.
           VITE_SYNC_SERVER_URL: ${{ vars.VITE_SYNC_SERVER_URL }}
-          # OAuth client_id для бэкапа в Google Диск. Не задан → раздел скрыт.
+          # OAuth client_id для копии в Google Диск. Не задан → раздел скрыт.
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy-pages:
-    needs: build-pages
-    runs-on: ubuntu-latest
-    concurrency:
-      group: pages
-      cancel-in-progress: true
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+          # '1' открывает Plus (синк через свой сервер). Включать, когда сервер
+          # поднят и биллинг работает; до тех пор не задавать.
+          VITE_FEATURE_PLUS: ${{ vars.VITE_FEATURE_PLUS }}
+      - name: Publish to thedad-releases/gh-pages
+        env:
+          TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          cd dist
+          # .nojekyll — иначе Pages прогонит файлы через Jekyll и спрячет всё,
+          # что начинается с подчёркивания.
+          touch .nojekyll
+          test -f CNAME || echo "thedad.ru" > CNAME
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Сайт из ${GITHUB_SHA::7}"
+          # Каждый раз ветка с нуля: история сборок никому не нужна и только
+          # раздувала бы репозиторий.
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/uyellowline/thedad-releases.git" gh-pages
 
   # ── Артефакты → публичный репозиторий релизов ───────────────────────────
   # Код лежит в приватном репозитории, а скачивать сборки и заводить issue
@@ -110,6 +113,7 @@ jobs:
         env:
           VITE_SYNC_SERVER_URL: ${{ vars.VITE_SYNC_SERVER_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_FEATURE_PLUS: ${{ vars.VITE_FEATURE_PLUS }}
           # Публикацию делаем сами через gh — иначе electron-builder полез бы
           # в приватный репозиторий, откуда пользователи скачать не смогут.
           CSC_IDENTITY_AUTO_DISCOVERY: false
