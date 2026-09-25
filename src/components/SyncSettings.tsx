@@ -4,9 +4,9 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
 import {
   getSync, disconnectSync, registerEmail, loginEmail, createVault,
-  buildSyncLink, pushNow, pullNow, type SyncConfig,
+  buildSyncLink, pullNow, syncNow, type SyncConfig,
 } from '@/lib/sync';
-import { RefreshCw, QrCode, LogOut, UploadCloud, DownloadCloud, Cloud } from 'lucide-react';
+import { RefreshCw, QrCode, LogOut, DownloadCloud, Cloud } from 'lucide-react';
 
 // Прод-адрес задаётся при сборке: VITE_SYNC_SERVER_URL (см. .env.example).
 // Без него — локальный сервер для разработки.
@@ -23,7 +23,7 @@ export const SyncSettings: React.FC = () => {
 
   const run = async (fn: () => Promise<void>, ok: string) => {
     setBusy(true);
-    try { await fn(); refresh(); toast.success(ok); }
+    try { await fn(); refresh(); if (ok) toast.success(ok); }
     catch (e: any) { toast.error('Ошибка синхронизации', String(e?.message ?? e)); }
     finally { setBusy(false); }
   };
@@ -47,8 +47,16 @@ export const SyncSettings: React.FC = () => {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" disabled={busy} onClick={() => run(async () => { await pushNow(); }, 'Данные отправлены на сервер')}><UploadCloud className="h-4 w-4" /> Отправить</Button>
-          <Button variant="soft" size="sm" disabled={busy} onClick={() => run(async () => { if (await pullNow()) { toast.success('Данные загружены'); setTimeout(() => location.reload(), 600); } else toast.info('На сервере пока пусто'); }, 'Готово')}><DownloadCloud className="h-4 w-4" /> Загрузить</Button>
+          <Button size="sm" disabled={busy} onClick={() => run(async () => {
+            const r = await syncNow();
+            toast.success('Синхронизировано', r.incoming || r.deleted
+              ? `С других устройств: ${r.incoming} изменений${r.deleted ? `, удалено ${r.deleted}` : ''}`
+              : 'Всё и так совпадало');
+          }, '')}><RefreshCw className="h-4 w-4" /> Синхронизировать</Button>
+          <Button variant="soft" size="sm" disabled={busy} title="Заменить данные на этом устройстве копией с сервера — на случай, если что-то пошло не так. Текущие данные сохранятся снимком." onClick={() => run(async () => {
+            if (!confirm('Заменить данные на этом устройстве копией с сервера?\n\nТекущие данные сохранятся локальным снимком.')) return;
+            if (await pullNow()) { toast.success('Данные загружены'); setTimeout(() => location.reload(), 600); } else toast.info('На сервере пока пусто');
+          }, '')}><DownloadCloud className="h-4 w-4" /> Заменить копией с сервера</Button>
           <Button variant="ghost" size="sm" disabled={busy} className="text-danger" onClick={() => { disconnectSync(); refresh(); }}><LogOut className="h-4 w-4" /> Отключить</Button>
         </div>
 

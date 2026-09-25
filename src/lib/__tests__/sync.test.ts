@@ -121,14 +121,35 @@ describe('синхронизация', () => {
     expect(db.query<{ title: string }>('SELECT title FROM goals')[0].title).toBe('Местная');
   });
 
-  it('syncNow тянет, если на сервере новее, и заливает, если новее локально', async () => {
+  it('два устройства правят офлайн — после синка у обоих всё', async () => {
+    // Ноутбук: цель, заводит хранилище.
+    await withGoal('С ноутбука');
+    let sync = await import('../sync');
+    await sync.registerEmail('https://sync.test', 'a@b.ru', 'password123');
+
+    // Телефон: входит, получает цель ноутбука, добавляет свою.
+    const { clear } = await import('idb-keyval');
+    await clear(); localStorage.clear(); vi.resetModules();
+    sync = await import('../sync');
+    await sync.loginEmail('https://sync.test', 'a@b.ru', 'password123');
+    let db = await import('../db');
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('phone', 'С телефона', 'x', '2026-09-25T10:00:00.000Z')");
+    const r = await sync.syncNow();
+    expect(r).toEqual({ incoming: 0, deleted: 0 }); // сервер ничего нового не принёс
+
+    // Раньше: синк «побеждает последний» затёр бы одну из целей.
+    const titles = db.query<{ title: string }>('SELECT title FROM goals ORDER BY title').map((g) => g.title);
+    expect(titles).toEqual(['С ноутбука', 'С телефона']);
+    db = await import('../db');
+  });
+
+  it('два синка одновременно не сливают дважды', async () => {
     await withGoal('Цель');
     const sync = await import('../sync');
     await sync.createVault('https://sync.test');
-    expect(await sync.syncNow()).toBe('pushed'); // сервер не новее — заливаем
-    const v = [...server.vaults.values()][0];
-    v.updatedAt = Date.now() + 60_000; // кто-то залил с другого устройства
-    expect(await sync.syncNow()).toBe('pulled');
+    const [a, b] = [sync.syncNow(), sync.syncNow()];
+    expect(a).toBe(b); // второй вызов получает тот же синк, а не запускает новый
+    await a;
   });
 
   it('после входа на новом устройстве первая же правка не затирает скачанное', async () => {
@@ -150,8 +171,8 @@ describe('синхронизация', () => {
     await db.persist();
     const titles = db.query<{ title: string }>('SELECT title FROM goals ORDER BY title').map((g) => g.title);
     expect(titles).toEqual(['Из облака', 'Новая']);
-    // И перед заменой снят снимок того, что было на устройстве.
-    expect((await db.listBackups()).map((b) => b.reason)).toContain('pre-sync-pull');
+    // Вход теперь сливает, а не заменяет: то, что было на устройстве до входа,
+    // не затирается, поэтому и снимок «на всякий случай» не нужен.
   });
 
   it('файл, не являющийся базой, отвергается без порчи текущей', async () => {

@@ -26,6 +26,7 @@ import { Celebration } from './components/Celebration';
 import { MiniPlayer } from './components/MiniPlayer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { lazyNamed, MountOnce } from './components/lazy';
+import { FEATURE_PLUS } from './lib/features';
 
 // Окна, которые открываются по требованию, грузятся при первом открытии —
 // вместе ~2100 строк кода, которые раньше шли до первой отрисовки у всех.
@@ -120,6 +121,19 @@ export default function App() {
     // Предустановленные виджеты-плагины (например, «Правильное питание на месяц»)
     void import('./lib/plugins').then((m) => m.ensureDefaultPlugins());
   }, [init]);
+
+  // Plus: фоновая синхронизация, и после слияния — перечитать стор, чтобы
+  // пришедшее с других устройств сразу появилось на экране.
+  useEffect(() => {
+    if (!ready || !FEATURE_PLUS) return;
+    let stop = () => {};
+    const onMerged = () => useStore.getState().reload();
+    void import('./lib/sync').then((m) => {
+      window.addEventListener(m.SYNC_MERGED_EVENT, onMerged);
+      stop = m.startAutoSync();
+    });
+    return () => { stop(); window.removeEventListener('thedad-sync-merged', onMerged); };
+  }, [ready]);
 
   // Быстрый ввод снаружи приложения: глобальная клавиша десктопа и «td …»
   // в адресной строке расширения.

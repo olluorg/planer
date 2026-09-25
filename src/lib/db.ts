@@ -1,13 +1,15 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { get, set, del, keys } from 'idb-keyval';
+import { applySyncSchema } from './syncSchema';
+import { mergeInto, type MergeStats } from './merge';
 
 export const DB_KEY = 'thedad.sqlite.v1';
 const LEGACY_KEYS = ['reform.sqlite.v1'];
 
 /** Версия схемы, которую понимает ЭТА сборка (PRAGMA user_version).
  *  Поднимать на 1 при добавлении миграции в MIGRATIONS. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const BACKUP_PREFIX = 'thedad.backup.';
 export const BACKUPS_EVENT = 'thedad-backups-changed';
@@ -193,6 +195,10 @@ const MIGRATIONS: Array<(d: Database) => void> = [
   (d) => {
     baselineColumns(d);
   },
+  // → 2: слияние при синхронизации — updated_at везде, надгробия, триггеры.
+  (d) => {
+    applySyncSchema(d);
+  },
 ];
 
 function baselineColumns(d: Database) {
@@ -277,6 +283,30 @@ export async function replaceDatabase(bytes: Uint8Array, reason: string) {
   }
   await set(DB_KEY, bytes);
   await getDB(); // тут же прогоняются миграции, если база старая
+}
+
+/** Сливает базу с другого устройства в текущую (см. merge.ts).
+ *
+ *  Входящая база сперва доводится до текущей схемы: на другом устройстве может
+ *  стоять старая версия приложения. Если там версия НОВЕЕ — отказ
+ *  (DbTooNewError): сливать поля, о которых эта версия не знает, нельзя.
+ *  Снимок перед слиянием не делается: оно транзакционное и ничего не
+ *  удаляет без надгробия, а снимок на каждый синк вытеснил бы из кольца
+ *  суточные копии. */
+export async function mergeIncoming(bytes: Uint8Array): Promise<MergeStats> {
+  const head = new TextDecoder().decode(bytes.slice(0, 16));
+  if (head !== SQLITE_MAGIC) throw new Error('Это не файл базы данных SQLite');
+  const d = await getDB();
+  const remote = new SQL!.Database(bytes);
+  try {
+    remote.exec(SCHEMA);
+    await migrate(remote, null);
+    const stats = mergeInto(d, remote);
+    schedulePersist();
+    return stats;
+  } finally {
+    remote.close();
+  }
 }
 
 /** Раз в сутки снимает бэкап текущей БД. Вызывается после старта приложения. */

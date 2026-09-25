@@ -114,4 +114,23 @@ describe('база данных', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(sets.filter((k) => k === db.DB_KEY)).toHaveLength(1);
   });
+
+  it('триггеры синхронизации: время правки, надгробие при удалении, снятие при возврате', async () => {
+    const db = await env.db();
+    await db.getDB();
+    db.exec("INSERT INTO progress_records (id, goal_id, date, value, note) VALUES ('p1', 'g', '2026-09-22', 1, NULL)");
+    const t1 = db.query<{ updated_at: string }>("SELECT updated_at FROM progress_records WHERE id = 'p1'")[0].updated_at;
+    expect(t1).toMatch(/^\d{4}-\d{2}-\d{2}T/); // проставлено при вставке
+
+    await new Promise((r) => setTimeout(r, 5));
+    db.exec("UPDATE progress_records SET value = 2 WHERE id = 'p1'");
+    const t2 = db.query<{ updated_at: string }>("SELECT updated_at FROM progress_records WHERE id = 'p1'")[0].updated_at;
+    expect(t2 > t1).toBe(true); // правка без явного updated_at — время обновилось само
+
+    db.exec("DELETE FROM progress_records WHERE id = 'p1'");
+    expect(db.query("SELECT * FROM tombstones WHERE entity = 'progress_records' AND id = 'p1'")).toHaveLength(1);
+
+    db.exec("INSERT INTO progress_records (id, goal_id, date, value, note) VALUES ('p1', 'g', '2026-09-22', 2, NULL)");
+    expect(db.query("SELECT * FROM tombstones WHERE id = 'p1'")).toHaveLength(0); // отмена удаления
+  });
 });

@@ -371,7 +371,7 @@ export const useStore = create<State>((set, get) => ({
       updated_at: now(),
     };
     exec(
-      `INSERT INTO habits VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO habits (id, goal_id, title, schedule, target_per_week, color, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
       [habit.id, habit.goal_id, habit.title, habit.schedule, habit.target_per_week, habit.color, habit.created_at, habit.updated_at],
     );
     get().reload();
@@ -402,7 +402,7 @@ export const useStore = create<State>((set, get) => ({
     if (ex) {
       exec('DELETE FROM habit_logs WHERE id = ?', [ex.id]);
     } else {
-      exec('INSERT INTO habit_logs VALUES (?,?,?,1)', [nanoid(10), habit_id, date]);
+      exec('INSERT INTO habit_logs (id, habit_id, date, done) VALUES (?,?,?,1)', [nanoid(10), habit_id, date]);
       get().awardXp('habit', habit_id);
     }
     get().reload();
@@ -413,7 +413,7 @@ export const useStore = create<State>((set, get) => ({
     if (ex) {
       exec('UPDATE health_logs SET value = ? WHERE id = ?', [value, ex.id]);
     } else {
-      exec('INSERT INTO health_logs VALUES (?,?,?,?,NULL)', [nanoid(10), date, metric, value]);
+      exec('INSERT INTO health_logs (id, date, metric, value, note) VALUES (?,?,?,?,NULL)', [nanoid(10), date, metric, value]);
     }
     // Авто-прогресс: цели, привязанные к этой метрике здоровья, двигаются сами
     const linked = query<Goal>(`SELECT * FROM goals WHERE health_metric = ? AND status = 'active'`, [metric]);
@@ -428,7 +428,7 @@ export const useStore = create<State>((set, get) => ({
 
   addMilestone: (m) => {
     const maxSort = query<{ s: number }>('SELECT COALESCE(MAX(sort),0) s FROM milestones WHERE goal_id = ?', [m.goal_id])[0]?.s ?? 0;
-    exec('INSERT INTO milestones VALUES (?,?,?,?,?,NULL,?)', [nanoid(10), m.goal_id, m.title, m.value ?? null, m.due_date ?? null, maxSort + 1]);
+    exec('INSERT INTO milestones (id, goal_id, title, value, due_date, done_at, sort) VALUES (?,?,?,?,?,NULL,?)', [nanoid(10), m.goal_id, m.title, m.value ?? null, m.due_date ?? null, maxSort + 1]);
     get().reload();
   },
 
@@ -447,7 +447,7 @@ export const useStore = create<State>((set, get) => ({
 
   addProgress: (r) => {
     const prev = query<Goal>('SELECT * FROM goals WHERE id = ?', [r.goal_id])[0];
-    exec('INSERT INTO progress_records VALUES (?,?,?,?,?)', [nanoid(10), r.goal_id, r.date, r.value, r.note]);
+    exec('INSERT INTO progress_records (id, goal_id, date, value, note) VALUES (?,?,?,?,?)', [nanoid(10), r.goal_id, r.date, r.value, r.note]);
     exec('UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?', [r.value, now(), r.goal_id]);
     if (prev) get().logChange('progress', r.goal_id, 'current_value', prev.current_value, r.value);
     // Цель впервые достигнута?
@@ -477,7 +477,7 @@ export const useStore = create<State>((set, get) => ({
       duration: 0,
       note: null,
     };
-    exec('INSERT INTO time_entries VALUES (?,?,?,?,?,?,?,?)', [e.id, e.task_id, e.goal_id, e.type, e.started_at, e.ended_at, e.duration, e.note]);
+    exec('INSERT INTO time_entries (id, task_id, goal_id, type, started_at, ended_at, duration, note) VALUES (?,?,?,?,?,?,?,?)', [e.id, e.task_id, e.goal_id, e.type, e.started_at, e.ended_at, e.duration, e.note]);
     get().reload();
     return e;
   },
@@ -492,7 +492,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   logChange: (entity, entity_id, field, oldV, newV) => {
-    exec('INSERT INTO change_log VALUES (?,?,?,?,?,?,?)', [
+    exec('INSERT INTO change_log (id, entity, entity_id, field, old_value, new_value, ts) VALUES (?,?,?,?,?,?,?)', [
       nanoid(10), entity, entity_id, field,
       oldV == null ? null : String(oldV),
       newV == null ? null : String(newV),
@@ -510,7 +510,7 @@ export const useStore = create<State>((set, get) => ({
     const ts = now();
     const date = todayISO();
     const prevLevel = levelFromXp(xpTotal(get().xpLog)).level;
-    exec('INSERT INTO xp_log VALUES (?,?,?,?,?,?)', [id, ts, date, source, sourceId, amount]);
+    exec('INSERT INTO xp_log (id, ts, date, source, source_id, amount) VALUES (?,?,?,?,?,?)', [id, ts, date, source, sourceId, amount]);
     set((st) => ({ recentXp: [...st.recentXp, { id, amount, ts: Date.now() }].slice(-5) }));
     playSuccess();
     get().reload();
@@ -585,7 +585,7 @@ export const useStore = create<State>((set, get) => ({
     const fresh = checkNewAchievements(ctx, st.achievements);
     if (fresh.length === 0) return;
     fresh.forEach((a) => {
-      exec('INSERT INTO achievements VALUES (?,?,?)', [nanoid(10), a.key, now()]);
+      exec('INSERT INTO achievements (id, key, unlocked_at) VALUES (?,?,?)', [nanoid(10), a.key, now()]);
     });
     set((s) => ({
       recentUnlocks: [...s.recentUnlocks, ...fresh.map((a) => ({ key: a.key, ts: Date.now() }))],
@@ -607,7 +607,7 @@ export const useStore = create<State>((set, get) => ({
       );
     } else {
       exec(
-        'INSERT INTO reflections VALUES (?,?,?,?,?,?,?)',
+        'INSERT INTO reflections (id, date, mood, done, not_done, reason, note) VALUES (?,?,?,?,?,?,?)',
         [nanoid(10), r.date, r.mood ?? null, r.done ?? null, r.not_done ?? null, r.reason ?? null, r.note ?? null],
       );
     }
@@ -631,21 +631,21 @@ function seed() {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const v = 80 - ((60 - i) / 60) * 3.2;
-    exec('INSERT INTO progress_records VALUES (?,?,?,?,?)', [nanoid(10), ids.g1, d.toISOString().slice(0, 10), Math.round(v * 10) / 10, null]);
+    exec('INSERT INTO progress_records (id, goal_id, date, value, note) VALUES (?,?,?,?,?)', [nanoid(10), ids.g1, d.toISOString().slice(0, 10), Math.round(v * 10) / 10, null]);
   }
   // running
   for (let i = 90; i >= 0; i -= 5) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const v = ((90 - i) / 90) * 6.2;
-    exec('INSERT INTO progress_records VALUES (?,?,?,?,?)', [nanoid(10), ids.g2, d.toISOString().slice(0, 10), Math.round(v * 10) / 10, null]);
+    exec('INSERT INTO progress_records (id, goal_id, date, value, note) VALUES (?,?,?,?,?)', [nanoid(10), ids.g2, d.toISOString().slice(0, 10), Math.round(v * 10) / 10, null]);
   }
   // money
   for (let i = 120; i >= 0; i -= 10) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const v = ((120 - i) / 120) * 120000;
-    exec('INSERT INTO progress_records VALUES (?,?,?,?,?)', [nanoid(10), ids.g3, d.toISOString().slice(0, 10), Math.round(v), null]);
+    exec('INSERT INTO progress_records (id, goal_id, date, value, note) VALUES (?,?,?,?,?)', [nanoid(10), ids.g3, d.toISOString().slice(0, 10), Math.round(v), null]);
   }
 
   // tasks today
@@ -687,7 +687,7 @@ function seed() {
   habits.forEach(([title, color]) => {
     const id = nanoid(10);
     habitIds.push(id);
-    exec('INSERT INTO habits VALUES (?,?,?,?,?,?,?,?)', [id, ids.g1, title, 'daily', 7, color, t, t]);
+    exec('INSERT INTO habits (id, goal_id, title, schedule, target_per_week, color, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)', [id, ids.g1, title, 'daily', 7, color, t, t]);
   });
   for (let i = 0; i < 7; i++) {
     const d = new Date();
@@ -695,7 +695,7 @@ function seed() {
     const date = d.toISOString().slice(0, 10);
     habitIds.forEach((hid, hi) => {
       const target = hi === 2 ? 4 : hi === 3 ? 5 : hi === 1 ? 6 : 7;
-      if (i < target) exec('INSERT INTO habit_logs VALUES (?,?,?,1)', [nanoid(10), hid, date]);
+      if (i < target) exec('INSERT INTO habit_logs (id, habit_id, date, done) VALUES (?,?,?,1)', [nanoid(10), hid, date]);
     });
   }
 }

@@ -2,7 +2,7 @@
 // заливается на sync-сервер как непрозрачный блоб. Сервер не знает ключ.
 // encKey: из пароля (PBKDF2) для email-входа, либо случайный для QR-привязки.
 import { get } from 'idb-keyval';
-import { DB_KEY, persist, replaceDatabase } from './db';
+import { DB_KEY, persist, replaceDatabase, mergeIncoming } from './db';
 import { encryptBytes, decryptBytes } from './cryptoExport';
 
 export interface SyncConfig {
@@ -75,7 +75,9 @@ export async function loginEmail(serverUrl: string, email: string, password: str
   const { syncId, authToken, salt } = await api(serverUrl, '/login', { method: 'POST', body: JSON.stringify({ email, password }) });
   const encKey = await deriveEncKey(password, salt);
   saveSync({ serverUrl, syncId, authToken, encKey, email });
-  await pullNow(); // на новом устройстве — подтягиваем БД
+  // Слияние, а не замена: если на этом устройстве уже что-то было, оно
+  // не теряется, а уезжает на сервер вместе с остальным.
+  await syncNow();
 }
 
 /** Аноним/QR-хост: создаёт vault и случайный encKey. */
@@ -105,7 +107,7 @@ export async function importSyncFromHashIfPresent(): Promise<boolean> {
     if (!obj?.s || !obj?.i || !obj?.t || !obj?.k) return false;
     saveSync({ serverUrl: obj.s, syncId: obj.i, authToken: obj.t, encKey: obj.k });
     history.replaceState(null, '', location.pathname); // чистим хеш с секретами
-    await pullNow();
+    await syncNow();
     return true;
   } catch { return false; }
 }
@@ -141,12 +143,52 @@ export async function pullNow(): Promise<boolean> {
   return true;
 }
 
-/** Умный синк: сравнить время, выбрать безопасное направление. */
-export async function syncNow(): Promise<'pushed' | 'pulled' | 'empty'> {
-  const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
-  const { updatedAt } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
-  const remote = Number(updatedAt) || 0;
-  if (remote > (c.lastSync || 0)) { const ok = await pullNow(); return ok ? 'pulled' : 'empty'; }
-  await pushNow();
-  return 'pushed';
+export const SYNC_MERGED_EVENT = 'thedad-sync-merged';
+
+export interface SyncOutcome {
+  /** Записей пришло с других устройств. */
+  incoming: number;
+  /** Записей удалено, потому что их удалили на другом устройстве. */
+  deleted: number;
+}
+
+let running: Promise<SyncOutcome> | null = null;
+
+/** Синхронизация со слиянием: скачать → расшифровать → слить построчно с
+ *  локальной → залить результат. Раньше здесь побеждало последнее сохранение
+ *  целиком, и правка, сделанная на другом устройстве офлайн, молча терялась.
+ *  Если другое устройство зальёт своё между нашими скачиванием и заливкой, его
+ *  правки не пропадут: они остаются у него и вернутся со следующим синком. */
+export function syncNow(): Promise<SyncOutcome> {
+  // Два синка одновременно (кнопка + автосинк) слили бы одно и то же дважды.
+  if (running) return running;
+  running = (async () => {
+    const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
+    const { ciphertext } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
+    let outcome: SyncOutcome = { incoming: 0, deleted: 0 };
+    if (ciphertext) {
+      const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
+      outcome = await mergeIncoming(bytes);
+    }
+    await pushNow();
+    if (outcome.incoming || outcome.deleted) window.dispatchEvent(new CustomEvent(SYNC_MERGED_EVENT, { detail: outcome }));
+    return outcome;
+  })().finally(() => { running = null; });
+  return running;
+}
+
+/** Фоновая синхронизация: при запуске, раз в 5 минут, при возврате сети и
+ *  при возвращении на вкладку. Ошибки глотаем — нет сети не повод мешать. */
+export function startAutoSync(): () => void {
+  const tick = () => { if (getSync() && navigator.onLine !== false) void syncNow().catch(() => {}); };
+  const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+  tick();
+  const id = window.setInterval(tick, 5 * 60 * 1000);
+  window.addEventListener('online', tick);
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    window.clearInterval(id);
+    window.removeEventListener('online', tick);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
 }
