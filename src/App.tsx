@@ -119,6 +119,42 @@ export default function App() {
     void import('./lib/plugins').then((m) => m.ensureDefaultPlugins());
   }, [init]);
 
+  // Быстрый ввод снаружи приложения: глобальная клавиша десктопа и «td …»
+  // в адресной строке расширения.
+  useEffect(() => {
+    if (!ready) return;
+    let stop = () => {};
+    void import('./lib/desktop').then((m) => { stop = m.bindDesktopQuickCapture(); });
+    const pull = () => void import('./lib/extension').then(async (m) => {
+      const items = await m.drainExtensionInbox();
+      const today = todayISO();
+      for (const it of items) useStore.getState().addTask({ title: it.title, date: today });
+      if (items.length) {
+        const { toast } = await import('./lib/toast');
+        toast.success(items.length === 1 ? 'Задача из адресной строки добавлена' : `Добавлено задач из адресной строки: ${items.length}`, items.map((i) => i.title).join(', '));
+      }
+    });
+    pull();
+    let unsub = () => {};
+    void import('./lib/extension').then((m) => { unsub = m.onExtensionInbox(pull); });
+    return () => { stop(); unsub(); };
+  }, [ready]);
+
+  // «Не успеваете»: при запуске и после каждой отметки прогресса. Не чаще раза
+  // в неделю на цель — это следит duePaceAlerts.
+  const progressCount = useStore((s) => s.progress.length);
+  useEffect(() => {
+    if (!ready) return;
+    const { goals, progress } = useStore.getState();
+    void import('./lib/paceAlert').then(({ duePaceAlerts, paceMessage }) => {
+      for (const v of duePaceAlerts(goals, progress)) {
+        const { title, body } = paceMessage(v);
+        addInbox({ kind: 'pace', title, body, link: '/goals' });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, progressCount]);
+
   useEffect(() => {
     if (!ready) return;
     scheduleHeartbeat({

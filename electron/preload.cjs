@@ -8,4 +8,10 @@ contextBridge.exposeInMainWorld('desktop', {
   /** Передать расписание напоминаний main-процессу: он показывает их и тогда,
    *  когда окно свёрнуто в трей и рендерер не выполняется. */
   setReminders: (reminders) => ipcRenderer.send('reminders:set', reminders),
+  /** Глобальная клавиша быстрой записи нажата — окно уже показано. */
+  onQuickCapture: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on('quick-capture', h);
+    return () => ipcRenderer.removeListener('quick-capture', h);
+  },
 });

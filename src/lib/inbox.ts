@@ -9,6 +9,7 @@ export type InboxKind =
   | 'daily_quest_full'
   | 'heartbeat'
   | 'reminder'
+  | 'pace'
   | 'system';
 
 export interface InboxItem {

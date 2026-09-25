@@ -107,3 +107,20 @@ async function openApp() {
     await chrome.tabs.create({ url });
   }
 }
+
+/* ===== Быстрая запись из адресной строки: «td купить молоко» ===== */
+// Задача кладётся в очередь chrome.storage; страница планера забирает её при
+// открытии (или сразу, если открыта). Сам фон базу не трогает — она живёт в
+// странице, и два писателя в одну базу — верный путь к потере правок.
+chrome.omnibox.setDefaultSuggestion({ description: 'Добавить задачу на сегодня: %s' });
+
+chrome.omnibox.onInputEntered.addListener(async (text) => {
+  const title = text.trim();
+  if (!title) return;
+  const { planer_inbox = [] } = await chrome.storage.local.get('planer_inbox');
+  planer_inbox.push({ title, at: Date.now() });
+  await chrome.storage.local.set({ planer_inbox });
+  chrome.notifications.create(`captured-${Date.now()}`, {
+    type: 'basic', iconUrl: 'icons/icon128.png', title: 'Добавлено в THEDAD', message: title, priority: 0,
+  });
+});

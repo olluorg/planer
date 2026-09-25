@@ -59,3 +59,25 @@ export async function ensureHostPermission(origins: string[]): Promise<boolean> 
 export function originPattern(url: string): string | null {
   try { return `${new URL(url).origin}/*`; } catch { return null; }
 }
+
+/** Задачи, набранные в адресной строке («td купить молоко»), ждут в очереди
+ *  chrome.storage. Забираем и очищаем атомарно для этой страницы: фон пишет
+ *  только в очередь, база живёт здесь — так у базы один писатель. */
+export async function drainExtensionInbox(): Promise<Array<{ title: string; at: number }>> {
+  if (!isExtension) return [];
+  const { planer_inbox = [] } = await cr().storage.local.get('planer_inbox');
+  if (!planer_inbox.length) return [];
+  await cr().storage.local.set({ planer_inbox: [] });
+  return planer_inbox;
+}
+
+/** Вызывает cb, когда в очередь из адресной строки что-то пришло, пока
+ *  страница открыта. Вне расширения — no-op. */
+export function onExtensionInbox(cb: () => void): () => void {
+  if (!isExtension) return () => {};
+  const h = (changes: Record<string, unknown>, area: string) => {
+    if (area === 'local' && 'planer_inbox' in changes) cb();
+  };
+  cr().storage.onChanged.addListener(h);
+  return () => cr().storage.onChanged.removeListener(h);
+}

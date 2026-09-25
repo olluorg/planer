@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, session, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, globalShortcut, ipcMain, session, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -228,6 +228,19 @@ function setupAutoUpdate() {
   }
 }
 
+/** Быстрая запись поверх любого приложения: задача за две секунды, не
+ *  переключаясь в планер вручную. Клавиша может быть занята другой
+ *  программой — тогда просто работаем без неё. */
+const QUICK_CAPTURE_KEY = 'CommandOrControl+Shift+Space';
+function registerQuickCapture() {
+  const ok = globalShortcut.register(QUICK_CAPTURE_KEY, () => {
+    showWindow();
+    mainWindow?.webContents.send('quick-capture');
+  });
+  if (!ok) console.error(`[shortcut] ${QUICK_CAPTURE_KEY} занята другой программой`);
+}
+app.on('will-quit', () => globalShortcut.unregisterAll());
+
 /** Адрес принадлежит самому приложению (упакованному или dev-серверу). */
 function isAppUrl(url) {
   if (url.startsWith('app://planer/')) return true;
@@ -246,6 +259,7 @@ app.whenReady().then(() => {
   if (!DEV_URL) serveRenderer();
   createWindow();
   createTray();
+  registerQuickCapture();
   setupAutoUpdate();
   app.on('activate', showWindow);
 });

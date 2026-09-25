@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "THEDAD — планер целей",
   "short_name": "THEDAD",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local-first планер: цели, задачи, привычки, здоровье и AI-помощник. Открывается вместо новой вкладки.",
   "permissions": [
     "alarms",
@@ -39,5 +39,8 @@
     "https://generativelanguage.googleapis.com/*",
     "https://api.open-meteo.com/*",
     "http://localhost:11434/*"
-  ]
+  ],
+  "omnibox": {
+    "keyword": "td"
+  }
 }

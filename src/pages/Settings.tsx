@@ -406,7 +406,7 @@ export const SettingsPage = () => {
             variant="soft"
             onClick={() => { localStorage.removeItem('onboarding.done.v1'); location.reload(); }}
           >
-            <Sparkles /> Пройти onboarding снова
+            <Sparkles /> Пройти знакомство заново
           </Button>
           <Button variant="danger" onClick={reset}>
             <RefreshCw /> Сбросить

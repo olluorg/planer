@@ -5,6 +5,7 @@ interface DesktopBridge {
   platform: string;
   version: string;
   setReminders?: (r: Array<{ id: string; text: string; time: string; enabled: boolean }>) => void;
+  onQuickCapture?: (cb: () => void) => () => void;
 }
 
 const bridge = (): DesktopBridge | null =>
@@ -18,4 +19,10 @@ export function desktopSetReminders(
   reminders: Array<{ id: string; text: string; time: string; enabled: boolean }>,
 ): void {
   bridge()?.setReminders?.(reminders);
+}
+
+/** Глобальная клавиша десктопа (Ctrl+Shift+Пробел) открывает то же окно
+ *  быстрой записи, что и кнопка «+». Вне Electron — no-op. */
+export function bindDesktopQuickCapture(): () => void {
+  return bridge()?.onQuickCapture?.(() => window.dispatchEvent(new CustomEvent('thedad:quick-capture'))) ?? (() => {});
 }

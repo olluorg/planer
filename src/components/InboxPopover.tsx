@@ -16,6 +16,7 @@ const KIND_ICON: Record<InboxKind, string> = {
   daily_quest_full: '🎰',
   heartbeat: '💗',
   reminder: '🔔',
+  pace: '⏱️',
   system: 'ℹ️',
 };
 
@@ -126,7 +127,7 @@ export const InboxPopover: React.FC<Props> = ({ open, onClose, anchor, initialTa
                           {!it.read && <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />}
                           <div className="text-sm font-semibold text-text truncate">{it.title}</div>
                         </div>
-                        {it.body && <div className="text-[12px] text-text-muted leading-snug mt-0.5">{it.body}</div>}
+                        {it.body && <div className="text-[12px] text-text-muted leading-snug mt-0.5 whitespace-pre-line">{it.body}</div>}
                         <div className="text-[10px] text-text-dim mt-1">{formatDistanceToNow(it.ts, { addSuffix: true, locale: ru })}</div>
                       </button>
                       <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
