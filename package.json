@@ -1,7 +1,7 @@
 {
   "name": "thedad-planer",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "description": "Local-first планер целей с прогнозированием результата. SQLite WASM, без сервера.",
   "license": "AGPL-3.0-or-later",
