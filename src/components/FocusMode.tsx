@@ -5,6 +5,7 @@ import { isoDate } from '@/lib/utils';
 import { compressImage } from '@/lib/imageCompress';
 import { getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from '@/lib/theme';
 import { preloadImages } from '@/lib/preload';
+import { WALLPAPERS, wallpaperPreview, wallpaperTitle } from '@/lib/wallpapers';
 import { notify } from '@/lib/notifications';
 import {
   X, Pause, Play, Square, SkipForward, Volume2, VolumeX, Youtube, Plus, Trash2,
@@ -32,7 +33,6 @@ const MODE_KEY = 'focus.mode.v1';
 
 /* ==================== Обои ==================== */
 
-const WALLPAPERS = Array.from({ length: 20 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
 const WP_KEY = 'focus.wallpaper.v1';
 
 const glass = 'rounded-xl bg-white/[0.05] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
@@ -137,8 +137,8 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
     return () => window.removeEventListener('resize', calc);
   }, []);
 
-  // Прогреваем кеш обоев при входе в фокус — переключение фона без «проявления» картинки
-  useEffect(() => { if (open) preloadImages([...customWp, ...WALLPAPERS]); }, [open, customWp]);
+  // Новая коллекция использует лёгкие превью; полный UHD загружается при выборе.
+  useEffect(() => { if (open) preloadImages([...customWp, ...WALLPAPERS.map(wallpaperPreview)]); }, [open, customWp]);
 
   const today = isoDate(new Date());
   const sessionTasks = useMemo(
@@ -862,8 +862,8 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
                 const isCustom = customWp.includes(w);
                 return (
                   <div key={w} className="relative group/wp">
-                    <button onClick={() => applyWallpaper(w)} className={`h-12 w-20 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${wallpaper === w ? 'border-white/90' : 'border-transparent opacity-70 hover:opacity-100'}`}>
-                      <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <button onClick={() => applyWallpaper(w)} aria-label={wallpaperTitle(w)} aria-pressed={wallpaper === w} title={wallpaperTitle(w)} className={`h-12 w-20 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${wallpaper === w ? 'border-white/90' : 'border-transparent opacity-70 hover:opacity-100'}`}>
+                      <img src={wallpaperPreview(w)} alt="" className="h-full w-full object-cover" loading="lazy" />
                     </button>
                     {isCustom && (
                       <button onClick={() => delWallpaper(w)} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/wp:opacity-100 transition-opacity" title="Удалить">

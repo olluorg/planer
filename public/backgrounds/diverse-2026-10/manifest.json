@@ -1,0 +1,112 @@
+[
+  {
+    "id": "01-city-cloud",
+    "title": "Город над облаками",
+    "prompt": "Cinematic architectural photograph from a high rooftop over a dense modern city swallowed by low blue-grey fog after rain, warm small window lights, wet glass parapet bottom right, distant towers disappear into layers, spacious misty quiet center, muted slate palette. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 579316,
+    "upscaled": true
+  },
+  {
+    "id": "02-tokyo-rain",
+    "title": "Токио после дождя",
+    "prompt": "Real cinematic photography of a quiet Tokyo side street at blue hour after rain, a small warm wooden eatery with unlettered lanterns and bicycle at one side, wet asphalt reflecting restrained amber and teal light, overhead wires fade into mist, intimate authentic city, not futuristic cyberpunk. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 1014774,
+    "upscaled": true
+  },
+  {
+    "id": "03-cafe-morning",
+    "title": "Кафе до открытия",
+    "prompt": "Editorial architecture photograph of a quiet Paris-like corner cafe before opening on an overcast rainy morning, oak benches under deep green awning, misty empty street receding right, tiny warm interior lights, silver wet cobblestones, muted sage charcoal and cream, no readable signage. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 1316434,
+    "upscaled": true
+  },
+  {
+    "id": "04-retro-night",
+    "title": "Ночная мастерская",
+    "prompt": "Premium cinematic still life of anonymous vintage computing equipment: cream miniature CRT monitor with blank dark glass, mechanical keyboard, joystick, cassette arranged on a studio desk. Restrained cobalt blue and burgundy accent light, tactile plastic, nostalgic sophisticated, broad dark negative space. No logos or lettering. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 280300,
+    "upscaled": true
+  },
+  {
+    "id": "05-cloud-sea",
+    "title": "Розовый горизонт",
+    "prompt": "Dreamlike fine art seascape, enormous soft peach pink cumulus clouds above a pale periwinkle turquoise calm ocean at dawn. Tiny unoccupied white rowing boat near horizon. Subtle pastel colors, natural volumetric clouds, gentle reflections, airy meditative wide composition, not oversaturated. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 532320,
+    "upscaled": true
+  },
+  {
+    "id": "06-white-object",
+    "title": "Белая тишина",
+    "prompt": "Strict monochrome white luxury industrial design still life. One unbranded long low rectangular brushed aluminum audio object with fine black horizontal cooling fins, resting on a white architectural plinth at lower right. Soft studio light, subtle grey shadows, spacious white empty left two thirds, precise restrained high-end product photograph. No text controls labels cables or logos. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 216444,
+    "upscaled": true
+  },
+  {
+    "id": "07-black-object",
+    "title": "Чёрный монолит",
+    "prompt": "Strict black on black premium industrial object photograph. One small vertical graphite rectangular slab with subtle fine perforations and a layered offset top panel on right third, charcoal anodized metal, extremely delicate grazing rim light. Vast almost black negative space, fine material texture just visible, sober elegant proportions. No text numbers logos or glowing accents. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 146660,
+    "upscaled": true
+  },
+  {
+    "id": "08-glass-sculpture",
+    "title": "Дымчатое стекло",
+    "prompt": "Minimal abstract fine art photograph of a single large curved translucent smoky glass ribbon along right edge above a matte warm grey plane. Soft sculptural refraction, subtle pale champagne caustic, foggy grey background with quiet empty left, sophisticated material realism, restrained neutral palette, no rainbow or neon. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 940,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 165922,
+    "upscaled": true
+  },
+  {
+    "id": "09-concrete-light",
+    "title": "Свет на бетоне",
+    "prompt": "Minimal architectural photograph, warm ivory concrete wall and floor, a single sharply defined diagonal blade of late afternoon sunlight crossing the right third, soft deep charcoal recess at far left. Monumental quiet geometry, tactile microtexture, neutral sand grey colors, no furniture plants people text. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 685162,
+    "upscaled": true
+  },
+  {
+    "id": "10-coastal-train",
+    "title": "Станция у моря",
+    "prompt": "Cinematic photograph of a tiny Japanese coastal railway platform after a rain shower. Empty dark wooden bench under simple shelter on right, wet platform, muted jade ocean on left, distant pale misty mountains, fine overhead lines, subdued warm station lamp. Nostalgic quiet cinematic teal grey, realistic, no train or people or legible signs. Wide 16:9 landscape wallpaper, coherent realistic detail, composed for use behind translucent application panels, no text, logos, watermark, people, collage or interface.",
+    "originalWidth": 1672,
+    "originalHeight": 941,
+    "width": 3840,
+    "height": 2160,
+    "bytes": 855014,
+    "upscaled": true
+  }
+]

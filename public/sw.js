@@ -7,10 +7,13 @@ const CACHE = 'thedad-shell-__SW_VERSION__';
 // Только то, что реально существует по этим путям в проде. Манифест сюда не
 // входит: Vite отдаёт его по хешированному имени, и addAll() на 404 отклоняет
 // ВЕСЬ precache — приложение молча остаётся без офлайн-оболочки.
-const SHELL = ['/', '/index.html'];
+// Build injects all code/font/WASM chunks, including lazy routes. Media is on demand.
+const ASSETS = /*__PRECACHE_ASSETS__*/ [];
+const SHELL = ['/', '/index.html', '/theme-init.js', ...ASSETS];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
+  // A partial download must not replace a working offline version.
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
   // Без skipWaiting: новый воркер ждёт, пока пользователь сам согласится
   // обновиться — иначе ассеты подменяются под открытым приложением.
 });
@@ -22,9 +25,9 @@ self.addEventListener('message', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('thedad-shell-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
@@ -43,7 +46,10 @@ self.addEventListener('fetch', (e) => {
 
   // Stale-while-revalidate for assets.
   e.respondWith(
-    caches.match(req).then((cached) => {
+    // Same-origin build assets are identical across Origin headers. Module loads
+    // send Origin while install-time addAll does not; Vary: Origin must not hide
+    // the precached response when the browser goes offline.
+    caches.open(CACHE).then((cache) => cache.match(req, { ignoreVary: true })).then((cached) => {
       const fetchPromise = fetch(req).then((res) => {
         if (res && res.status === 200) {
           const clone = res.clone();

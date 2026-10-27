@@ -67,7 +67,14 @@ export function swVersion(outDir: string): Plugin {
       const out = path.join(outDir, 'sw.js');
       if (!fs.existsSync(out)) return;
       const src = fs.readFileSync(out, 'utf-8');
-      fs.writeFileSync(out, src.replace(/__SW_VERSION__/g, `${appVersion}-${Date.now().toString(36)}`));
+      const collect = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true })
+        .flatMap((entry) => entry.isDirectory() ? collect(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
+      const assets = collect(path.join(outDir, 'assets'))
+        .filter((file) => /\.(js|css|wasm|woff2?)$/.test(file))
+        .map((file) => '/' + path.relative(outDir, file).split(path.sep).join('/'));
+      fs.writeFileSync(out, src
+        .replace(/__SW_VERSION__/g, `${appVersion}-${Date.now().toString(36)}`)
+        .replace('/*__PRECACHE_ASSETS__*/ []', JSON.stringify(assets)));
     },
   };
 }

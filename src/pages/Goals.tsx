@@ -14,13 +14,14 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { fmtNum, colorByPct } from '@/lib/utils';
 import { forecastGoal } from '@/lib/predict';
+import { forecastSummary } from '@/lib/forecastSummary';
 import { ECharts } from '@/components/charts/ECharts';
 import { Ring } from '@/components/ui/ring';
 import { Sparkline } from '@/components/ui/sparkline';
 import { CountUp } from '@/components/ui/count-up';
 import { PageContainer } from '@/components/ui/page-container';
 import { GoalPath } from '@/components/GoalPath';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 import type { Goal, GoalType } from '@/lib/types';
 
@@ -28,7 +29,7 @@ export const GoalsPage = () => {
   const { goals, progress, addGoal, removeGoal, updateGoal, addProgress, tasks, habits, habitLogs, reflections, timeEntries, milestones, toggleTask, toggleHabitLog, addMilestone, toggleMilestone, removeMilestone } = useStore();
   const nav = useNavigate();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark');
+  const cc = getChartColors(isDarkMode(theme));
   const [open, setOpen] = useState(false);
   const [statusTab, setStatusTab] = useState<'active' | 'done' | 'archived'>('active');
   const [view, setView] = useState<'cards' | 'timeline' | 'tree'>('cards');
@@ -82,8 +83,6 @@ export const GoalsPage = () => {
   const activeRoots = roots.filter((g) => g.status === 'active' && !isAchieved(g));
   const overall = activeRoots.length ? Math.round((activeRoots.reduce((s, g) => s + pctOf(g), 0) / activeRoots.length) * 100) : 0;
   const fcList = activeRoots.map((g) => ({ g, f: forecastGoal(g, progress.filter((p) => p.goal_id === g.id), 30) }));
-  const succVals = fcList.filter((x) => x.f.etaDate).map((x) => x.f.etaConfidence);
-  const avgSuccess = succVals.length ? Math.round((succVals.reduce((a, b) => a + b, 0) / succVals.length) * 100) : null;
   const sphereMap = new Map<string, { label: string; color: string; count: number }>();
   activeRoots.forEach((g) => { const s = goalSphere(g.title); const e = sphereMap.get(s.label) ?? { ...s, count: 0 }; e.count++; sphereMap.set(s.label, e); });
   const spheres = [...sphereMap.values()];
@@ -127,14 +126,16 @@ export const GoalsPage = () => {
           </div>
           <p className="text-small text-text-muted mt-1">Фокусируйся на важном. Действуй ежедневно. Достигай большего.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex w-full sm:w-auto items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-0 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim pointer-events-none" />
-            <Input placeholder="Поиск целей…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9 w-56" />
+            <Input placeholder="Поиск целей…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9 w-full sm:w-56" />
           </div>
-          <Button variant="ghost" onClick={() => nav('/settings')}><Download /> Импорт</Button>
-          <Button variant="ghost" onClick={() => nav('/templates')}><FileText /> Шаблоны</Button>
-          <Button onClick={() => setOpen(true)}><Plus /> Новая цель</Button>
+          <Button onClick={() => setOpen(true)} className="shrink-0"><Plus /> Новая цель</Button>
+          <div className="flex w-full sm:w-auto gap-1">
+            <Button variant="ghost" onClick={() => nav('/settings')}><Download /> Импорт</Button>
+            <Button variant="ghost" onClick={() => nav('/templates')}><FileText /> Шаблоны</Button>
+          </div>
         </div>
       </div>
 
@@ -150,7 +151,7 @@ export const GoalsPage = () => {
           <Tabs value={view} onValueChange={(v) => setView(v as any)}>
             <TabsList>
               <TabsTrigger value="cards">Карточки</TabsTrigger>
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="timeline">Хронология</TabsTrigger>
               <TabsTrigger value="tree">Дерево</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -182,15 +183,14 @@ export const GoalsPage = () => {
         const recs = progress.filter((p) => p.goal_id === g.id);
         const f = forecastGoal(g, recs, 30);
         const r = Math.round(pctOf(g) * 100);
-        const successPct = f.etaDate ? Math.round(f.etaConfidence * 100) : null;
-        const chance = successPct == null ? null : successPct >= 70 ? 'Высокий' : successPct >= 40 ? 'Средний' : 'Низкий';
+        const estimate = forecastSummary(g, recs, f);
         const daysLeft = g.deadline ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000) : null;
         const gap = scheduleGap(g);
         const Icon = goalIcon(g.title);
         const accent = g.color || GOAL_PALETTE[0];
         const typeLabel = { long: 'Долгосрочная', mid: 'Среднесрочная', short: 'Краткосрочная' }[g.type];
         const aiText = gap == null
-          ? 'Добавь дедлайн и записывай прогресс — оценю темп и шанс достижения.'
+          ? 'Добавь дедлайн и записывай прогресс — сравним текущий темп с нужным.'
           : gap <= -5 ? 'Ты идёшь с опережением графика. Продолжай в том же темпе.'
           : gap >= 5 ? `Отставание от графика ~${gap}%. Стоит увеличить частоту действий.`
           : 'Ты держишь темп графика. Так держать.';
@@ -198,13 +198,13 @@ export const GoalsPage = () => {
           <Card className="relative overflow-hidden border-accent/15">
             <span className="absolute inset-x-0 top-0 h-1" style={{ background: accent }} />
             <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-4">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4">
                 <div className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${accent}1f` }}>
                   <Icon className="h-7 w-7" style={{ color: accent }} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-h2">{g.title}</h2>
+                    <h2 className="text-h2 break-words">{g.title}</h2>
                     <Badge tone="soft">основная цель</Badge>
                   </div>
                   <p className="text-small text-text-muted mt-1">
@@ -212,17 +212,17 @@ export const GoalsPage = () => {
                   </p>
                   <div className="flex items-center gap-2 flex-wrap mt-2 text-caption text-text-muted">
                     <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: accent }} />{typeLabel}</span>
-                    {successPct != null && <><span className="text-text-dim">·</span><span>{successPct}% уверенность</span></>}
                     {daysLeft != null && <><span className="text-text-dim">·</span><span>{daysLeft < 0 ? 'просрочено' : `осталось ${daysLeft} дн`}</span></>}
                     {g.health_metric && <><span className="text-text-dim">·</span><span className="text-accent">⛓ авто из Здоровья</span></>}
                   </div>
                 </div>
-                <div className="text-right shrink-0">
+                <div data-testid="goal-forecast" className="col-span-2 sm:col-span-1 text-left sm:text-right sm:max-w-[220px] rounded-lg bg-bg-soft p-3">
                   <div className="text-caption text-text-muted uppercase tracking-wider">Прогноз достижения</div>
-                  <div className="text-4xl font-bold tabular-nums leading-none mt-1" style={{ color: successPct == null ? 'var(--text-dim)' : successPct >= 70 ? '#22c55e' : successPct >= 40 ? '#f59e0b' : '#ef4444' }}>
-                    {successPct == null ? '—' : <CountUp value={successPct} suffix="%" />}
+                  <div className="text-xl font-semibold tabular-nums mt-1 text-text">
+                    {estimate.eta ? fmtDate(estimate.eta) : 'Пока нет оценки'}
                   </div>
-                  {chance && <div className="text-caption text-text-muted mt-1">Шанс: {chance}</div>}
+                  <div className={`text-small mt-1 ${estimate.tone === 'warning' ? 'text-warning' : estimate.tone === 'success' ? 'text-success' : 'text-text-muted'}`}>{estimate.label}</div>
+                  <div className="text-caption text-text-muted mt-1">{estimate.evidence}</div>
                 </div>
               </div>
 
@@ -233,7 +233,7 @@ export const GoalsPage = () => {
                     <CountUp value={r} suffix="%" className="text-h3 font-bold tabular-nums" />
                   </div>
                   <div className="text-caption text-text-muted mt-1.5">
-                    {g.deadline ? `Дедлайн ${fmtDate(g.deadline)} · прогноз ${f.etaDate ?? '—'}` : 'Без дедлайна'}
+                    {g.deadline ? `Дедлайн ${fmtDate(g.deadline)}` : 'Без дедлайна'}
                   </div>
                 </div>
                 {distinctDays(recs) < 2 ? (
@@ -254,13 +254,13 @@ export const GoalsPage = () => {
               <div className="flex items-start gap-2.5 rounded-xl border border-accent/15 bg-accent/[0.06] p-3">
                 <Sparkles className="h-4 w-4 text-accent shrink-0 mt-0.5" />
                 <div>
-                  <div className="text-caption font-semibold text-accent">AI Coach</div>
+                  <div className="text-caption font-semibold text-accent">Подсказка по темпу</div>
                   <div className="text-small text-text mt-0.5">{aiText}</div>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={() => nav('/plan')}><Rocket className="h-4 w-4" /> Перейти в фокус</Button>
+                <Button onClick={() => window.dispatchEvent(new CustomEvent('thedad:focus-mode'))}><Rocket className="h-4 w-4" /> Перейти в фокус</Button>
                 <div className="flex-1 min-w-[200px]">
                   <QuickProgress goal={g} onAdd={(v) => addProgress({ goal_id: g.id, date: todayISO(), value: v, note: null })} />
                 </div>
@@ -281,7 +281,7 @@ export const GoalsPage = () => {
           const accent = g.color || GOAL_PALETTE[i % GOAL_PALETTE.length];
           const Icon = goalIcon(g.title);
           const daysLeft = g.deadline ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000) : null;
-          const successPct = f.etaDate ? Math.round(f.etaConfidence * 100) : null;
+          const estimate = forecastSummary(g, recs, f);
           const children = goals.filter((x) => x.parent_id === g.id);
 
           return (
@@ -312,11 +312,12 @@ export const GoalsPage = () => {
               </div>
               <Progress value={r} className="mt-1.5" barColor={accent} />
 
-              <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center justify-between gap-2 mt-3">
                 <span className="text-caption text-text-muted">
                   Дедлайн: <b className="text-text font-medium">{g.deadline ? fmtDate(g.deadline) : '—'}</b>
                   <span className="mx-1.5 text-text-dim">·</span>
-                  Прогноз: <b className={`font-medium ${successClass(successPct)}`}>{successPct == null ? '—' : `${successPct}%`}</b>
+                  Прогноз: <b className="font-medium text-text">{estimate.eta ? fmtDate(estimate.eta) : '—'}</b>
+                  <span className={`block mt-1 ${estimate.tone === 'warning' ? 'text-warning' : 'text-text-muted'}`}>{estimate.label}</span>
                 </span>
                 <Sparkline data={recs.length >= 2 ? recs.map((x) => x.value) : [g.start_value, g.current_value]} width={72} height={26} color={accent} />
               </div>
@@ -357,7 +358,7 @@ export const GoalsPage = () => {
                 <thead>
                   <tr className="text-text-muted text-caption">
                     <th className="text-left font-medium pb-2">Цель</th>
-                    <th className="text-left font-medium pb-2">Вероятность</th>
+                    <th className="text-left font-medium pb-2">Относительно срока</th>
                     <th className="text-left font-medium pb-2">Прогноз даты</th>
                     <th className="text-right font-medium pb-2">Прогресс</th>
                   </tr>
@@ -365,12 +366,12 @@ export const GoalsPage = () => {
                 <tbody>
                   {fcList.map(({ g, f }) => {
                     const r = Math.round(pctOf(g) * 100);
-                    const sp = f.etaDate ? Math.round(f.etaConfidence * 100) : null;
+                    const estimate = forecastSummary(g, progress.filter((p) => p.goal_id === g.id), f);
                     return (
                       <tr key={g.id} className="border-t border-border-soft">
                         <td className="py-2 pr-3 truncate max-w-[160px]">{g.title}</td>
-                        <td className={`py-2 pr-3 font-medium ${successClass(sp)}`}>{sp == null ? '—' : `${sp}%`}</td>
-                        <td className="py-2 pr-3 text-text-muted tabular-nums">{f.etaDate ?? '—'}</td>
+                        <td className={`py-2 pr-3 font-medium ${estimate.tone === 'warning' ? 'text-warning' : 'text-text-muted'}`}>{estimate.label}</td>
+                        <td className="py-2 pr-3 text-text-muted tabular-nums">{estimate.eta ?? '—'}</td>
                         <td className="py-2 text-right tabular-nums">{r}%</td>
                       </tr>
                     );
@@ -417,8 +418,7 @@ export const GoalsPage = () => {
         <Card className="border-accent/20 bg-gradient-to-br from-accent/[0.08] to-transparent">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="h-4 w-4 text-accent" />
-            <h3 className="text-base font-semibold text-text">AI Coach</h3>
-            <span className="ml-auto inline-flex items-center gap-1 text-caption text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" />онлайн</span>
+            <h3 className="text-base font-semibold text-text">Следующий шаг</h3>
           </div>
           {coachPush.length === 0 ? (
             <p className="text-small text-text-muted">Все цели идут по графику. Выбери любую и действуй сегодня.</p>
@@ -435,14 +435,14 @@ export const GoalsPage = () => {
               </ul>
             </>
           )}
-          <Button className="w-full mt-3" onClick={() => nav('/plan')}>Оптимизировать план <ChevronRight className="h-4 w-4" /></Button>
+          <Button className="w-full mt-3" onClick={() => nav('/plan')}>Открыть план дня <ChevronRight className="h-4 w-4" /></Button>
         </Card>
 
         <Card>
-          <CardTitle>Прогноз на неделю</CardTitle>
+          <CardTitle>Прогресс активных целей</CardTitle>
           <div className="flex items-center gap-4">
-            <Ring value={avgSuccess ?? 0} size={84} stroke={9} color="#6366f1" glow={false} trackColor="var(--border)">
-              <div className="text-base font-bold tabular-nums leading-none">{avgSuccess == null ? '—' : `${avgSuccess}%`}</div>
+            <Ring value={overall} size={84} stroke={9} color="#6366f1" glow={false} trackColor="var(--border)">
+              <div className="text-base font-bold tabular-nums leading-none">{overall}%</div>
             </Ring>
             <div className="flex-1 space-y-2">
               <RailStat label="Средний прогресс" value={`${overall}%`} />
@@ -1021,13 +1021,6 @@ function fmtDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-}
-
-function successClass(pct: number | null): string {
-  if (pct == null) return 'text-text';
-  if (pct >= 70) return 'text-success';
-  if (pct >= 40) return 'text-warning';
-  return 'text-danger';
 }
 
 const GoalStat: React.FC<{ label: string; value: string; valueClass?: string }> = ({ label, value, valueClass }) => (

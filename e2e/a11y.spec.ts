@@ -34,4 +34,5 @@ test('у всех кнопок, флажков и полей есть имя', a
   }
   console.log(`\nБЕЗЫМЯННЫХ ВИДОВ: ${found.size}`);
   for (const [k, v] of found) console.log(`  ${k}  ← ${[...v].join(' ')}`);
+  expect([...found.keys()], 'Все видимые элементы должны иметь доступное имя').toEqual([]);
 });

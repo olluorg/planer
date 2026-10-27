@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Shuffle, Save, Check, Utensils, Plus } from 'lucide-react';
+import { X, Shuffle, Save, Check, Utensils, Plus, BookOpen } from 'lucide-react';
 import { installPlugin, renderTemplate, type PluginWidgetDef } from '@/lib/plugins';
 import { toast } from '@/lib/toast';
+import { withDiningCollection, diningPreview, DINING_FILTERS, matchesDiningFilter, diningTotals, type DiningFilter } from '@/lib/diningCollection';
+import { RecipeModal } from './dashboard/RecipeModal';
+import type { PluginRow } from '@/lib/plugins';
 
 /* Планер рациона для контентных плагинов (cards + static + dayField).
  * В одной ячейке (день × приём) может быть НЕСКОЛЬКО блюд: основное, гарнир,
@@ -25,7 +28,7 @@ const Thumb: React.FC<{ src: string | null; size?: number }> = ({ src, size = 34
       <Utensils className="h-3.5 w-3.5 text-accent/60" />
     </div>
   ) : (
-    <img src={src} alt="" loading="lazy" className="rounded-lg object-cover shrink-0" style={{ width: size, height: size }} onError={() => setFailed(true)} />
+    <img src={diningPreview(src)} alt="" loading="lazy" className="rounded-lg object-contain bg-white shrink-0" style={{ width: size, height: size }} onError={() => setFailed(true)} />
   );
 };
 
@@ -43,6 +46,10 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
 
   // Свои блюда, добавленные в этой сессии планера (вливаются в библиотеку и сохраняются)
   const [customDishes, setCustomDishes] = useState<Row[]>([]);
+  const [libraryQuery, setLibraryQuery] = useState('');
+  const [studioOnly, setStudioOnly] = useState(false);
+  const [diningFilter, setDiningFilter] = useState<DiningFilter>('all');
+  const [preview, setPreview] = useState<PluginRow | null>(null);
 
   // Библиотека уникальных блюд (включая блюда без day) и приёмы пищи.
   // daylessKeys — блюда «только из библиотеки» (напитки/десерты/свои): их сохраняем без day.
@@ -51,7 +58,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
     const mealList: string[] = [];
     const dayless = new Set<string>();
     let maxDay = 0;
-    for (const row of [...(def.source.static ?? []), ...customDishes]) {
+    for (const row of withDiningCollection(def.id, [...(def.source.static ?? []), ...customDishes])) {
       const meal = badgeField ? String(row[badgeField] ?? '') : '';
       if (!mealList.includes(meal)) mealList.push(meal);
       const label = renderTemplate(labelTpl, row);
@@ -112,6 +119,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
     return typeof v === 'string' && v.startsWith('/') && !v.startsWith('//') ? v : null;
   };
   const cellKcal = (cell: string) => (plan[cell] ?? []).reduce((s, k) => s + dishKcal(k), 0);
+  const visibleDish = (key: string) => dishLabel(key).toLowerCase().includes(libraryQuery.trim().toLowerCase()) && (!studioOnly || library.get(key)?.collection === 'studio-2026') && matchesDiningFilter(library.get(key)!, diningFilter);
 
   /** Случайная раскладка: в каждый приём — по одному блюду каждого типа из стека
    *  (или основное из всей библиотеки, если стек пуст). Основное не повторяется два дня подряд. */
@@ -222,13 +230,13 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
   });
 
   return createPortal(
-    <div className="fixed inset-0 z-[190] flex items-start justify-center p-2 sm:p-5" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[190] flex items-start justify-center p-2 sm:p-5" role="dialog" aria-modal="true" aria-label="Конструктор рациона">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-[1400px] h-[94vh] rounded-2xl bg-bg border border-border shadow-2xl overflow-hidden flex flex-col animate-[slide-up_200ms_ease-out]">
+      <div className="relative z-10 w-full max-w-[1400px] h-[94vh] rounded-2xl bg-bg modal-surface border border-border shadow-2xl overflow-hidden flex flex-col animate-[slide-up_200ms_ease-out]">
         {/* Шапка */}
-        <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border-soft shrink-0">
+        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-5 py-3.5 border-b border-border-soft shrink-0">
           <Utensils className="h-4 w-4 text-accent" />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-[70%] sm:basis-auto">
             <div className="text-sm font-semibold text-text truncate">{def.name} — конструктор рациона</div>
             <div className="text-[11px] text-text-muted">В приём можно класть несколько блюд: основное, гарнир, напиток, десерт… Клик по блюду слева → клики по ячейкам, или тяни мышью</div>
           </div>
@@ -243,9 +251,18 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
           </button>
         </div>
 
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex flex-col sm:flex-row min-h-0">
           {/* Библиотека блюд */}
-          <aside className="w-72 shrink-0 border-r border-border-soft overflow-y-auto p-3 space-y-4">
+          <aside aria-label="Библиотека блюд" className="w-full sm:w-80 max-h-[38vh] sm:max-h-none shrink-0 border-r border-border-soft overflow-y-auto p-3 space-y-4">
+            <input aria-label="Поиск блюд" placeholder="Найти блюдо…" value={libraryQuery} onChange={(e) => setLibraryQuery(e.target.value)} className="w-full h-10 rounded-lg bg-bg-soft border border-border px-3 text-sm" />
+            {def.id === 'nutrition-month' && <div className="space-y-2">
+              <label className="block text-xs text-text-muted" htmlFor="dining-filter">Подобрать под свой день</label>
+              <select id="dining-filter" value={diningFilter} onChange={(e) => setDiningFilter(e.target.value as DiningFilter)} className="w-full h-10 rounded-lg bg-bg-soft border border-border px-2 text-sm">
+                {DINING_FILTERS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+              <p className="text-xs text-text-muted leading-relaxed">{DINING_FILTERS.find((f) => f.id === diningFilter)?.hint}</p>
+            </div>}
+            {def.id === 'nutrition-month' && <button onClick={() => setStudioOnly((v) => !v)} aria-pressed={studioOnly} className={`rounded-lg px-3 py-2 text-xs border ${studioOnly ? 'bg-accent/10 text-accent border-accent' : 'border-border text-text-muted'}`}>Новая коллекция · 4 блюда</button>}
             <div className="text-[11px] text-text-muted leading-relaxed">
               Галочка — блюдо в <b className="text-text">стеке</b>: «Случайно» соберёт рацион из стека,
               по одному блюду каждого типа на приём.
@@ -281,25 +298,28 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
               )}
             </div>
 
+            {![...library.keys()].some(visibleDish) && <div role="status" className="p-3 rounded-xl bg-bg-soft text-sm text-text-muted">Пока нет блюд с такими данными. <button className="text-accent underline" onClick={() => { setDiningFilter('all'); setStudioOnly(false); setLibraryQuery(''); }}>Сбросить фильтры</button></div>}
             {meals.map((meal) => (
               <div key={meal}>
                 <div className="section-label">{meal || 'Блюда'}</div>
                 <div className="space-y-1.5">
-                  {dishesOf(meal).map((key) => (
+                  {dishesOf(meal).filter(visibleDish).map((key) => (
                     <div
                       key={key}
                       draggable
                       onDragStart={(e) => onDragStart(e, { from: 'lib', key })}
-                      onClick={() => setSelected(selected === key ? null : key)}
                       className={`flex items-center gap-2 rounded-lg border p-1.5 cursor-pointer transition-colors ${
                         selected === key ? 'border-accent bg-accent/10' : 'border-border-soft hover:border-border bg-bg-soft/50'
                       }`}
                     >
-                      <Thumb src={dishImg(key)} />
+                      <button type="button" aria-label={`Выбрать блюдо: ${dishLabel(key)}`} aria-pressed={selected === key} onClick={() => setSelected(selected === key ? null : key)} className="flex flex-1 min-w-0 gap-2 items-center text-left">
+                      <Thumb src={dishImg(key)} size={52} />
                       <span className="flex-1 min-w-0">
                         <span className="block text-xs text-text leading-snug line-clamp-2">{dishLabel(key)}</span>
                         <span className="block text-[10px] text-text-dim">{dishKind(key)}{dishKcal(key) ? ` · ${dishKcal(key)} ккал` : ''}</span>
                       </span>
+                      </button>
+                      <button type="button" aria-label={`Рецепт: ${dishLabel(key)}`} onClick={() => setPreview({ label: dishLabel(key), value: dishKcal(key), raw: library.get(key)! })} className="h-8 w-8 shrink-0 rounded-lg text-text-muted hover:text-accent hover:bg-bg-hover"><BookOpen className="h-4 w-4 mx-auto" /></button>
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleStack(key); }}
                         className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
@@ -317,14 +337,15 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
           </aside>
 
           {/* План: 30 дней × приёмы, в ячейке несколько блюд */}
-          <div className="flex-1 overflow-auto">
-            <table className="w-full border-collapse">
+          <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full min-w-[600px] border-collapse">
               <thead className="sticky top-0 z-10 bg-bg">
                 <tr>
                   <th className="text-left text-[11px] uppercase tracking-wider text-text-muted font-semibold px-3 py-2 w-14 border-b border-border-soft">День</th>
                   {meals.map((m) => (
                     <th key={m} className="text-left text-[11px] uppercase tracking-wider text-text-muted font-semibold px-3 py-2 border-b border-border-soft">{m || 'Блюдо'}</th>
                   ))}
+                  <th className="text-left text-xs text-text-muted px-3 py-2 border-b border-border-soft">Итого за день</th>
                 </tr>
               </thead>
               <tbody>
@@ -370,6 +391,18 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
                         </td>
                       );
                     })}
+                    <td className="px-3 py-3 align-top min-w-[150px]">
+                      {(() => {
+                        const rows = meals.flatMap((meal) => (plan[`${d}|${meal}`] ?? []).map((key) => library.get(key)!));
+                        const total = diningTotals(rows);
+                        const macroText = (key: 'protein' | 'fat' | 'carbs') => rows.some((row) => typeof row[key] === 'number' && Number.isFinite(row[key]) && Number(row[key]) >= 0) ? total[key].toFixed(1) : '—';
+                        return rows.length ? <div className="text-xs tabular-nums space-y-1" aria-label={`Питание за день ${d}`}>
+                          <div className="font-semibold">{Math.round(total.kcal)} ккал</div>
+                          <div className="text-text-muted">Б {macroText('protein')} · Ж {macroText('fat')} · У {macroText('carbs')} г</div>
+                          {total.missing > 0 && <div className="text-text-dim text-[10px]">Частичный итог: у {total.missing} блюд неполные БЖУК</div>}
+                        </div> : <span className="text-text-dim">—</span>;
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -377,6 +410,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
           </div>
         </div>
       </div>
+      {preview && <RecipeModal def={def} row={preview} onClose={() => setPreview(null)} />}
     </div>,
     document.body,
   );

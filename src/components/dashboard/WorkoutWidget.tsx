@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Dumbbell, Play, Check, Shuffle } from 'lucide-react';
+import { Dumbbell, Play, Check } from 'lucide-react';
 import { WorkoutMode, EXERCISES, WORKOUT_DONE_KEY } from '@/components/WorkoutMode';
 import { isoDate } from '@/lib/utils';
 
@@ -15,10 +15,10 @@ const RoundPreview: React.FC<{ img: string; size?: number }> = ({ img, size = 44
     </div>
   ) : (
     <img
-      src={img}
+      src={img.replace('/studio/', '/studio/thumbs/')}
       alt=""
       loading="lazy"
-      className="rounded-full object-cover border border-border-soft shrink-0"
+      className="rounded-xl object-contain bg-white border border-border-soft shrink-0"
       style={{ width: size, height: size }}
       onError={() => setFailed(true)}
     />
@@ -40,7 +40,7 @@ export const WorkoutWidget: React.FC = () => {
     <div className="h-full rounded-xl bg-bg-card border border-border-soft shadow-card p-4 flex flex-col overflow-hidden">
       <div className="flex items-center gap-2 shrink-0">
         <Dumbbell className="h-4 w-4 text-accent shrink-0" />
-        <span className="text-sm font-semibold text-text truncate flex-1">Зарядка 7 минут</span>
+        <span className="text-sm font-semibold text-text truncate flex-1">Движение · 7 минут</span>
         {doneToday && (
           <span className="flex items-center gap-1 rounded-full bg-accent/10 text-accent px-2 py-0.5 text-[10px] font-semibold">
             <Check className="h-3 w-3" /> сегодня
@@ -50,7 +50,7 @@ export const WorkoutWidget: React.FC = () => {
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center gap-3 py-2">
         {/* Стопка круглых превью упражнений — прячется, если по высоте тесно */}
-        <div className="flex -space-x-3 shrink-0">
+        <div className="flex gap-1 shrink-0">
           {EXERCISES.slice(0, 5).map((e) => <RoundPreview key={e.img} img={e.img} />)}
           <div className="h-11 w-11 rounded-full bg-bg-soft border border-border-soft flex items-center justify-center text-[10px] font-semibold text-text-muted shrink-0">
             +{EXERCISES.length - 5}
@@ -58,7 +58,7 @@ export const WorkoutWidget: React.FC = () => {
         </div>
         <div className="text-xs text-text-muted text-center leading-relaxed shrink-0">
           7 упражнений × 1 минута.<br />
-          <span className="inline-flex items-center gap-1 text-text-dim"><Shuffle className="h-3 w-3" /> каждый запуск — новый набор из {EXERCISES.length}</span>
+          <span className="text-text-dim">Без прыжков, зарядка, калистеника и йога</span>
         </div>
       </div>
 
@@ -66,7 +66,7 @@ export const WorkoutWidget: React.FC = () => {
         onClick={() => setOpen(true)}
         className="shrink-0 w-full h-10 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition-[opacity,transform]"
       >
-        <Play className="h-4 w-4" fill="currentColor" /> {doneToday ? 'Ещё разок' : 'Начать зарядку'}
+        <Play className="h-4 w-4" fill="currentColor" /> {doneToday ? 'Ещё разок' : 'Выбрать тренировку'}
       </button>
 
       <WorkoutMode open={open} onClose={() => setOpen(false)} />

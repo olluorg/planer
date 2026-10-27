@@ -8,6 +8,7 @@ import { getUserName } from '@/lib/onboarding';
 import { GoogleIcon, openGoogleSearch } from './ui/google-icon';
 import { usePwaInstall, promptInstall } from '@/lib/pwa';
 import { toast } from '@/lib/toast';
+import { AppNavigation } from './AppNavigation';
 
 interface Props {
   onAdd?: () => void;
@@ -179,6 +180,7 @@ export const Topbar: React.FC<Props> = ({ onAdd, onBell, onFocusMode, onPalette,
           <AppMenu />
         </div>
       </div>
+      <AppNavigation />
     </header>
   );
 };

@@ -15,6 +15,7 @@ import { isHeartbeatEnabled, setHeartbeatEnabled } from "@/lib/notifications";
 import { isSoundEnabled, setSoundEnabled, playSuccess } from "@/lib/sound";
 import { toast } from "@/lib/toast";
 import { ACCENTS, APP_WALLPAPERS, applyAppWallpaper, getAppWallpaper, getCustomWallpapers, addCustomWallpaper, removeCustomWallpaper } from "@/lib/theme";
+import { wallpaperPreview, wallpaperTitle } from '@/lib/wallpapers';
 import { getIconStyle, setIconStyle, type IconStyle } from "@/lib/iconStyle";
 import { compressImage } from "@/lib/imageCompress";
 import { getAiConfig, setAiConfig, askAI, AI_PROVIDERS, type AiConfig } from "@/lib/ai";
@@ -659,8 +660,8 @@ const PluginsSettings: React.FC = () => {
 const GlassWallpaperPicker: React.FC = () => {
   const [current, setCurrent] = useState(getAppWallpaper());
   const [custom, setCustom] = useState<string[]>(getCustomWallpapers());
-  // прогреваем кеш всех обоев, чтобы превью и смена фона не «проявлялись»
-  useEffect(() => { preloadImages([...custom, ...APP_WALLPAPERS]); }, [custom]);
+  // Прогреваем превью; новая коллекция не загружает все UHD-файлы заранее.
+  useEffect(() => { preloadImages([...custom, ...APP_WALLPAPERS.map(wallpaperPreview)]); }, [custom]);
   const pick = (src: string) => { applyAppWallpaper(src); setCurrent(src); };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -690,9 +691,12 @@ const GlassWallpaperPicker: React.FC = () => {
             <div key={w} className="relative group">
               <button
                 onClick={() => pick(w)}
+                aria-label={wallpaperTitle(w)}
+                aria-pressed={current === w}
+                title={wallpaperTitle(w)}
                 className={`h-11 w-[72px] rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${current === w ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"}`}
               >
-                <img src={w} alt="" className="h-full w-full object-cover" loading="lazy" />
+                <img src={wallpaperPreview(w)} alt="" className="h-full w-full object-cover" loading="lazy" />
               </button>
               {isCustom && (
                 <button

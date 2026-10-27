@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { computeInsights } from '@/lib/insights';
 import { useTheme } from '@/lib/theme';
+import { isoDate } from '@/lib/utils';
 import { ECharts } from '@/components/charts/ECharts';
 import { Sparkles, ArrowRight, TriangleAlert, TrendingUp, Info } from 'lucide-react';
 
@@ -35,7 +36,7 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
     [date, tasks, habits, habitLogs, reflections, timeEntries, goals, progress],
   );
 
-  const todayIso = date.toISOString().slice(0, 10);
+  const todayIso = isoDate(date);
 
   const headline = useMemo(() => {
     const dt = tasks.filter((t) => t.date === todayIso && !t.parent_id);

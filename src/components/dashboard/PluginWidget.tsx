@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { MealPlanner } from '@/components/MealPlanner';
 import { RecipeModal } from '@/components/dashboard/RecipeModal';
-import { isEaten, toggleEaten, NUTRITION_EVENT } from '@/lib/nutrition';
+import { isEaten, toggleEaten, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
 import { toast } from '@/lib/toast';
 import { isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
@@ -78,7 +78,7 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
 
   const onToggleEaten = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleEaten(today, { key: eatKey, title, kcal, meal: badge });
+    toggleEaten(today, { key: eatKey, title, kcal, meal: badge, ...readMacros(row.raw) });
     if (!eaten) toast.success(`Учтено: ${title}`, kcal ? `+${kcal} ккал` : undefined);
   };
 

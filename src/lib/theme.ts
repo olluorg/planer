@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { preloadImages } from './preload';
+import { WALLPAPERS, wallpaperPreview } from './wallpapers';
 
 // Две оси: стиль (minimalism | glass) и режим (light | dark).
 // 'glass' = стеклянная тёмная (историческое значение, не мигрируем), 'glass-light' = стеклянная светлая.
@@ -35,15 +36,15 @@ export function applyTheme(t: Theme) {
   root.classList.toggle('glass-light', t === 'glass-light'); // светлые панели поверх обоев
   if (isGlass(t)) {
     applyAppWallpaper(getAppWallpaper());
-    // прогреваем кеш всех обоев — смена фона в пикере станет мгновенной, без «проявления»
-    preloadImages([...getCustomWallpapers(), ...APP_WALLPAPERS]);
+    // Для новой коллекции прогреваем миниатюры; UHD загружается при выборе.
+    preloadImages([...getCustomWallpapers(), ...APP_WALLPAPERS.map(wallpaperPreview)]);
   }
   window.dispatchEvent(new CustomEvent(EVENT, { detail: t }));
 }
 
 /* Обои приложения (glass-тема): готовые из /wallpapers или свой dataURL */
 const WP_KEY = 'app.wallpaper.v1';
-export const APP_WALLPAPERS = Array.from({ length: 20 }, (_, i) => `/wallpapers/wp${i + 1}.jpg`);
+export const APP_WALLPAPERS = WALLPAPERS;
 export const DEFAULT_WALLPAPER = '/wallpapers/wp14.jpg';
 
 export function getAppWallpaper(): string {
@@ -89,7 +90,8 @@ export function applyAccent(id: AccentId) {
 }
 
 export function getTheme(): Theme {
-  return (localStorage.getItem('theme') as Theme) || 'light';
+  const saved = localStorage.getItem('theme');
+  return saved === 'light' || saved === 'dark' || saved === 'glass' || saved === 'glass-light' ? saved : 'dark';
 }
 export function getAccent(): AccentId {
   return ((localStorage.getItem('accent') as AccentId) || 'purple');

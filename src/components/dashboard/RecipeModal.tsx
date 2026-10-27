@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Youtube, Flame, Utensils, CheckCircle2 } from 'lucide-react';
 import { renderTemplate, type PluginWidgetDef, type PluginRow } from '@/lib/plugins';
 import { parseYouTubeId } from '@/components/LiveWallpaper';
-import { isEaten, toggleEaten } from '@/lib/nutrition';
+import { isEaten, toggleEaten, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
 import { isoDate } from '@/lib/utils';
 
 /** Локальные пути (внешние URL отсекаются). */
@@ -24,10 +24,17 @@ function parseSteps(text: string): { steps: string[]; nutrition: string | null }
 export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null; onClose: () => void }> = ({ def, row, onClose }) => {
   const [tab, setTab] = useState<'photo' | 'video'>('photo');
   const [imgIdx, setImgIdx] = useState(0);
+  const [failedImages, setFailedImages] = useState<string[]>([]);
+  const [, setNutritionVersion] = useState(0);
+  useEffect(() => {
+    const sync = () => setNutritionVersion((v) => v + 1);
+    window.addEventListener(NUTRITION_EVENT, sync);
+    return () => window.removeEventListener(NUTRITION_EVENT, sync);
+  }, []);
   const today = isoDate(new Date());
 
   useEffect(() => {
-    setTab('photo'); setImgIdx(0);
+    setTab('photo'); setImgIdx(0); setFailedImages([]);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -48,7 +55,8 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
   const gallery = [
     ...localPaths(r.image ? row.raw[r.image] : null),
     ...localPaths(r.gallery ? row.raw[r.gallery] : null),
-  ].filter((v, i, a) => a.indexOf(v) === i);
+  ].filter((v, i, a) => a.indexOf(v) === i && !failedImages.includes(v));
+  const currentImage = gallery[Math.min(imgIdx, gallery.length - 1)];
 
   const videoId = r.video ? parseYouTubeId(String(row.raw[r.video] ?? '')) : null;
   const eatKey = `${meal}¦${title}`;
@@ -57,12 +65,12 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
 
   const macros = [
     ['Белки', row.raw.protein], ['Жиры', row.raw.fat], ['Углеводы', row.raw.carbs],
-  ].filter(([, v]) => Number(v) > 0) as [string, number][];
+  ].filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v >= 0) as [string, number][];
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-start justify-center p-2 sm:p-5" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[200] flex items-start justify-center p-2 sm:p-5" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-[1100px] h-[94vh] rounded-2xl bg-bg border border-border shadow-2xl overflow-hidden flex flex-col animate-[slide-up_200ms_ease-out]">
+      <div className="relative z-10 w-full max-w-[1100px] h-[94vh] rounded-2xl bg-bg modal-surface border border-border shadow-2xl overflow-hidden flex flex-col animate-[slide-up_200ms_ease-out]">
         <button onClick={onClose} className="absolute top-3 right-3 z-30 h-9 w-9 rounded-lg bg-bg-soft/90 hover:bg-bg-hover flex items-center justify-center text-text-muted hover:text-text transition-colors" title="Закрыть (Esc)">
           <X className="h-4 w-4" />
         </button>
@@ -84,8 +92,8 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
                   </div>
                 ) : gallery.length > 0 ? (
                   <div className="w-full">
-                    <div className="aspect-[4/3] rounded-xl overflow-hidden bg-bg-hover">
-                      <img src={gallery[imgIdx]} alt="" className="w-full h-full object-cover" />
+                    <div className="aspect-square rounded-xl overflow-hidden bg-white">
+                      <img src={currentImage} alt={title} className="w-full h-full object-contain" onError={() => setFailedImages((images) => [...images, currentImage])} />
                     </div>
                     {gallery.length > 1 && (
                       <div className="flex gap-2 mt-2 overflow-x-auto">
@@ -163,7 +171,7 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
               {/* Отметка «съел» */}
               {trackable && (
                 <button
-                  onClick={() => toggleEaten(today, { key: eatKey, title, kcal, meal })}
+                  onClick={() => toggleEaten(today, { key: eatKey, title, kcal, meal, ...readMacros(row.raw) })}
                   className={`mt-6 w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
                     eaten ? 'bg-accent/12 text-accent' : 'bg-accent text-white hover:opacity-90'
                   }`}

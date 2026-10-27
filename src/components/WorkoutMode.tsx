@@ -13,7 +13,22 @@ import { logWorkout } from '@/lib/activity';
  *   йога      → public/workout/yoga-NN.jpg
  * Пока файла нет — показывается заглушка, тренировка работает и без картинок. */
 export interface Exercise { name: string; hint: string; img: string }
-export type WorkoutType = 'charge' | 'calisthenics' | 'yoga';
+export type WorkoutType = 'charge' | 'calisthenics' | 'yoga' | 'low-impact';
+
+const studioImage = (id: string) => `/workout/studio/${id}.webp`;
+const STUDIO_BY_NAME: Record<string, string> = {
+  'Приседания': 'squat', 'Планка': 'plank', 'Ягодичный мостик': 'bridge', 'Поза ребёнка': 'child-pose',
+};
+
+export const LOW_IMPACT: Exercise[] = [
+  { name: 'Шаг на месте', hint: 'Начни спокойно, ставь стопу мягко и дыши свободно.', img: studioImage('march') },
+  { name: 'Приседания', hint: 'Пятки на полу, колени по направлению стоп. Выбирай комфортную глубину.', img: studioImage('squat') },
+  { name: 'Подъём на носки', hint: 'Плавно поднимай и опускай пятки, опираясь на переднюю часть стоп. При необходимости держись за опору.', img: studioImage('calf-raise') },
+  { name: 'Ягодичный мостик', hint: 'Стопы на полу. Поднимай таз без чрезмерного прогиба поясницы.', img: studioImage('bridge') },
+  { name: 'Птица-собака', hint: 'Из положения на четвереньках вытягивай противоположные руку и ногу. Чередуй стороны, сохраняя таз ровным.', img: studioImage('bird-dog') },
+  { name: 'Планка', hint: 'Локти под плечами, дыши свободно. Можно опустить колени или сделать паузу раньше сигнала.', img: studioImage('plank') },
+  { name: 'Поза ребёнка', hint: 'Мягко отведи таз к пяткам и расслабь плечи. Не углубляй положение через боль.', img: studioImage('child-pose') },
+];
 
 const CHARGE = [
   { name: 'Джампинг джек', hint: 'Прыжки: ноги врозь, руки вверх' },
@@ -68,17 +83,18 @@ const YOGA = [
 ];
 
 function withImg(list: { name: string; hint: string }[], slug: string): Exercise[] {
-  return list.map((e, i) => ({ ...e, img: `/workout/${slug}-${String(i + 1).padStart(2, '0')}.jpg` }));
+  return list.map((e, i) => ({ ...e, img: STUDIO_BY_NAME[e.name] ? studioImage(STUDIO_BY_NAME[e.name]) : `/workout/${slug}-${String(i + 1).padStart(2, '0')}.jpg` }));
 }
 
 export const WORKOUT_TYPES: { id: WorkoutType; label: string; icon: React.ElementType; hint: string; exercises: Exercise[] }[] = [
+  { id: 'low-impact', label: 'Без прыжков', icon: Flower2, hint: '7 минут · коврик · спокойный темп · фиксированный порядок', exercises: LOW_IMPACT },
   { id: 'charge', label: 'Зарядка', icon: Dumbbell, hint: 'Лёгкая разминка на всё тело', exercises: withImg(CHARGE, 'ex') },
   { id: 'calisthenics', label: 'Калистеника', icon: Flame, hint: 'Сила с весом тела, без снаряжения', exercises: withImg(CALISTHENICS, 'calisthenics') },
   { id: 'yoga', label: 'Йога', icon: Flower2, hint: 'Растяжка, баланс и дыхание', exercises: withImg(YOGA, 'yoga') },
 ];
 
 /** Для превью виджета — упражнения зарядки (обратная совместимость с /workout/ex-NN.jpg). */
-export const EXERCISES = WORKOUT_TYPES[0].exercises;
+export const EXERCISES = LOW_IMPACT;
 
 const EX_SECONDS = 60;
 const EX_COUNT = 7;
@@ -129,7 +145,7 @@ const ExerciseImage: React.FC<{ ex: Exercise; size: number }> = ({ ex, size }) =
     <img
       src={ex.img}
       alt={ex.name}
-      className="rounded-full object-cover"
+      className="rounded-2xl object-contain bg-white p-2"
       style={{ width: size, height: size }}
       onError={() => setFailed(true)}
     />
@@ -144,7 +160,10 @@ interface Props {
 /** Полноэкранная зарядка: 7 упражнений × 1 минута, кольцо-таймер, картинка в круге. */
 export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const { startTimeEntry, finishTimeEntry } = useStore();
-  const [type, setType] = useState<WorkoutType>(() => (localStorage.getItem(TYPE_KEY) as WorkoutType) || 'charge');
+  const [type, setType] = useState<WorkoutType>(() => {
+    const saved = localStorage.getItem(TYPE_KEY);
+    return WORKOUT_TYPES.find((w) => w.id === saved)?.id ?? 'low-impact';
+  });
   const [plan, setPlan] = useState<Exercise[]>([]);
   const [idx, setIdx] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(EX_SECONDS);
@@ -154,11 +173,12 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const elapsedRef = useRef(0);
 
   const exercisesOf = (t: WorkoutType) => WORKOUT_TYPES.find((x) => x.id === t)!.exercises;
+  const makePlan = (t: WorkoutType) => t === 'low-impact' ? [...LOW_IMPACT] : shuffle(exercisesOf(t)).slice(0, EX_COUNT);
 
   // Новый случайный план на каждое открытие
   useEffect(() => {
     if (open) {
-      setPlan(shuffle(exercisesOf(type)).slice(0, EX_COUNT));
+      setPlan(makePlan(type));
       setIdx(0);
       setSecondsLeft(EX_SECONDS);
       setRunning(false);
@@ -176,7 +196,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const pickType = (t: WorkoutType) => {
     setType(t);
     try { localStorage.setItem(TYPE_KEY, t); } catch {}
-    setPlan(shuffle(exercisesOf(t)).slice(0, EX_COUNT));
+    setPlan(makePlan(t));
     setIdx(0);
     setSecondsLeft(EX_SECONDS);
   };
@@ -258,7 +278,8 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   // и класс молча не генерился — оверлей был прозрачным.
   return createPortal(
     <div
-      className="fixed inset-0 z-[210] text-white select-none flex flex-col items-center justify-center p-4 bg-[#0b0a14]"
+      role="dialog" aria-modal="true" aria-label="Тренировка"
+      className="fixed inset-0 z-[210] text-white select-none flex flex-col items-center overflow-y-auto p-4 pt-20 bg-[#0b0a14]"
       style={{ backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(52,211,153,0.10), transparent), radial-gradient(ellipse 60% 50% at 50% 110%, rgba(99,102,241,0.10), transparent)' }}
     >
       {/* Выход */}
@@ -279,7 +300,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
             <Check className="h-10 w-10" />
           </div>
           <div className="text-3xl font-bold">{WORKOUT_TYPES.find((w) => w.id === type)!.label} — готово!</div>
-          <p className="text-white/50 mt-2 max-w-xs">7 минут движения — день уже лучше. Каждый запуск — новый набор упражнений.</p>
+          <p className="text-white/50 mt-2 max-w-xs">Сессия завершена. В журнал записано фактическое время движения.</p>
           <button onClick={onClose} className={`mt-7 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
             Готово
           </button>
@@ -287,8 +308,8 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
       ) : (
         <>
           {/* Круг: кольцо-таймер минуты + круглая картинка упражнения */}
-          <div className="relative" style={{ width: 340, height: 340 }}>
-            <svg width="340" height="340" className="absolute inset-0 -rotate-90">
+          <div className="relative shrink-0" style={{ width: 'min(340px, calc(100vw - 32px))', height: 'min(340px, calc(100vw - 32px))' }}>
+            <svg width="100%" height="100%" viewBox="0 0 340 340" className="absolute inset-0 -rotate-90">
               <circle cx="170" cy="170" r={R} stroke="rgba(255,255,255,0.10)" strokeWidth="6" fill="none" />
               <circle
                 cx="170" cy="170" r={R}
@@ -317,11 +338,12 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
 
           {/* Выбор типа тренировки — только до старта */}
           {!started && (
-            <div className="flex items-center gap-2 mt-5">
+            <div className="flex flex-wrap justify-center items-center gap-2 mt-5 max-w-lg">
               {WORKOUT_TYPES.map((wt) => (
                 <button
                   key={wt.id}
                   onClick={() => pickType(wt.id)}
+                  aria-pressed={type === wt.id}
                   title={wt.hint}
                   className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm transition-all ${
                     type === wt.id ? 'bg-white/15 text-white ring-1 ring-white/50' : 'text-white/55 hover:text-white hover:bg-white/10'
@@ -334,6 +356,13 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
           )}
 
           {/* Прогресс из 7 точек */}
+          {!started && <details className="mt-4 w-full max-w-lg rounded-xl border border-white/15 bg-white/5 p-3 text-sm">
+            <summary className="cursor-pointer text-white/80">План занятия · 7 упражнений · 7 минут</summary>
+            <p className="mt-2 text-white/55">{WORKOUT_TYPES.find((w) => w.id === type)!.hint}</p>
+            <ol className="mt-3 space-y-2" aria-label="Упражнения до старта">
+              {plan.map((exercise, i) => <li key={i} className="flex gap-3 text-white/75"><span className="text-white/35 tabular-nums">{i + 1}.</span><span className="flex-1">{exercise.name}</span><span className="text-white/40">60 с</span></li>)}
+            </ol>
+          </details>}
           <div className="flex items-center gap-2 mt-4">
             {plan.map((_, i) => (
               <span

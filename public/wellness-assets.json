@@ -1,0 +1,163 @@
+{
+  "assets": [
+    {
+      "id": "squat",
+      "title": "Приседания",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-5db37fd0-2c47-4ed3-a6e3-2703c18c45b3.png",
+      "src": "/workout/studio/squat.webp",
+      "preview": "/workout/studio/thumbs/squat.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 22760,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "plank",
+      "title": "Планка",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-1c6ff5e8-97b5-441c-82da-cb36638e53f5.png",
+      "src": "/workout/studio/plank.webp",
+      "preview": "/workout/studio/thumbs/plank.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 21186,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "bridge",
+      "title": "Ягодичный мостик",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-2f03256d-7c42-49d9-b0da-d3776bcc060b.png",
+      "src": "/workout/studio/bridge.webp",
+      "preview": "/workout/studio/thumbs/bridge.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 28520,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "bird-dog",
+      "title": "Птица-собака",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-d8d4b311-a896-4861-8c31-1fb8eb49821f.png",
+      "src": "/workout/studio/bird-dog.webp",
+      "preview": "/workout/studio/thumbs/bird-dog.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 21908,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "calf-raise",
+      "title": "Подъём на носки",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-8213cd9d-b729-46e8-b5a0-ccef58867207.png",
+      "src": "/workout/studio/calf-raise.webp",
+      "preview": "/workout/studio/thumbs/calf-raise.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 16352,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "march",
+      "title": "Шаг на месте",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-222a657b-9eef-4b86-85ef-de3b8109edff.png",
+      "src": "/workout/studio/march.webp",
+      "preview": "/workout/studio/thumbs/march.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 20358,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "child-pose",
+      "title": "Поза ребёнка",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-cede44f3-53de-4173-a4b2-66299bcd48e3.png",
+      "src": "/workout/studio/child-pose.webp",
+      "preview": "/workout/studio/thumbs/child-pose.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 19914,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "oatmeal-banana",
+      "title": "Овсянка с бананом и орехами",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-e01822c1-2988-4acc-8c78-4f3779336fe6.png",
+      "src": "/food/studio/oatmeal-banana.webp",
+      "preview": "/food/studio/thumbs/oatmeal-banana.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 78170,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "quinoa-chickpeas",
+      "title": "Киноа с нутом и цукини",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-8d808b82-ee97-419a-b502-2639118ab1b6.png",
+      "src": "/food/studio/quinoa-chickpeas.webp",
+      "preview": "/food/studio/thumbs/quinoa-chickpeas.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 138504,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "salmon-asparagus",
+      "title": "Лосось со спаржей",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-7265a948-4ed7-44c2-b6c4-b9412a35a579.png",
+      "src": "/food/studio/salmon-asparagus.webp",
+      "preview": "/food/studio/thumbs/salmon-asparagus.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 79584,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "yogurt-berries",
+      "title": "Йогурт с ягодами и миндалём",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-7f39b2a4-770e-4e7e-bb98-57599d747f7e.png",
+      "src": "/food/studio/yogurt-berries.webp",
+      "preview": "/food/studio/thumbs/yogurt-berries.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 54622,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    },
+    {
+      "id": "eggs-toast",
+      "title": "Яичница с хлебом",
+      "source": "C:\\Users\\X\\.codex\\generated_images\\01a17376-258b-79f2-8dc0-8a9b35171348\\exec-fddc0e93-b47a-40b3-bd7e-84583dda21ae.png",
+      "src": "/food/studio/eggs-toast.webp",
+      "preview": "/food/studio/thumbs/eggs-toast.webp",
+      "width": 960,
+      "height": 960,
+      "bytes": 102368,
+      "generator": "GPT Image built-in",
+      "generated": "2026-10-26",
+      "direction": "White studio, soft daylight, ivory and charcoal fitness clothing / matte ivory ceramic food presentation. One subject per image. No logos or text."
+    }
+  ],
+  "rejected": [
+    "exec-1fc964a4-e828-4f36-96c8-146a36f305e2.png: excessive toe-point posture"
+  ]
+}

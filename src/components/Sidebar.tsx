@@ -1,19 +1,19 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutGrid, Target, CheckSquare, HeartPulse, Plus } from 'lucide-react';
+import { LayoutGrid, Target, CheckSquare, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MoreNavigation } from './AppNavigation';
 
 // Десктопный сайдбар убран (фокус-группа: «меню слева устарело»). Навигация теперь —
 // раскрытие виджетов + меню у аватара в шапке + Ctrl+K. На мобильных оставляем нижнюю навигацию.
 const mobileItems = [
-  { to: '/', label: 'Главная', icon: LayoutGrid, end: true },
-  { to: '/goals', label: 'Цели', icon: Target },
+  { to: '/', label: 'Сегодня', icon: LayoutGrid, end: true },
   { to: '/tasks', label: 'Задачи', icon: CheckSquare },
-  { to: '/health', label: 'Здоровье', icon: HeartPulse },
+  { to: '/goals', label: 'Цели', icon: Target },
 ];
 
 export const Sidebar = () => {
   return (
-    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg border-t border-border flex py-1 safe-area-inset-bottom">
+    <nav aria-label="Мобильная навигация" className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-card backdrop-blur-xl border-t border-border flex py-1 safe-area-inset-bottom">
       {mobileItems.slice(0, 2).map((it) => (
         <NavLink
           key={it.to}
@@ -58,6 +58,7 @@ export const Sidebar = () => {
           <span className="truncate">{it.label}</span>
         </NavLink>
       ))}
+      <MoreNavigation mobile />
     </nav>
   );
 };

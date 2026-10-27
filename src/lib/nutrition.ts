@@ -7,6 +7,16 @@
 
 export interface Macros { protein?: number; fat?: number; carbs?: number }
 
+/** Unknown values stay unknown; explicit zero is valid nutrition data. */
+export function readMacros(row: Record<string, unknown>): Macros {
+  const result: Macros = {};
+  for (const key of ['protein', 'fat', 'carbs'] as const) {
+    const value = row[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) result[key] = value;
+  }
+  return result;
+}
+
 export interface EatenItem extends Macros {
   key: string;      // стабильный ключ блюда ("Завтрак¦Овсянка…") или "custom:<id>"
   title: string;

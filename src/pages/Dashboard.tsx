@@ -354,7 +354,9 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
   // все новые виджеты (зарядка, календарь, калории, активность, AI) схлопывались в узкие обрубки.
   const mobileLayout = useMemo(() => {
     let y = 0;
-    return visibleLayout.map((l) => {
+    const priority = ['today-plan', 'today-focus', 'habit-dots', 'day-brief'];
+    const rank = (id: string) => { const n = priority.indexOf(id); return n < 0 ? priority.length : n; };
+    return [...visibleLayout].sort((a, b) => rank(a.i) - rank(b.i)).map((l) => {
       const item = { ...l, x: 0, y, w: 4, minW: 4 };
       y += l.h;
       return item;

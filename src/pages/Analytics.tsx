@@ -12,7 +12,8 @@ import { forecast as runForecast, type ForecastMethod } from '@/lib/forecast';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { isoDate, fmtNum } from '@/lib/utils';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
+import { forecastSummary } from '@/lib/forecastSummary';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 
 type Tab = 'overview' | 'focus' | 'tasks' | 'habits' | 'goals';
@@ -20,7 +21,7 @@ type Tab = 'overview' | 'focus' | 'tasks' | 'habits' | 'goals';
 export const AnalyticsPage = () => {
   const { goals, progress, tasks, habits, habitLogs, reflections, timeEntries } = useStore();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark');
+  const cc = getChartColors(isDarkMode(theme));
   const [tab, setTab] = useState<Tab>('overview');
   const [period, setPeriod] = useState<number>(7);
   const [goalId, setGoalId] = useState<string>(goals[0]?.id ?? '');
@@ -31,6 +32,7 @@ export const AnalyticsPage = () => {
 
   const multiplier = activity / 100;
   const f = useMemo(() => goal ? runForecast(goal, recs, { horizon: 60, multiplier, method }) : null, [goal, recs, multiplier, method]);
+  const estimate = goal && f ? forecastSummary(goal, recs, f) : null;
 
   // KPI-ряд + тренд за выбранный период
   const kpis = useMemo(() => {
@@ -506,8 +508,8 @@ export const AnalyticsPage = () => {
                   <div className="flex items-center gap-3 text-caption text-text-muted">
                     <Badge tone="info">прогноз</Badge>
                     <span>скорость: <b className="text-text">{fmtNum(f.velocity, 3)}</b> ед./день</span>
-                    {f.etaDate && <span>ETA: <b className="text-text">{f.etaDate}</b></span>}
-                    <span>точность: <b className="text-text">{Math.round(f.etaConfidence * 100)}%</b></span>
+                    {estimate?.eta && <span>Оценка даты: <b className="text-text">{estimate.eta}</b></span>}
+                    <span>Оценка по текущему темпу, не гарантия результата</span>
                   </div>
                 </div>
                 <ECharts height={340} option={mainChart(goal, recs, f, cc)} />
@@ -532,29 +534,20 @@ export const AnalyticsPage = () => {
                 </Card>
 
                 <Card className="lg:col-span-2 flex flex-col justify-center">
-                  <CardTitle>Диапазон достижения</CardTitle>
-                  <div className="text-caption text-text-muted mb-3">95% доверительный интервал</div>
-                  {f.etaDate ? (
+                  <CardTitle>Оценка достижения</CardTitle>
+                  <div className="text-caption text-text-muted mb-3">При сохранении текущего темпа</div>
+                  {estimate?.eta ? (
                     <div className="space-y-3">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-text">{f.etaDate}</div>
-                        <div className="text-caption text-text-muted">ожидаемая дата</div>
-                      </div>
-                      <div className="relative h-2 rounded-full bg-bg-soft overflow-hidden">
-                        <div className="absolute inset-y-0 left-[15%] right-[15%] bg-accent/30" />
-                        <div className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-accent" />
-                      </div>
-                      <div className="flex justify-between text-caption text-text-muted">
-                        <span>оптимистично</span>
-                        <span>вероятно</span>
-                        <span>пессимистично</span>
+                        <div className="text-2xl font-bold text-text">{estimate.eta}</div>
+                        <div className="text-caption text-text-muted">{estimate.label}</div>
                       </div>
                       <div className="text-center text-small text-text-muted">
-                        точность модели: <b className="text-text">{Math.round(f.etaConfidence * 100)}%</b>
+                        Прогноз меняется с новыми отметками. Это не обещание результата и не вероятность успеха.
                       </div>
                     </div>
                   ) : (
-                    <div className="text-small text-text-dim text-center py-4">Недостаточно данных для прогноза. Записывайте прогресс цели.</div>
+                    <div className="text-small text-text-muted text-center py-4">{estimate?.label}. Записывайте прогресс цели.</div>
                   )}
                 </Card>
               </div>
