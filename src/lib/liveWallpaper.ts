@@ -10,6 +10,7 @@ export type LiveWallpaper =
 const KEY = 'app.livewallpaper.v1';
 const IDB_PREFIX = 'livewp:';
 export const LIVEWP_EVENT = 'thedad:livewallpaper-changed';
+let selectionVersion = 0;
 
 export function getLiveWallpaper(): LiveWallpaper | null {
   try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; }
@@ -21,23 +22,32 @@ function save(w: LiveWallpaper | null) {
 }
 
 export function setYouTubeWallpaper(id: string) {
+  selectionVersion++;
+  const prev = getLiveWallpaper();
   save({ kind: 'youtube', ref: id });
+  if (prev?.kind === 'video') void del(prev.ref).catch(() => {});
 }
 
 /** Сохраняет видеофайл в IndexedDB и делает его живыми обоями. */
 export async function setVideoWallpaper(file: File): Promise<void> {
-  const ref = `${IDB_PREFIX}${Date.now().toString(36)}`;
+  const version = ++selectionVersion;
+  const ref = `${IDB_PREFIX}${crypto.randomUUID()}`;
   await set(ref, file);
+  if (version !== selectionVersion) {
+    try { await del(ref); } catch {}
+    throw new Error('Выбор фона изменился до завершения загрузки видео');
+  }
   // подчищаем прежний видео-блоб, если был
   const prev = getLiveWallpaper();
-  if (prev?.kind === 'video' && prev.ref !== ref) { try { await del(prev.ref); } catch {} }
   save({ kind: 'video', ref });
+  if (prev?.kind === 'video' && prev.ref !== ref) { try { await del(prev.ref); } catch {} }
 }
 
 export async function clearLiveWallpaper(): Promise<void> {
+  selectionVersion++;
   const prev = getLiveWallpaper();
-  if (prev?.kind === 'video') { try { await del(prev.ref); } catch {} }
   save(null);
+  if (prev?.kind === 'video') { try { await del(prev.ref); } catch {} }
 }
 
 /** Object URL для видео-обоев из idb (null, если нет). Освобождать через revoke по надобности. */

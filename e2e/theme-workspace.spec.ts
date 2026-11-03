@@ -32,6 +32,22 @@ test('keeps a user-selected YouTube background', async ({ page }) => {
   await expect(page.locator('iframe[title="Живой фон"]')).toHaveCount(1);
 });
 
+test('switching from YouTube to a still wallpaper persists after reload', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'glass');
+    localStorage.setItem('onboarding.done.v1', '1');
+  });
+  await page.goto('/settings');
+  await page.getByPlaceholder('Ссылка YouTube…').fill('https://youtu.be/abcdefghijk');
+  await page.getByRole('button', { name: 'Задать', exact: true }).click();
+  await expect(page.locator('iframe[title="Живой фон"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Токио после дождя', exact: true }).click();
+  await expect(page.locator('iframe[title="Живой фон"]')).toHaveCount(0);
+  await page.reload();
+  expect(await page.evaluate(() => localStorage.getItem('app.livewallpaper.v1'))).toBeNull();
+  await expect(page.getByRole('button', { name: 'Токио после дождя', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('an existing user without an accent retains the original default', async ({page}) => {
   await page.addInitScript(() => { localStorage.setItem('theme', 'glass'); localStorage.setItem('onboarding.done.v1', '1'); });
   await page.goto('/');
