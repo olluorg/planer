@@ -9,9 +9,10 @@ import { Sparkline } from '@/components/ui/sparkline';
 import { ECharts } from '@/components/charts/ECharts';
 import { useStore } from '@/lib/store';
 import { isoDate, fmtNum } from '@/lib/utils';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 import type { HealthMetric } from '@/lib/types';
+import { releaseNutritionOwnership, releaseWorkoutOwnership } from '@/lib/nutritionSync';
 
 interface MetricDef {
   key: HealthMetric;
@@ -38,7 +39,7 @@ const METRICS: MetricDef[] = [
 export const HealthPage: React.FC<{ date: Date }> = ({ date }) => {
   const { healthLogs, upsertHealthLog, reflections } = useStore();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark');
+  const cc = getChartColors(isDarkMode(theme));
   const d = isoDate(date);
 
   const days14 = useMemo(() => Array.from({ length: 14 }, (_, i) => isoDate(addDays(date, -13 + i))), [date]);
@@ -87,7 +88,13 @@ export const HealthPage: React.FC<{ date: Date }> = ({ date }) => {
                 def={m}
                 today={valueOf(d, m.key)}
                 series={days14.map((day) => valueOf(day, m.key) ?? 0)}
-                onLog={(v) => upsertHealthLog(d, m.key, v)}
+                onLog={(v) => {
+                  if (d === isoDate(new Date())) {
+                    if (m.key === 'calories') releaseNutritionOwnership();
+                    if (m.key === 'workout') releaseWorkoutOwnership();
+                  }
+                  upsertHealthLog(d, m.key, v);
+                }}
               />
             ))}
           </div>

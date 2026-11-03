@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useStore } from './store';
 import { isoDate } from './utils';
-import { getEaten, eatenKcal, NUTRITION_EVENT } from './nutrition';
-import { workoutSeconds, ACTIVITY_EVENT } from './activity';
+import { getEaten, eatenKcal, hasCompleteEatenCalories, isEatenStorageReadable, NUTRITION_EVENT } from './nutrition';
+import { workoutSeconds, isWorkoutStorageReadable, ACTIVITY_EVENT } from './activity';
+import { NUTRITION_OWNER_KEY, WORKOUT_OWNER_KEY, planOwnedHealthSync } from './nutritionSync';
+import type { HealthMetric } from './types';
 
 /**
  * Централизованная синхронизация виджетов.
@@ -31,20 +33,25 @@ export function useHealthSync() {
       // уменьшении значения (сняли отметку/сброс зарядки) кеш рассинхронизируется.
       const st = useStore.getState();
       const today = isoDate(new Date());
-      const valueOf = (metric: string) => st.healthLogs.find((l) => l.date === today && l.metric === metric)?.value;
-
-      // Калории: как только за день появилась хоть одна отметка «съел», метрику
-      // ведём мы (включая обнуление). Пустой день не трогаем — вдруг залогировано вручную.
-      const curCal = valueOf('calories');
-      const owned = getEaten(today).length > 0 || curCal !== undefined;
-      if (owned) {
-        const cals = eatenKcal(today);
-        if (curCal !== cals) st.upsertHealthLog(today, 'calories', cals);
+      // Автоматический источник меняет только собственные значения, не ручные или импортированные.
+      const syncOwned = (metric: HealthMetric, key: string, count: number, total: number) => {
+        const current = useStore.getState().healthLogs.find((l) => l.date === today && l.metric === metric);
+        let owner: { date: string; value: number } | null = null;
+        try { owner = JSON.parse(localStorage.getItem(key) || 'null'); } catch { /* old or invalid state */ }
+        const previous = owner?.date === today && Number.isFinite(owner.value) ? owner.value : undefined;
+        const decision = planOwnedHealthSync(current?.value, previous, count, total);
+        if (decision.action === 'write') st.upsertHealthLog(today, metric, decision.value);
+        if (decision.action === 'remove' && current) st.removeHealthLog(current.id);
+        try {
+          if (decision.action === 'write') localStorage.setItem(key, JSON.stringify({date: today, value: decision.value}));
+          else if (decision.action === 'remove' || !decision.owned) localStorage.removeItem(key);
+        } catch { /* leave health data intact if local storage is unavailable */ }
+      };
+      if (isEatenStorageReadable()) syncOwned('calories', NUTRITION_OWNER_KEY, hasCompleteEatenCalories(today) ? getEaten(today).length : 0, eatenKcal(today));
+      if (isWorkoutStorageReadable()) {
+        const wMin = Math.round(workoutSeconds(today) / 60);
+        syncOwned('workout', WORKOUT_OWNER_KEY, wMin > 0 ? 1 : 0, wMin);
       }
-
-      // Зарядка: минуты за сегодня; пишем всегда, когда отличается от лога.
-      const wMin = Math.round(workoutSeconds(today) / 60);
-      if (wMin > 0 && valueOf('workout') !== wMin) st.upsertHealthLog(today, 'workout', wMin);
     };
     const schedule = () => { window.clearTimeout(timer); timer = window.setTimeout(run, 300); };
 

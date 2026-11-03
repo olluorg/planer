@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { useToastStore, type ToastKind } from '@/lib/toast';
 import { springs } from '@/components/ui/motion';
 import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
@@ -19,8 +20,8 @@ export const Toaster: React.FC = () => {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
 
-  return (
-    <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2 w-[360px] max-w-[92vw] pointer-events-none">
+  return createPortal(
+    <div className="fixed bottom-4 right-4 z-[300] flex flex-col gap-2 w-[360px] max-w-[92vw] pointer-events-none" aria-live="polite">
       <AnimatePresence mode="popLayout">
         {toasts.map((t) => (
           <motion.div
@@ -57,6 +58,6 @@ export const Toaster: React.FC = () => {
           </motion.div>
         ))}
       </AnimatePresence>
-    </div>
+    </div>, document.body
   );
 };

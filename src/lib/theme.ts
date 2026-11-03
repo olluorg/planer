@@ -4,7 +4,7 @@ import { WALLPAPERS, wallpaperPreview } from './wallpapers';
 
 // Две оси: стиль (minimalism | glass) и режим (light | dark).
 // 'glass' = стеклянная тёмная (историческое значение, не мигрируем), 'glass-light' = стеклянная светлая.
-export type Theme = 'dark' | 'light' | 'glass' | 'glass-light';
+export type Theme = 'dark' | 'light' | 'glass' | 'glass-light' | 'work' | 'work-light';
 
 const EVENT = 'reform-theme';
 const ACCENT_EVENT = 'reform-accent';
@@ -12,7 +12,7 @@ const ACCENT_EVENT = 'reform-accent';
 /** Стеклянная тема (любой режим). */
 export const isGlass = (t: Theme) => t === 'glass' || t === 'glass-light';
 /** Тёмный режим (для иконок/графиков): dark и стеклянная-тёмная. */
-export const isDarkMode = (t: Theme) => t === 'dark' || t === 'glass';
+export const isDarkMode = (t: Theme) => t === 'dark' || t === 'glass' || t === 'work';
 
 /* Приглушённая минималистичная палитра — без кислотных тонов */
 export const ACCENTS = [
@@ -24,6 +24,7 @@ export const ACCENTS = [
   { id: 'rose',     label: 'Пыльная роза', color: '#b07a8c', soft: '#c295a4' },
   { id: 'terracotta', label: 'Терракота', color: '#bd7a5f', soft: '#cf957d' },
   { id: 'graphite', label: 'Графит',    color: '#64748b', soft: '#7e8da3' },
+  { id: 'forest',   label: 'Тёмная хвоя', color: '#405e4a', soft: '#57765f' },
 ] as const;
 
 export type AccentId = typeof ACCENTS[number]['id'];
@@ -34,6 +35,9 @@ export function applyTheme(t: Theme) {
   root.classList.toggle('dark', isDarkMode(t));            // glass-dark тоже тёмный
   root.classList.toggle('glass', isGlass(t));
   root.classList.toggle('glass-light', t === 'glass-light'); // светлые панели поверх обоев
+  root.classList.toggle('work', t === 'work' || t === 'work-light');
+  root.classList.toggle('work-light', t === 'work-light');
+  applyAccent(getAccent(), false);
   if (isGlass(t)) {
     applyAppWallpaper(getAppWallpaper());
     // Для новой коллекции прогреваем миниатюры; UHD загружается при выборе.
@@ -81,9 +85,10 @@ export function removeCustomWallpaper(dataUrl: string): string[] {
   return list;
 }
 
-export function applyAccent(id: AccentId) {
+export function applyAccent(id: AccentId, persist = true) {
   const a = ACCENTS.find((x) => x.id === id) ?? ACCENTS[0];
-  localStorage.setItem('accent', a.id);
+  const work = document.documentElement.classList.contains('work');
+  if (persist) localStorage.setItem(work ? 'accent.workspace.v1' : 'accent', a.id);
   document.documentElement.style.setProperty('--accent', a.color);
   document.documentElement.style.setProperty('--accent-soft', a.soft);
   window.dispatchEvent(new CustomEvent(ACCENT_EVENT, { detail: a.id }));
@@ -91,10 +96,12 @@ export function applyAccent(id: AccentId) {
 
 export function getTheme(): Theme {
   const saved = localStorage.getItem('theme');
-  return saved === 'light' || saved === 'dark' || saved === 'glass' || saved === 'glass-light' ? saved : 'dark';
+  return saved === 'light' || saved === 'dark' || saved === 'glass' || saved === 'glass-light' || saved === 'work' || saved === 'work-light' ? saved : 'dark';
 }
 export function getAccent(): AccentId {
-  return ((localStorage.getItem('accent') as AccentId) || 'purple');
+  const work = getTheme() === 'work' || getTheme() === 'work-light';
+  const saved = localStorage.getItem(work ? 'accent.workspace.v1' : 'accent');
+  return ACCENTS.find(a => a.id === saved)?.id ?? (work ? 'forest' : 'purple');
 }
 
 export function useTheme() {
@@ -118,7 +125,7 @@ export function useTheme() {
   // Переключатель меняет только режим (свет/тьма) ВНУТРИ выбранного стиля,
   // не перекидывая glass↔minimalism.
   const toggle = () => setTheme(
-    isGlass(theme)
+    theme === 'work' ? 'work-light' : theme === 'work-light' ? 'work' : isGlass(theme)
       ? (theme === 'glass' ? 'glass-light' : 'glass')
       : (theme === 'light' ? 'dark' : 'light'),
   );

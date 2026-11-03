@@ -49,7 +49,56 @@ function localColumns(d: Database, table: string): string[] {
   return rows(d, `PRAGMA table_info(${table})`).map((r) => String(r.name));
 }
 
-export function mergeInto(local: Database, remote: Database): MergeStats {
+/** Automatic reconciliation is limited to disjoint inserts on the same schema.
+ *  Updates, deletions, tombstones and natural-key collisions require review. */
+export function canMergeIndependentInserts(base: Database, local: Database, remote: Database): boolean {
+  const version = (d: Database) => d.exec('PRAGMA user_version')[0]?.values[0]?.[0];
+  if (version(base) !== version(local) || version(base) !== version(remote)) return false;
+  const schema = (d: Database) => JSON.stringify(rows(d, "SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"));
+  if (schema(base) !== schema(local) || schema(base) !== schema(remote)) return false;
+  const expected = [...SYNC_TABLES, 'tombstones'].sort();
+  const actual = rows(base, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").map(row => String(row.name));
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) return false;
+  const encode = (row: Row, columns: string[]) => JSON.stringify(columns.map(column => {
+    const value = row[column];
+    return value instanceof Uint8Array ? Array.from(value) : value ?? null;
+  }));
+  const tombs = (d: Database) => JSON.stringify(rows(d, 'SELECT entity, id, deleted_at FROM tombstones ORDER BY entity, id'));
+  if (tombs(base) !== tombs(local) || tombs(base) !== tombs(remote)) return false;
+  for (const table of SYNC_TABLES) {
+    const columns = localColumns(base, table);
+    const baseRows = rows(base, `SELECT * FROM ${table}`);
+    const localRows = rows(local, `SELECT * FROM ${table}`);
+    const remoteRows = rows(remote, `SELECT * FROM ${table}`);
+    if ([...baseRows, ...localRows, ...remoteRows].some(row => typeof row.id !== 'string' || !row.id)) return false;
+    const baseById = new Map(baseRows.map(row => [String(row.id), row]));
+    const localById = new Map(localRows.map(row => [String(row.id), row]));
+    const remoteById = new Map(remoteRows.map(row => [String(row.id), row]));
+    if (baseById.size !== baseRows.length || localById.size !== localRows.length || remoteById.size !== remoteRows.length) return false;
+    for (const [id, row] of baseById) {
+      const l = localById.get(id), r = remoteById.get(id);
+      if (!l || !r || encode(row, columns) !== encode(l, columns) || encode(row, columns) !== encode(r, columns)) return false;
+    }
+    const localNew = localRows.filter(row => !baseById.has(String(row.id)));
+    const remoteNew = remoteRows.filter(row => !baseById.has(String(row.id)));
+    const natural = NATURAL_KEYS[table as SyncTable];
+    const remoteNatural = new Map<string, string>();
+    if (natural) for (const row of remoteNew) {
+      const key = encode(row, natural);
+      if (remoteNatural.has(key)) return false;
+      remoteNatural.set(key, String(row.id));
+    }
+    for (const l of localNew) {
+      const id = String(l.id), r = remoteById.get(id);
+      if (r && encode(l, columns) !== encode(r, columns)) return false;
+      const otherId = natural ? remoteNatural.get(encode(l, natural)) : undefined;
+      if (otherId !== undefined && otherId !== id) return false;
+    }
+  }
+  return true;
+}
+
+export function mergeInto(local: Database, remote: Database, missingRemoteTaskColumns: readonly string[] = []): MergeStats {
   const stats: MergeStats = { incoming: 0, deleted: 0 };
   local.exec('BEGIN');
   try {
@@ -66,7 +115,7 @@ export function mergeInto(local: Database, remote: Database): MergeStats {
     for (const table of SYNC_TABLES) {
       const cols = localColumns(local, table);
       const remoteCols = new Set(localColumns(remote, table));
-      const shared = cols.filter((c) => remoteCols.has(c));
+      const shared = cols.filter((c) => remoteCols.has(c) && !(table === 'tasks' && missingRemoteTaskColumns.includes(c)));
       const natural = NATURAL_KEYS[table as SyncTable];
 
       // 2. Входящие версии.

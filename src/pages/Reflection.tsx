@@ -10,7 +10,7 @@ import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ECharts } from '@/components/charts/ECharts';
 import { Sparkline } from '@/components/ui/sparkline';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 
 const MOODS = ['😞', '😕', '😐', '🙂', '😊'];
@@ -18,7 +18,7 @@ const MOODS = ['😞', '😕', '😐', '🙂', '😊'];
 export const ReflectionPage: React.FC<{ date: Date }> = ({ date }) => {
   const { reflections, tasks, habits, habitLogs, timeEntries, healthLogs, upsertReflection } = useStore();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark');
+  const cc = getChartColors(isDarkMode(theme));
   const today = isoDate(date);
   const cur = reflections.find((r) => r.date === today);
   const [mood, setMood] = useState<number | null>(cur?.mood ?? null);

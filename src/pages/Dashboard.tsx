@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Responsive, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -40,7 +40,7 @@ import { isoDate, fmtNum, colorByPct } from '@/lib/utils';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ECharts } from '@/components/charts/ECharts';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { QuickAddDialog } from '@/components/QuickAddDialog';
@@ -68,6 +68,7 @@ import { WeeklyConsistency } from '@/components/dashboard/WeeklyConsistency';
 import { GoalsProgress } from '@/components/dashboard/GoalsProgress';
 import { QuickCapture } from '@/components/dashboard/QuickCapture';
 import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard';
+import { PlacesWidget } from '@/components/dashboard/PlacesWidget';
 import { quoteOfDay } from '@/lib/quotes';
 import { getUserName } from '@/lib/onboarding';
 import { lazyNamed, WidgetSkeleton } from '@/components/lazy';
@@ -160,11 +161,11 @@ const WeatherChip: React.FC = () => {
   );
 };
 
-export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({ date, onStartFocus }) => {
+export const Dashboard: React.FC<{ date: Date; onStartFocus?: (taskId: string) => void }> = ({ date, onStartFocus }) => {
   const nav = useNavigate();
   const { goals, tasks, habits, habitLogs, progress, reflections, timeEntries, xpLog, toggleTask, addProgress, upsertReflection, awardXp } = useStore();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark');
+  const cc = getChartColors(isDarkMode(theme));
   const today = isoDate(date);
 
   const [gridRef, gridW] = useContainerWidth();
@@ -440,10 +441,11 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
   // Фабрика: параметр editing затеняет внешний стейт, чтобы те же виджеты рендерились
   // «начисто» (editing=false) как живые превью в окне выбора виджетов.
   const buildWidgets = (editing: boolean): Record<string, () => React.ReactNode> => ({
+    'places': () => <Cell editing={editing} onHide={() => hideWidget('places')}><PlacesWidget preview={editing} /></Cell>,
     // === Основные виджеты (по макету) — рендерят собственную карточку ===
     'today-focus': () => (
       <Cell editing={editing} onHide={() => hideWidget('today-focus')}>
-        <TodayFocus date={date} onStartFocus={() => onStartFocus?.()} />
+        <TodayFocus date={date} onStartFocus={(taskId) => onStartFocus?.(taskId)} />
       </Cell>
     ),
     'day-brief': () => (
@@ -1252,6 +1254,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
   // Превью для окна выбора: без редакторской хромки и с отключёнными кликами
   const previewWidgets = buildWidgets(false);
   const renderWidgetPreview = (id: string): React.ReactNode => {
+    if (id === 'places') return <PlacesWidget preview />;
     if (id.startsWith('plugin:')) {
       const p = plugins.find((x) => `plugin:${x.id}` === id);
       return p ? <PluginWidget def={p} /> : null;
@@ -1282,7 +1285,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
               </h1>
               <div className="text-sm text-text-muted mt-1">
                 <span className="capitalize">{format(date, 'EEEE, d MMMM', { locale: ru })}</span>
-                <span className="text-text-dim"> · ты на <span className="text-accent font-medium">{weekDoneRatio}%</span> ближе к целям недели</span>
+                <span className="text-text-dim"> · задач за неделю выполнено: <span className="text-accent font-medium">{weekStats.done} из {weekStats.total}</span></span>
               </div>
             </div>
             <div className="hidden lg:flex items-start gap-2 pt-2 shrink min-w-0 max-w-md">
@@ -1364,7 +1367,7 @@ export const Dashboard: React.FC<{ date: Date; onStartFocus?: () => void }> = ({
             draggableCancel="button,input,textarea,label,a,select"
           >
             {visibleLayout.map((l) => (
-              <div key={l.i} className="bento-item group/bento relative">
+              <div key={l.i} data-widget={l.i} className="bento-item group/bento relative">
                 {l.i.startsWith('plugin:') ? (
                   <Cell editing={editing} onHide={() => hideWidget(l.i)}>
                     {(() => {

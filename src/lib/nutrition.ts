@@ -6,9 +6,12 @@
  */
 
 export interface Macros { protein?: number; fat?: number; carbs?: number }
+export function readCalories(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
 
 /** Unknown values stay unknown; explicit zero is valid nutrition data. */
-export function readMacros(row: Record<string, unknown>): Macros {
+export function readMacros(row: { protein?: unknown; fat?: unknown; carbs?: unknown }): Macros {
   const result: Macros = {};
   for (const key of ['protein', 'fat', 'carbs'] as const) {
     const value = row[key];
@@ -20,7 +23,7 @@ export function readMacros(row: Record<string, unknown>): Macros {
 export interface EatenItem extends Macros {
   key: string;      // стабильный ключ блюда ("Завтрак¦Овсянка…") или "custom:<id>"
   title: string;
-  kcal: number;
+  kcal?: number;
   meal: string;     // приём пищи («Завтрак»…), для ручных — «Другое»
   custom?: boolean; // добавлено вручную, не из плана
 }
@@ -32,15 +35,32 @@ export const DEFAULT_KCAL_GOAL = 2200;
 
 type EatenStore = Record<string, EatenItem[]>;
 
-function load(): EatenStore {
-  try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; }
+function validateNutrition(title: string, kcal: number, macros: Macros = {}) {
+  if (!title.trim() || !Number.isFinite(kcal) || kcal < 0) throw new Error('Укажите название и неотрицательное число калорий.');
+  if ((['protein', 'fat', 'carbs'] as const).some(key => { const value = macros[key]; return value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0); })) {
+    throw new Error('БЖУ должны быть неотрицательными числами.');
+  }
+}
+
+function load(strict = false): EatenStore {
+  try {
+    const raw = localStorage.getItem(KEY);
+    const data: unknown = raw === null ? {} : JSON.parse(raw);
+    if (!data || typeof data !== 'object' || Array.isArray(data) || !Object.values(data).every(day => Array.isArray(day) && day.every(item => item && typeof item === 'object' && !Array.isArray(item) && typeof item.key === 'string'))) throw new Error('invalid');
+    return data as EatenStore;
+  } catch {
+    if (strict) throw new Error('Дневник питания повреждён или недоступен. Данные не изменены; сохраните копию перед восстановлением.');
+    return {};
+  }
+}
+
+export function isEatenStorageReadable(): boolean {
+  try { load(true); return true; } catch { return false; }
 }
 
 function save(store: EatenStore) {
-  // держим только последние 90 дней, чтобы не распухать
-  const dates = Object.keys(store).sort();
-  for (const d of dates.slice(0, Math.max(0, dates.length - 90))) delete store[d];
-  try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {}
+  try { localStorage.setItem(KEY, JSON.stringify(store)); }
+  catch { throw new Error('Не удалось сохранить дневник питания. Проверьте свободное место в хранилище.'); }
   window.dispatchEvent(new CustomEvent(NUTRITION_EVENT));
 }
 
@@ -54,8 +74,11 @@ export function isEaten(date: string, key: string): boolean {
 
 /** Отметить/снять блюдо из плана. Возвращает новый список дня. */
 export function toggleEaten(date: string, item: EatenItem): EatenItem[] {
-  const store = load();
+  const store = load(true);
   const day = store[date] ?? [];
+  if (!day.some((x) => x.key === item.key)) {
+    validateNutrition(item.title, item.kcal ?? 0, {protein:item.protein, fat:item.fat, carbs:item.carbs});
+  }
   store[date] = day.some((x) => x.key === item.key)
     ? day.filter((x) => x.key !== item.key)
     : [...day, item];
@@ -65,7 +88,8 @@ export function toggleEaten(date: string, item: EatenItem): EatenItem[] {
 
 /** Ручная запись «что ещё съел» (не из плана), с опциональными БЖУ. */
 export function addCustomEaten(date: string, title: string, kcal: number, meal = 'Другое', macros: Macros = {}): EatenItem[] {
-  const store = load();
+  validateNutrition(title, kcal, macros);
+  const store = load(true);
   const item: EatenItem = {
     key: `custom:${Math.random().toString(36).slice(2, 10)}`,
     title: title.trim().slice(0, 80),
@@ -80,7 +104,7 @@ export function addCustomEaten(date: string, title: string, kcal: number, meal =
 }
 
 export function removeEaten(date: string, key: string): EatenItem[] {
-  const store = load();
+  const store = load(true);
   store[date] = (store[date] ?? []).filter((x) => x.key !== key);
   save(store);
   return store[date];
@@ -88,6 +112,11 @@ export function removeEaten(date: string, key: string): EatenItem[] {
 
 export function eatenKcal(date: string): number {
   return getEaten(date).reduce((s, x) => s + (x.kcal || 0), 0);
+}
+
+export function hasCompleteEatenCalories(date: string): boolean {
+  const entries = getEaten(date);
+  return entries.length > 0 && entries.every(item => readCalories(item.kcal) !== undefined);
 }
 
 /** Сумма БЖУ съеденного за день (только по тем позициям, где макросы указаны). */
@@ -100,9 +129,10 @@ export function eatenMacros(date: string): Required<Macros> {
 
 function cleanMacros(m: Macros): Macros {
   const out: Macros = {};
-  if (m.protein != null && m.protein > 0) out.protein = Math.round(m.protein * 10) / 10;
-  if (m.fat != null && m.fat > 0) out.fat = Math.round(m.fat * 10) / 10;
-  if (m.carbs != null && m.carbs > 0) out.carbs = Math.round(m.carbs * 10) / 10;
+  for (const key of ['protein', 'fat', 'carbs'] as const) {
+    const value = m[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) out[key] = Math.round(value * 10) / 10;
+  }
   return out;
 }
 
@@ -119,16 +149,28 @@ export interface CustomFood extends Macros {
 
 const FOODS_KEY = 'nutrition.foods.v1';
 
-export function getFoods(): CustomFood[] {
-  try { return JSON.parse(localStorage.getItem(FOODS_KEY) || '[]'); } catch { return []; }
+function loadFoods(strict = false): CustomFood[] {
+  try {
+    const raw = localStorage.getItem(FOODS_KEY);
+    const data: unknown = raw === null ? [] : JSON.parse(raw);
+    if (!Array.isArray(data) || !data.every(item => item && typeof item === 'object' && !Array.isArray(item) && typeof item.id === 'string' && typeof item.title === 'string')) throw new Error('invalid');
+    return data as CustomFood[];
+  } catch {
+    if (strict) throw new Error('Библиотека продуктов повреждена или недоступна. Данные не изменены; сохраните копию перед восстановлением.');
+    return [];
+  }
 }
+export function getFoods(): CustomFood[] { return loadFoods(); }
+export function isFoodStorageReadable(): boolean { try { loadFoods(true); return true; } catch { return false; } }
 
 function saveFoods(list: CustomFood[]) {
-  try { localStorage.setItem(FOODS_KEY, JSON.stringify(list.slice(0, 200))); } catch {}
+  try { localStorage.setItem(FOODS_KEY, JSON.stringify(list)); }
+  catch { throw new Error('Не удалось сохранить библиотеку продуктов. Проверьте свободное место в хранилище.'); }
   window.dispatchEvent(new CustomEvent(NUTRITION_EVENT));
 }
 
 export function addFood(food: Omit<CustomFood, 'id'>): CustomFood[] {
+  validateNutrition(food.title, food.kcal, {protein:food.protein, fat:food.fat, carbs:food.carbs});
   const item: CustomFood = {
     id: Math.random().toString(36).slice(2, 10),
     title: food.title.trim().slice(0, 80),
@@ -136,13 +178,13 @@ export function addFood(food: Omit<CustomFood, 'id'>): CustomFood[] {
     ...(food.image ? { image: food.image } : {}),
     ...cleanMacros(food),
   };
-  const list = [item, ...getFoods()];
+  const list = [item, ...loadFoods(true)];
   saveFoods(list);
   return list;
 }
 
 export function removeFood(id: string): CustomFood[] {
-  const list = getFoods().filter((f) => f.id !== id);
+  const list = loadFoods(true).filter((f) => f.id !== id);
   saveFoods(list);
   return list;
 }
@@ -154,7 +196,7 @@ export function eatFood(date: string, food: CustomFood, meal = 'Мои прод�
 
 /** Экспорт библиотеки своих продуктов в .json (шаринг/перенос между устройствами). */
 export function exportFoods() {
-  const payload = { schema: 'thedad.foods/v1', foods: getFoods() };
+  const payload = { schema: 'thedad.foods/v1', foods: loadFoods(true) };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -169,14 +211,14 @@ export function importFoods(raw: unknown): number {
   const data = raw as { schema?: string; foods?: unknown };
   const arr = Array.isArray(data?.foods) ? data.foods : Array.isArray(raw) ? (raw as unknown[]) : null;
   if (!arr) throw new Error('Неверный формат файла продуктов');
-  const existing = getFoods();
+  const existing = loadFoods(true);
   const seen = new Set(existing.map((f) => f.title.toLowerCase()));
   let added = 0;
   const clean: CustomFood[] = [];
   for (const item of arr) {
     const f = item as Partial<CustomFood>;
     if (!f || typeof f.title !== 'string' || !f.title.trim()) continue;
-    if (typeof f.kcal !== 'number' || !(f.kcal >= 0)) continue;
+    if (typeof f.kcal !== 'number' || !Number.isFinite(f.kcal) || f.kcal < 0) continue;
     if (seen.has(f.title.trim().toLowerCase())) continue;
     // картинку принимаем только как data-URL или локальный путь (без внешней сети)
     const img = typeof f.image === 'string' && (f.image.startsWith('data:image/') || (f.image.startsWith('/') && !f.image.startsWith('//'))) ? f.image : undefined;
@@ -201,6 +243,8 @@ export function getKcalGoal(): number {
 }
 
 export function setKcalGoal(v: number) {
-  try { localStorage.setItem(GOAL_KEY, String(Math.max(500, Math.min(10000, Math.round(v))))); } catch {}
+  if (!Number.isFinite(v)) throw new Error('Укажите числовую цель по калориям.');
+  try { localStorage.setItem(GOAL_KEY, String(Math.max(500, Math.min(10000, Math.round(v))))); }
+  catch { throw new Error('Не удалось сохранить цель по калориям. Проверьте свободное место в хранилище.'); }
   window.dispatchEvent(new CustomEvent(NUTRITION_EVENT));
 }

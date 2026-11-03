@@ -146,8 +146,8 @@ export function computeInsights(ctx: InsightCtx): Insight[] {
     out.push({
       id: 'reflection_gap',
       tone: 'neutral', icon: '📝', priority: 50,
-      title: 'Мало рефлексии на этой неделе',
-      body: `Только ${reflDays} из 7 дней с записью. Рефлексия закрепляет прогресс.`,
+      title: 'Записи за неделю',
+      body: `Дней с записью: ${reflDays} из 7.`,
       link: '/reflection',
     });
   }

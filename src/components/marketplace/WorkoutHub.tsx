@@ -9,6 +9,7 @@ import {
 } from '@/lib/marketplace';
 import { useStore } from '@/lib/store';
 import { logWorkout } from '@/lib/activity';
+import { activityAction } from '@/lib/activityAction';
 import { todayISO } from '@/lib/utils';
 import { WorkoutCalendar } from './WorkoutCalendar';
 import { WorkoutProgress } from './WorkoutProgress';
@@ -66,7 +67,7 @@ export const WorkoutHub: React.FC<{ programId: string | null; onClose: () => voi
     setGoalsTick((t) => t + 1);
   };
   const sessionById = (id: string) => hub?.sessions.find((s) => s.id === id);
-  const completeSession = (min: number) => logWorkout(todayISO(), min * 60);
+  const completeSession = (min: number) => activityAction(() => logWorkout(todayISO(), min * 60)) !== undefined;
 
   if (!programId) return null;
 
@@ -229,7 +230,7 @@ export const WorkoutHub: React.FC<{ programId: string | null; onClose: () => voi
         <WorkoutPlayer
           session={player}
           onClose={() => setPlayer(null)}
-          onComplete={(min) => { completeSession(min); setPlayer(null); setDetail(null); }}
+          onComplete={(min) => { if (!completeSession(min)) return false; setPlayer(null); setDetail(null); return true; }}
         />
       )}
     </div>,
@@ -282,7 +283,7 @@ const SessionCard: React.FC<{ session: WorkoutSession; onOpen: () => void }> = (
 };
 
 const SessionDetail: React.FC<{
-  session: WorkoutSession; onBack: () => void; onStart: () => void; onQuickDone: (min: number) => void;
+  session: WorkoutSession; onBack: () => void; onStart: () => void; onQuickDone: (min: number) => boolean;
 }> = ({ session, onBack, onStart, onQuickDone }) => {
   const [done, setDone] = useState(false);
   const photo = safePhoto(session.photo);
@@ -290,8 +291,8 @@ const SessionDetail: React.FC<{
   const hasExercises = !!session.exercises?.length;
   const quickDone = () => {
     if (done) return;
+    if (!onQuickDone(durationMin(session.duration))) return;
     setDone(true);
-    onQuickDone(durationMin(session.duration));
     window.dispatchEvent(new CustomEvent('thedad:celebrate', { detail: { title: 'Тренировка засчитана!', subtitle: session.title, emoji: '🔥' } }));
   };
   return (
@@ -386,7 +387,7 @@ function beep() {
   } catch { /* аудио недоступно — не критично */ }
 }
 
-const WorkoutPlayer: React.FC<{ session: WorkoutSession; onClose: () => void; onComplete: (min: number) => void }> = ({ session, onClose, onComplete }) => {
+const WorkoutPlayer: React.FC<{ session: WorkoutSession; onClose: () => void; onComplete: (min: number) => boolean }> = ({ session, onClose, onComplete }) => {
   const exercises = session.exercises ?? [];
   const [idx, setIdx] = useState(0);
   const [resting, setResting] = useState(false);
@@ -407,8 +408,7 @@ const WorkoutPlayer: React.FC<{ session: WorkoutSession; onClose: () => void; on
 
   const finish = () => {
     const min = Math.max(1, Math.round((Date.now() - startRef.current) / 60000)) || durationMin(session.duration);
-    window.dispatchEvent(new CustomEvent('thedad:celebrate', { detail: { title: 'Тренировка завершена!', subtitle: session.title, emoji: '🔥' } }));
-    onComplete(min);
+    if (onComplete(min)) window.dispatchEvent(new CustomEvent('thedad:celebrate', { detail: { title: 'Тренировка завершена!', subtitle: session.title, emoji: '🔥' } }));
   };
   const nextExercise = () => {
     if (isLast) { finish(); return; }

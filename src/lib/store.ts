@@ -266,6 +266,9 @@ export const useStore = create<State>((set, get) => ({
       parent_id: t.parent_id ?? null,
       title: t.title,
       notes: t.notes ?? null,
+      place_name: t.place_name ?? null,
+      place_lat: t.place_lat ?? null,
+      place_lon: t.place_lon ?? null,
       date: t.date ?? todayISO(),
       time_block: t.time_block ?? null,
       priority: t.priority ?? 3, // 3 = «Обычный» (зелёный) по умолчанию, см. priority-dot.tsx
@@ -280,8 +283,8 @@ export const useStore = create<State>((set, get) => ({
       updated_at: now(),
     };
     exec(
-      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, date, time_block, priority, status, stage, tags, estimate_min, start_time, recurrence, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.date, task.time_block, task.priority, task.status, task.stage, task.tags, task.estimate_min, task.start_time, task.recurrence, task.completed_at, task.created_at, task.updated_at],
+      `INSERT INTO tasks (id, goal_id, parent_id, title, notes, place_name, place_lat, place_lon, date, time_block, priority, status, stage, tags, estimate_min, start_time, recurrence, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [task.id, task.goal_id, task.parent_id, task.title, task.notes, task.place_name ?? null, task.place_lat ?? null, task.place_lon ?? null, task.date, task.time_block, task.priority, task.status, task.stage, task.tags, task.estimate_min, task.start_time, task.recurrence, task.completed_at, task.created_at, task.updated_at],
     );
     if (!batching) {
       get().logChange('task', task.id, 'created', null, task.title);
@@ -295,8 +298,8 @@ export const useStore = create<State>((set, get) => ({
     if (!cur) return;
     const next = { ...cur, ...p, updated_at: now() };
     exec(
-      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, date=?, time_block=?, priority=?, status=?, stage=?, tags=?, estimate_min=?, start_time=?, recurrence=?, completed_at=?, updated_at=? WHERE id=?`,
-      [next.goal_id, next.parent_id, next.title, next.notes, next.date, next.time_block, next.priority, next.status, next.stage, next.tags, next.estimate_min, next.start_time, next.recurrence, next.completed_at, next.updated_at, id],
+      `UPDATE tasks SET goal_id=?, parent_id=?, title=?, notes=?, place_name=?, place_lat=?, place_lon=?, date=?, time_block=?, priority=?, status=?, stage=?, tags=?, estimate_min=?, start_time=?, recurrence=?, completed_at=?, updated_at=? WHERE id=?`,
+      [next.goal_id, next.parent_id, next.title, next.notes, next.place_name ?? null, next.place_lat ?? null, next.place_lon ?? null, next.date, next.time_block, next.priority, next.status, next.stage, next.tags, next.estimate_min, next.start_time, next.recurrence, next.completed_at, next.updated_at, id],
     );
     get().reload();
   },
@@ -327,6 +330,7 @@ export const useStore = create<State>((set, get) => ({
             title: cur.title, goal_id: cur.goal_id, date: nextDate, time_block: cur.time_block,
             priority: cur.priority, tags: cur.tags, estimate_min: cur.estimate_min,
             start_time: cur.start_time, recurrence: cur.recurrence,
+            place_name: cur.place_name, place_lat: cur.place_lat, place_lon: cur.place_lon,
           });
         }
       }
@@ -410,18 +414,53 @@ export const useStore = create<State>((set, get) => ({
 
   upsertHealthLog: (date, metric, value) => {
     const ex = query<HealthLog>('SELECT * FROM health_logs WHERE date = ? AND metric = ?', [date, metric])[0];
-    if (ex) {
+    if (ex && ex.value !== value) {
       exec('UPDATE health_logs SET value = ? WHERE id = ?', [value, ex.id]);
-    } else {
+    } else if (!ex) {
       exec('INSERT INTO health_logs (id, date, metric, value, note) VALUES (?,?,?,?,NULL)', [nanoid(10), date, metric, value]);
     }
-    // Авто-прогресс: цели, привязанные к этой метрике здоровья, двигаются сами
+    // Одна автоматическая запись на цель и день; старые даты не меняют текущий прогресс.
     const linked = query<Goal>(`SELECT * FROM goals WHERE health_metric = ? AND status = 'active'`, [metric]);
-    linked.forEach((g) => get().addProgress({ goal_id: g.id, date, value, note: 'авто из Здоровья' }));
+    linked.forEach((g) => {
+      const automatic = query<ProgressRecord>("SELECT * FROM progress_records WHERE goal_id = ? AND date = ? AND note = 'авто из Здоровья' ORDER BY rowid DESC LIMIT 1", [g.id, date])[0];
+      const latest = query<ProgressRecord>('SELECT * FROM progress_records WHERE goal_id = ? ORDER BY date DESC, rowid DESC LIMIT 1', [g.id])[0];
+      if (automatic) {
+        if (automatic.value === value) return;
+        exec('UPDATE progress_records SET value = ? WHERE id = ?', [value, automatic.id]);
+        if (latest?.id === automatic.id) {
+          exec('UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?', [value, now(), g.id]);
+          get().logChange('progress', g.id, 'current_value', g.current_value, value);
+          const range = g.target_value - g.start_value || 1;
+          if ((g.current_value - g.start_value) / range < 1 && (value - g.start_value) / range >= 1) {
+            import('./toast').then((m) => m.toast.success(`Цель достигнута: ${g.title} 🎉`, 'Поздравляем!'));
+            import('./inbox').then((m) => m.useInbox.getState().add({kind:'system', title:`Цель достигнута: ${g.title}`, icon:'🎯', link:'/goals'}));
+          }
+        }
+      } else if (!latest || date >= latest.date) {
+        get().addProgress({ goal_id: g.id, date, value, note: 'авто из Здоровья' });
+      } else {
+        exec('INSERT INTO progress_records (id, goal_id, date, value, note) VALUES (?,?,?,?,?)', [nanoid(10), g.id, date, value, 'авто из Здоровья']);
+      }
+    });
     get().reload();
   },
 
   removeHealthLog: (id) => {
+    const log = query<HealthLog>('SELECT * FROM health_logs WHERE id = ?', [id])[0];
+    if (log) {
+      const linked = query<Goal>("SELECT * FROM goals WHERE health_metric = ? AND status = 'active'", [log.metric]);
+      for (const goal of linked) {
+        const matching = query<ProgressRecord>("SELECT * FROM progress_records WHERE goal_id = ? AND date = ? AND note = 'авто из Здоровья' AND value = ?", [goal.id, log.date, log.value]);
+        const latest = query<ProgressRecord>('SELECT * FROM progress_records WHERE goal_id = ? ORDER BY date DESC, rowid DESC LIMIT 1', [goal.id])[0];
+        for (const record of matching) exec('DELETE FROM progress_records WHERE id = ?', [record.id]);
+        if (latest && matching.some(record => record.id === latest.id) && goal.current_value === log.value) {
+          const previous = query<ProgressRecord>('SELECT * FROM progress_records WHERE goal_id = ? ORDER BY date DESC, rowid DESC LIMIT 1', [goal.id])[0];
+          const next = previous?.value ?? goal.start_value;
+          exec('UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?', [next, now(), goal.id]);
+          get().logChange('progress', goal.id, 'current_value', goal.current_value, next);
+        }
+      }
+    }
     exec('DELETE FROM health_logs WHERE id = ?', [id]);
     get().reload();
   },

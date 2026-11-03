@@ -1,6 +1,7 @@
 const DONE_KEY = 'onboarding.done.v1';
 const NAME_KEY = 'user.name.v1';
 const CATEGORIES_KEY = 'user.categories.v1';
+export const PROFILE_CHANGED_EVENT = 'thedad:profile-changed';
 
 export function isOnboardingDone(): boolean {
   return localStorage.getItem(DONE_KEY) === '1';
@@ -14,7 +15,10 @@ export function getUserName(): string {
   return localStorage.getItem(NAME_KEY) || 'друг';
 }
 export function setUserName(name: string) {
-  if (name.trim()) localStorage.setItem(NAME_KEY, name.trim());
+  if (name.trim()) {
+    localStorage.setItem(NAME_KEY, name.trim());
+    window.dispatchEvent(new CustomEvent(PROFILE_CHANGED_EVENT));
+  }
 }
 
 export function getUserCategories(): string[] {

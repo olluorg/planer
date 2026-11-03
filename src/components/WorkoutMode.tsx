@@ -4,7 +4,8 @@ import { X, Pause, Play, SkipForward, Check, Dumbbell, Flame, Flower2 } from 'lu
 import { useStore } from '@/lib/store';
 import { isoDate } from '@/lib/utils';
 import { fmtSec } from '@/lib/pomodoroState';
-import { logWorkout } from '@/lib/activity';
+import { logWorkout, WORKOUT_TYPE_MET } from '@/lib/activity';
+import { activityAction } from '@/lib/activityAction';
 
 /* ==================== База упражнений ====================
  * Три типа тренировки, все домашние и без снаряжения. Картинки:
@@ -17,7 +18,17 @@ export type WorkoutType = 'charge' | 'calisthenics' | 'yoga' | 'low-impact';
 
 const studioImage = (id: string) => `/workout/studio/${id}.webp`;
 const STUDIO_BY_NAME: Record<string, string> = {
-  'Приседания': 'squat', 'Планка': 'plank', 'Ягодичный мостик': 'bridge', 'Поза ребёнка': 'child-pose',
+  'Приседания': 'squat', 'Отжимания': 'push-up', 'Выпады вперёд': 'forward-lunge',
+  'Планка': 'plank', 'Ягодичный мостик': 'bridge', 'Поза ребёнка': 'child-pose', 'Кошка-корова': 'cat-cow',
+  'Джампинг джек': 'jumping-jack', 'Собака мордой вниз': 'downward-dog',
+  'Боковая планка слева': 'side-plank', 'Боковая планка справа': 'side-plank',
+  'Поза горы': 'mountain-pose', 'Стул у стены': 'wall-sit', 'Высокие колени': 'high-knees',
+  'Поза кобры': 'cobra-pose', 'Поза воина II': 'warrior-two',
+  'Скручивания': 'crunch', 'Наклон вперёд стоя': 'standing-forward-fold',
+  'Велосипед': 'bicycle-crunch', 'Подъём ног лёжа': 'leg-raise',
+  'Бег на месте': 'jog-in-place', 'Супермен': 'superman', 'Махи руками': 'arm-circles', 'Скалолаз': 'mountain-climber',
+  'Поза дерева (слева)': 'tree-pose', 'Поза дерева (справа)': 'tree-pose',
+  'Поза лодки': 'boat-pose',
 };
 
 export const LOW_IMPACT: Exercise[] = [
@@ -32,7 +43,7 @@ export const LOW_IMPACT: Exercise[] = [
 
 const CHARGE = [
   { name: 'Джампинг джек', hint: 'Прыжки: ноги врозь, руки вверх' },
-  { name: 'Приседания', hint: 'Спина прямая, колени не выходят за носки' },
+  { name: 'Приседания', hint: 'Пятки на полу, колени по направлению стоп; выбирай комфортную глубину' },
   { name: 'Отжимания', hint: 'Можно с колен — главное корпус ровный' },
   { name: 'Планка', hint: 'Живот подтянут, не проваливай поясницу' },
   { name: 'Выпады вперёд', hint: 'Поочерёдно каждой ногой' },
@@ -49,7 +60,7 @@ const CHARGE = [
 
 const CALISTHENICS = [
   { name: 'Отжимания', hint: 'Локти вдоль тела, корпус — одна линия' },
-  { name: 'Приседания', hint: 'Ниже параллели, пятки от пола не отрывать' },
+  { name: 'Приседания', hint: 'Пятки на полу, колени по направлению стоп; выбирай комфортную глубину' },
   { name: 'Отжимания узким хватом', hint: 'Ладони под грудью, работают трицепсы' },
   { name: 'Обратные отжимания от стула', hint: 'Локти назад, опускайся до угла 90°' },
   { name: 'Болгарские выпады', hint: 'Задняя нога на диване, вес на передней' },
@@ -73,12 +84,12 @@ const YOGA = [
   { name: 'Поза кобры', hint: 'Грудь вверх, плечи от ушей, таз на полу' },
   { name: 'Поза воина II', hint: 'Переднее колено над стопой, руки в стороны' },
   { name: 'Наклон вперёд стоя', hint: 'Колени мягкие, отпусти шею и руки' },
-  { name: 'Поза дерева (слева)', hint: 'Стопа на голени, взгляд в точку' },
-  { name: 'Поза дерева (справа)', hint: 'Держи баланс, дыши ровно' },
+  { name: 'Поза дерева (слева)', hint: 'Опора на левой ноге. Стопа у щиколотки или на голени, не на колене.' },
+  { name: 'Поза дерева (справа)', hint: 'Опора на правой ноге. Стопа у щиколотки или на голени, не на колене.' },
   { name: 'Скручивание сидя', hint: 'Спина прямая, поворот от талии' },
   { name: 'Поза голубя', hint: 'Раскрытие бедра, дыши в натяжение' },
   { name: 'Мостик лёжа', hint: 'Таз вверх, лопатки вместе' },
-  { name: 'Поза лодки', hint: 'Баланс на седалищных костях, пресс' },
+  { name: 'Поза лодки', hint: 'Балансируй на седалищных костях, держи спину вытянутой; колени можно согнуть.' },
   { name: 'Шавасана / дыхание', hint: 'Ляг, расслабься, дыши животом' },
 ];
 
@@ -89,7 +100,7 @@ function withImg(list: { name: string; hint: string }[], slug: string): Exercise
 export const WORKOUT_TYPES: { id: WorkoutType; label: string; icon: React.ElementType; hint: string; exercises: Exercise[] }[] = [
   { id: 'low-impact', label: 'Без прыжков', icon: Flower2, hint: '7 минут · коврик · спокойный темп · фиксированный порядок', exercises: LOW_IMPACT },
   { id: 'charge', label: 'Зарядка', icon: Dumbbell, hint: 'Лёгкая разминка на всё тело', exercises: withImg(CHARGE, 'ex') },
-  { id: 'calisthenics', label: 'Калистеника', icon: Flame, hint: 'Сила с весом тела, без снаряжения', exercises: withImg(CALISTHENICS, 'calisthenics') },
+  { id: 'calisthenics', label: 'Калистеника', icon: Flame, hint: 'Сила с весом тела; для некоторых упражнений нужна устойчивая опора', exercises: withImg(CALISTHENICS, 'calisthenics') },
   { id: 'yoga', label: 'Йога', icon: Flower2, hint: 'Растяжка, баланс и дыхание', exercises: withImg(YOGA, 'yoga') },
 ];
 
@@ -146,7 +157,7 @@ const ExerciseImage: React.FC<{ ex: Exercise; size: number }> = ({ ex, size }) =
       src={ex.img}
       alt={ex.name}
       className="rounded-2xl object-contain bg-white p-2"
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, transform: ex.name === 'Поза дерева (справа)' ? 'scaleX(-1)' : undefined }}
       onError={() => setFailed(true)}
     />
   );
@@ -169,8 +180,13 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const [secondsLeft, setSecondsLeft] = useState(EX_SECONDS);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [workoutSaved, setWorkoutSaved] = useState(true);
   const entryRef = useRef<string | null>(null);
   const elapsedRef = useRef(0);
+  const idxRef = useRef(0);
+  const secondsRef = useRef(EX_SECONDS);
+  const finishedRef = useRef(false);
+  const tickRef = useRef<() => void>(() => {});
 
   const exercisesOf = (t: WorkoutType) => WORKOUT_TYPES.find((x) => x.id === t)!.exercises;
   const makePlan = (t: WorkoutType) => t === 'low-impact' ? [...LOW_IMPACT] : shuffle(exercisesOf(t)).slice(0, EX_COUNT);
@@ -183,7 +199,11 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
       setSecondsLeft(EX_SECONDS);
       setRunning(false);
       setFinished(false);
+      setWorkoutSaved(true);
       elapsedRef.current = 0;
+      idxRef.current = 0;
+      secondsRef.current = EX_SECONDS;
+      finishedRef.current = false;
     } else if (entryRef.current) {
       // вышли до конца — фиксируем фактическое время
       finishTimeEntry(entryRef.current, elapsedRef.current);
@@ -199,17 +219,29 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
     setPlan(makePlan(t));
     setIdx(0);
     setSecondsLeft(EX_SECONDS);
+    idxRef.current = 0;
+    secondsRef.current = EX_SECONDS;
+  };
+
+  const saveWorkoutSession = () => {
+    const saved = activityAction(() => logWorkout(isoDate(new Date()), elapsedRef.current, WORKOUT_TYPE_MET[type])) !== undefined;
+    setWorkoutSaved(saved);
+    if (saved) {
+      try { localStorage.setItem(WORKOUT_DONE_KEY, isoDate(new Date())); } catch {}
+      window.dispatchEvent(new CustomEvent('thedad:workout-done'));
+    }
+    return saved;
   };
 
   const finish = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     setRunning(false);
     setFinished(true);
     if (entryRef.current) { finishTimeEntry(entryRef.current, elapsedRef.current); entryRef.current = null; }
-    try { localStorage.setItem(WORKOUT_DONE_KEY, isoDate(new Date())); } catch {}
     // минуты зарядки → лог активности; событие поднимет useHealthSync,
     // который сведёт зарядку в healthLogs('workout') → виджеты и цели
-    logWorkout(isoDate(new Date()), elapsedRef.current);
-    window.dispatchEvent(new CustomEvent('thedad:workout-done'));
+    saveWorkoutSession();
     // Крупный эмоциональный отклик: конфетти (App) + праздничный оверлей (Celebration)
     window.dispatchEvent(new CustomEvent('thedad:celebrate', {
       detail: { title: `${WORKOUT_TYPES.find((w) => w.id === type)!.label} — готово!`, subtitle: 'Минимальная активность на сегодня выполнена 💪', emoji: '🎉' },
@@ -217,22 +249,45 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
     beep(880); setTimeout(() => beep(1175), 180); setTimeout(() => beep(1568), 360);
   };
 
+  const closeWorkout = () => {
+    if (finished && !workoutSaved && !window.confirm('Активность не сохранена. Выйти без записи времени тренировки?')) return;
+    if (running) tickRef.current();
+    setRunning(false);
+    if (entryRef.current) {
+      if (elapsedRef.current > 0 && activityAction(() => logWorkout(isoDate(new Date()), elapsedRef.current, WORKOUT_TYPE_MET[type])) === undefined) return;
+      finishTimeEntry(entryRef.current, elapsedRef.current);
+      entryRef.current = null;
+    }
+    onClose();
+  };
+
   useEffect(() => {
     if (!running || finished) return;
-    const t = window.setInterval(() => {
-      elapsedRef.current += 1;
-      setSecondsLeft((s) => {
-        if (s > 1) return s - 1;
-        // конец минуты: следующее упражнение или финиш
-        setIdx((i) => {
-          if (i >= EX_COUNT - 1) { finish(); return i; }
-          beep();
-          return i + 1;
-        });
-        return EX_SECONDS;
-      });
-    }, 1000);
-    return () => window.clearInterval(t);
+    let lastTick = performance.now();
+    const tick = () => {
+      let delta = Math.floor((performance.now() - lastTick) / 1000);
+      if (delta <= 0) return;
+      lastTick += delta * 1000;
+      let transitioned = false;
+      while (delta > 0 && !finishedRef.current) {
+        const spent = Math.min(delta, secondsRef.current);
+        secondsRef.current -= spent;
+        elapsedRef.current += spent;
+        delta -= spent;
+        if (secondsRef.current === 0) {
+          if (idxRef.current >= EX_COUNT - 1) { finish(); break; }
+          idxRef.current += 1;
+          secondsRef.current = EX_SECONDS;
+          transitioned = true;
+        }
+      }
+      setIdx(idxRef.current);
+      setSecondsLeft(secondsRef.current);
+      if (transitioned && !finishedRef.current) beep();
+    };
+    tickRef.current = tick;
+    const t = window.setInterval(tick, 1000);
+    return () => { window.clearInterval(t); tickRef.current = () => {}; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, finished]);
 
@@ -246,23 +301,33 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   };
 
   const skip = () => {
-    if (finished) return;
-    if (idx >= EX_COUNT - 1) { finish(); return; }
+    if (running) tickRef.current();
+    if (finishedRef.current) return;
+    if (idxRef.current >= EX_COUNT - 1) { finish(); return; }
     beep();
-    setIdx((i) => i + 1);
+    idxRef.current += 1;
+    secondsRef.current = EX_SECONDS;
+    setIdx(idxRef.current);
     setSecondsLeft(EX_SECONDS);
   };
+
+  const pause = () => { tickRef.current(); setRunning(false); };
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === ' ') { e.preventDefault(); running ? setRunning(false) : start(); }
+      if (e.key === 'Escape') closeWorkout();
+      if (e.key === ' ' && !finished && !e.repeat) {
+        const target = e.target;
+        if (target instanceof HTMLElement && (target.isContentEditable || target.closest('button, input, textarea, select, a, summary, [role="button"]'))) return;
+        e.preventDefault();
+        running ? pause() : start();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, running]);
+  }, [open, running, finished, type]);
 
   if (!open) return null;
 
@@ -271,7 +336,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const pct = (EX_SECONDS - secondsLeft) / EX_SECONDS;
   const R = 148;
   const C = 2 * Math.PI * R;
-  const started = running || elapsedRef.current > 0;
+  const started = running || entryRef.current !== null;
 
   // portal: у ячеек сетки transform, из-за него fixed-оверлей внутри виджета ломается.
   // Фон полностью непрозрачный (как у Focus Mode): /97 не входит в шкалу opacity Tailwind
@@ -283,7 +348,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
       style={{ backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(52,211,153,0.10), transparent), radial-gradient(ellipse 60% 50% at 50% 110%, rgba(99,102,241,0.10), transparent)' }}
     >
       {/* Выход */}
-      <button onClick={onClose} className="absolute top-5 left-6 flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+      <button onClick={closeWorkout} className="absolute top-5 left-6 flex items-center gap-2 text-white/60 hover:text-white transition-colors">
         <span className={`h-9 w-9 ${glass} !rounded-full flex items-center justify-center`}><X className="h-4 w-4" /></span>
         <span className="text-sm">Выйти</span>
         <kbd className="text-[10px] bg-white/10 rounded px-1.5 py-0.5">Esc</kbd>
@@ -300,8 +365,9 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
             <Check className="h-10 w-10" />
           </div>
           <div className="text-3xl font-bold">{WORKOUT_TYPES.find((w) => w.id === type)!.label} — готово!</div>
-          <p className="text-white/50 mt-2 max-w-xs">Сессия завершена. В журнал записано фактическое время движения.</p>
-          <button onClick={onClose} className={`mt-7 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
+          <p className="text-white/50 mt-2 max-w-xs">{workoutSaved ? 'Сессия завершена. В журнал записано фактическое время движения.' : 'Сессия завершена, но активность не записана. Проверьте хранилище и повторите сохранение.'}</p>
+          {!workoutSaved && <button onClick={saveWorkoutSession} className={`mt-4 ${glass} px-6 py-2.5 text-sm font-medium`}>Повторить сохранение активности</button>}
+          <button onClick={closeWorkout} className={`mt-7 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
             Готово
           </button>
         </div>
@@ -379,7 +445,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
                 <Play className="h-4 w-4" fill="white" /> {started ? 'Продолжить' : `Начать · ${WORKOUT_TYPES.find((w) => w.id === type)!.label}`}
               </button>
             ) : (
-              <button onClick={() => setRunning(false)} className={`flex items-center gap-2 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
+              <button onClick={pause} className={`flex items-center gap-2 ${glass} px-6 py-2.5 text-sm font-medium hover:bg-white/[0.12] transition-colors`}>
                 <Pause className="h-4 w-4" /> Пауза
               </button>
             )}

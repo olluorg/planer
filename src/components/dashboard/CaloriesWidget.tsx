@@ -3,17 +3,18 @@ import { createPortal } from 'react-dom';
 import { useRef } from 'react';
 import { X, Flame, Plus, Trash2, UtensilsCrossed, Maximize2, Target, Check, ImagePlus, Utensils, Download, Upload } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 import { Ring } from '@/components/ui/ring';
 import { ECharts } from '@/components/charts/ECharts';
 import { isoDate, fmtNum } from '@/lib/utils';
 import { compressImage } from '@/lib/imageCompress';
 import { toast } from '@/lib/toast';
+import { nutritionAction } from '@/lib/nutritionAction';
 import {
-  getEaten, toggleEaten, isEaten, addCustomEaten, removeEaten, eatenKcal, eatenMacros,
+  getEaten, toggleEaten, isEaten, addCustomEaten, removeEaten, eatenKcal, eatenMacros, readCalories, readMacros, hasCompleteEatenCalories, isEatenStorageReadable, isFoodStorageReadable,
   getKcalGoal, setKcalGoal, NUTRITION_EVENT, type EatenItem,
-  getFoods, addFood, removeFood, eatFood, exportFoods, importFoods, type CustomFood,
+  getFoods, addFood, removeFood, eatFood, exportFoods, importFoods, type CustomFood, type Macros,
 } from '@/lib/nutrition';
 import { burnedKcal, ACTIVITY_EVENT } from '@/lib/activity';
 import {
@@ -23,7 +24,7 @@ import {
 import { getInstalledPlugins, selectRows, renderTemplate, PLUGINS_EVENT, type PluginWidgetDef, type PluginDataSnapshot } from '@/lib/plugins';
 
 /** Сегодняшнее меню из плагина питания (первый контентный «дневной» плагин). */
-function todayMenu(): { def: PluginWidgetDef | null; items: { key: string; title: string; kcal: number; meal: string; kind: string }[] } {
+function todayMenu(): { def: PluginWidgetDef | null; items: ({ key: string; title: string; kcal?: number; meal: string; kind: string } & Macros)[] } {
   const def = getInstalledPlugins().find((p) => p.render.type === 'cards' && p.source.static && p.render.dayField) ?? null;
   if (!def) return { def: null, items: [] };
   const rows = selectRows(def, {} as PluginDataSnapshot);
@@ -35,9 +36,10 @@ function todayMenu(): { def: PluginWidgetDef | null; items: { key: string; title
       return {
         key: `${meal}¦${r.label}`,
         title: r.label,
-        kcal: Number(r.raw.kcal) || 0,
+        kcal: readCalories(r.raw.kcal),
         meal,
         kind: typeof r.raw.kind === 'string' ? r.raw.kind : '',
+        ...readMacros(r.raw),
       };
     }),
   };
@@ -67,11 +69,12 @@ function useNutritionTick(): number {
 const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const { healthLogs, goals } = useStore();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark' || theme === 'glass');
+  const cc = getChartColors(isDarkMode(theme));
   const tick = useNutritionTick();
   const today = isoDate(new Date());
   const [addTitle, setAddTitle] = useState('');
   const [addKcal, setAddKcal] = useState('');
+  const [quickError, setQuickError] = useState('');
   const [goalEdit, setGoalEdit] = useState('');
   // форма своего продукта
   const [profileOpen, setProfileOpen] = useState(false);
@@ -82,6 +85,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
   const [fF, setFF] = useState('');
   const [fC, setFC] = useState('');
   const [fImg, setFImg] = useState('');
+  const [foodError, setFoodError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -94,8 +98,16 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
 
   const { items } = useMemo(() => todayMenu(), [tick, open]); // eslint-disable-line react-hooks/exhaustive-deps
   const eatenList = getEaten(today);
+  const storageProblem = !isEatenStorageReadable() || !isFoodStorageReadable();
+  const caloriesIncomplete = eatenList.some(item => readCalories(item.kcal) === undefined);
   const eaten = eatenKcal(today);
   const macros = eatenMacros(today);
+  const macroKeys = ['protein', 'fat', 'carbs'] as const;
+  const macroCounts = Object.fromEntries(macroKeys.map(key => [key, eatenList.filter(item => readMacros(item)[key] !== undefined).length])) as Record<typeof macroKeys[number], number>;
+  const hasMacroData = macroKeys.some(key => macroCounts[key] > 0);
+  const incompleteMacros = eatenList.some(item => macroKeys.some(key => readMacros(item)[key] === undefined));
+  const healthCalories = healthLogs.find((entry) => entry.date === today && entry.metric === 'calories')?.value;
+  const healthCaloriesDiffer = eatenList.length > 0 && healthCalories !== undefined && healthCalories !== eaten;
   const foods = getFoods();
   const goal = getKcalGoal();
   const steps = healthLogs.find((l) => l.date === today && l.metric === 'steps')?.value ?? 0;
@@ -103,7 +115,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
   const burned = burnedKcal(today, steps, weight);
   const bmr = computeBMR(weight);
   const totalBurn = bmr + burned.total;        // покой + активность
-  const balance = eaten - totalBurn;
+  const balance = hasCompleteEatenCalories(today) && bmr > 0 ? eaten - totalBurn : null;
   const maintenance = bmr > 0 ? Math.round(bmr * 1.4) : 0; // TDEE при лёгкой активности
 
   // Баланс за последние 7 дней (съедено − покой − активность)
@@ -111,10 +123,10 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
   const weekData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = isoDate(new Date(Date.now() - (6 - i) * 86400000));
     const st = healthLogs.find((l) => l.date === d && l.metric === 'steps')?.value ?? 0;
-    const balance = Math.round(eatenKcal(d) - (bmr + burnedKcal(d, st, weight).total));
+    const balance = bmr > 0 && hasCompleteEatenCalories(d) ? Math.round(eatenKcal(d) - (bmr + burnedKcal(d, st, weight).total)) : null;
     return { label: d.slice(5), balance };
   }), [tick, open, healthLogs, weight, bmr]);
-  const weekHasData = weekData.some((x) => x.balance !== 0);
+  const weekHasData = weekData.some((x) => x.balance !== null);
 
   // связь с целями: похудение (кг, цель ниже старта) и цель по калориям
   const weightGoal = goals.find((g) => g.status === 'active' && (g.unit ?? '').toLowerCase().includes('кг') && g.target_value < g.start_value);
@@ -127,10 +139,10 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
   const customToday = eatenList.filter((x) => x.custom);
 
   const quickAdd = () => {
-    const kcal = Math.round(Number(addKcal) || 0);
-    if (!addTitle.trim() || kcal <= 0) return;
-    addCustomEaten(today, addTitle, kcal);
-    setAddTitle(''); setAddKcal('');
+    const kcal = Number(addKcal.replace(',', '.'));
+    if (!addTitle.trim() || !addKcal.trim() || !Number.isFinite(kcal) || kcal < 0) { setQuickError('Укажите название и неотрицательное число калорий.'); return; }
+    if (!nutritionAction(() => addCustomEaten(today, addTitle, kcal))) return;
+    setAddTitle(''); setAddKcal(''); setQuickError('');
   };
 
   const uploadFoodImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,10 +153,14 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
   };
 
   const saveFood = () => {
-    const kcal = Math.round(Number(fKcal) || 0);
-    if (!fTitle.trim() || kcal <= 0) return;
-    addFood({ title: fTitle, kcal, protein: Number(fP) || 0, fat: Number(fF) || 0, carbs: Number(fC) || 0, image: fImg || undefined });
+    const kcal = Number(fKcal.replace(',', '.'));
+    if (!fTitle.trim() || !fKcal.trim() || !Number.isFinite(kcal) || kcal < 0) { setFoodError('Укажите название и неотрицательное число калорий.'); return; }
+    const optionalNumber = (value: string) => value.trim() === '' ? undefined : Number(value.replace(',', '.'));
+    const macros = {protein: optionalNumber(fP), fat: optionalNumber(fF), carbs: optionalNumber(fC)};
+    if (Object.values(macros).some(value => value !== undefined && (!Number.isFinite(value) || value < 0))) { setFoodError('БЖУ должны быть неотрицательными числами; неизвестные значения оставьте пустыми.'); return; }
+    if (!nutritionAction(() => addFood({ title: fTitle, kcal, ...macros, image: fImg || undefined }))) return;
     setFTitle(''); setFKcal(''); setFP(''); setFF(''); setFC(''); setFImg('');
+    setFoodError('');
     setFoodOpen(false);
   };
 
@@ -189,14 +205,14 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
               <div className="flex justify-between"><span className="text-text-muted">Активность</span><b className="tabular-nums text-accent">−{fmtNum(burned.total, 0)} ккал</b></div>
               <div className="flex justify-between border-t border-border-soft pt-1.5">
                 <span className="text-text-muted">Баланс дня</span>
-                <b className={`tabular-nums ${balance > 0 ? 'text-text' : 'text-accent'}`}>{balance > 0 ? '+' : ''}{fmtNum(balance, 0)} ккал</b>
+                <b className="tabular-nums text-text">{balance === null ? '—' : `${balance > 0 ? '+' : ''}${fmtNum(balance, 0)} ккал`}</b>
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <span className="text-xs text-text-muted">Цель:</span>
                 <input
                   value={goalEdit || String(goal)}
                   onChange={(e) => setGoalEdit(e.target.value)}
-                  onBlur={() => { const v = Number(goalEdit); if (v > 0) setKcalGoal(v); setGoalEdit(''); }}
+                  onBlur={() => { const v = Number(goalEdit); if (v <= 0 || nutritionAction(() => { setKcalGoal(v); return true; })) setGoalEdit(''); }}
                   inputMode="numeric"
                   className="w-20 h-7 rounded-lg bg-bg-soft border border-border-soft px-2 text-xs tabular-nums outline-none focus:border-border"
                 />
@@ -204,18 +220,24 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
               </div>
             </div>
           </div>
+          {balance === null ? <p className="text-xs text-text-muted">Для оценки баланса нужны записи о еде и заполненный профиль.</p> : <p className="text-xs text-text-muted">Оценка по внесённым записям и расчётному расходу; неполный дневник влияет на результат.</p>}
+          {steps > 0 && (burned.workoutMin > 0 || burned.manual.length > 0) && <p className="text-xs text-text-muted">Шаги и тренировки могут пересекаться, поэтому расход может быть завышен.</p>}
 
           {/* БЖУ за день (по позициям, где макросы известны) */}
-          {(macros.protein > 0 || macros.fat > 0 || macros.carbs > 0) && (
+          {hasMacroData && (
             <div className="grid grid-cols-3 gap-2">
-              {([['Белки', macros.protein, '#22c55e'], ['Жиры', macros.fat, '#f59e0b'], ['Углеводы', macros.carbs, '#6366f1']] as const).map(([l, v, c]) => (
+              {([['Белки', 'protein', '#22c55e'], ['Жиры', 'fat', '#f59e0b'], ['Углеводы', 'carbs', '#6366f1']] as const).map(([l, key, c]) => (
                 <div key={l} className="rounded-xl border border-border-soft p-2.5 text-center">
-                  <div className="text-lg font-bold tabular-nums" style={{ color: c }}>{fmtNum(v, 0)}<span className="text-[10px] text-text-dim ml-0.5">г</span></div>
+                  <div className="text-lg font-bold tabular-nums" style={{ color: c }}>{macroCounts[key] ? fmtNum(macros[key], 1) : '—'}{macroCounts[key] > 0 && <span className="text-[10px] text-text-dim ml-0.5">г</span>}</div>
                   <div className="text-[10px] text-text-muted">{l}</div>
                 </div>
               ))}
             </div>
           )}
+          {incompleteMacros && <p className="text-xs text-text-muted">БЖУ указаны не для всех записей. Итог рассчитан только по доступным данным.</p>}
+          {caloriesIncomplete && <p className="text-xs text-text-muted">Калорийность указана не для всех записей. Показана только известная часть; баланс и запись в «Здоровье» не рассчитываются.</p>}
+          {storageProblem && <p role="alert" className="text-xs text-danger">Данные питания повреждены или недоступны. Сохраните исходную копию личных данных в настройках перед восстановлением.</p>}
+          {healthCaloriesDiffer && <p className="text-xs text-text-muted">В «Здоровье» сохранено другое значение калорий. Существующая запись не перезаписана дневником питания.</p>}
 
           {/* Недельный тренд баланса */}
           {weekHasData && (
@@ -240,24 +262,23 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                     tooltip: { trigger: 'axis', valueFormatter: (v: number) => `${v > 0 ? '+' : ''}${v} ккал` },
                     series: [{
                       type: 'bar', barMaxWidth: 22,
-                      data: weekData.map((x) => ({
+                      data: weekData.map((x) => x.balance === null ? null : ({
                         value: x.balance,
-                        // дефицит (≤0) — зелёный, профицит (>0) — красный
                         itemStyle: { color: x.balance <= 0 ? '#22c55e' : '#ef4444', borderRadius: [3, 3, 0, 0] },
                       })),
                     }],
                   }}
                 />
               </div>
-              <p className="text-[10px] text-text-dim mt-1">Зелёный — дефицит (минус к весу), красный — профицит. Данные накапливаются день за днём.</p>
+              <p className="text-[10px] text-text-dim mt-1">Оценка по внесённой еде и активности. Дни без записей о еде не показаны; для расчёта используется текущий профиль.</p>
             </div>
           )}
 
           {/* Профиль для точного расчёта: пол, возраст, рост, вес → BMR */}
           <div className="rounded-xl border border-border-soft p-3">
             <button onClick={() => setProfileOpen((v) => !v)} className="w-full flex items-center justify-between text-sm">
-              <span className="font-medium text-text">Профиль и точный расчёт</span>
-              <span className="text-xs text-text-muted">{hasBmrProfile() ? `BMR ${fmtNum(bmr, 0)} ккал` : 'заполни для точности'}</span>
+              <span className="font-medium text-text">Профиль и расчёт расхода</span>
+              <span className="text-xs text-text-muted">{hasBmrProfile() ? `BMR ≈ ${fmtNum(bmr, 0)} ккал` : 'заполните профиль'}</span>
             </button>
             {profileOpen && (
               <div className="mt-3 space-y-2.5">
@@ -285,8 +306,8 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                 {bmr > 0 && (
                   <div className="flex items-center gap-2 pt-1">
                     <span className="text-[11px] text-text-muted flex-1">Поддержание ≈ {fmtNum(maintenance, 0)} ккал</span>
-                    <button onClick={() => setKcalGoal(maintenance)} className="h-7 px-2.5 rounded-lg bg-bg-soft hover:bg-bg-hover text-[11px] transition-colors">Поддержание</button>
-                    <button onClick={() => setKcalGoal(Math.max(1000, maintenance - 500))} className="h-7 px-2.5 rounded-lg bg-accent/10 text-accent text-[11px] font-semibold hover:bg-accent/20 transition-colors">−500 (похудение)</button>
+                    <button onClick={() => nutritionAction(() => setKcalGoal(maintenance))} className="h-7 px-2.5 rounded-lg bg-bg-soft hover:bg-bg-hover text-[11px] transition-colors">Поддержание</button>
+                    <button onClick={() => nutritionAction(() => setKcalGoal(Math.max(1000, maintenance - 500)))} className="h-7 px-2.5 rounded-lg bg-accent/10 text-accent text-[11px] font-semibold hover:bg-accent/20 transition-colors">−500 (похудение)</button>
                   </div>
                 )}
                 <p className="text-[10px] text-text-dim leading-relaxed">Вес берётся из последней записи в «Здоровье», если она есть. BMR — базовый метаболизм (Миффлин-Сан-Жеор): калории, которые тело тратит в покое.</p>
@@ -301,12 +322,10 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
               <div className="space-y-1">
                 {weightGoal && (
                   <div>
-                    Цель «<b className="text-text">{weightGoal.title}</b>»: {balance < 0
-                      ? <span className="text-accent">дефицит {fmtNum(-balance, 0)} ккал — работаешь на снижение веса.</span>
-                      : <span>профицит {fmtNum(balance, 0)} ккал — для снижения веса нужен дефицит.</span>}
+                    Цель «<b className="text-text">{weightGoal.title}</b>»: {balance === null ? 'для оценки баланса нужны записи о еде и заполненный профиль.' : `расчётный баланс по записям ${balance > 0 ? '+' : ''}${fmtNum(balance, 0)} ккал.`}
                   </div>
                 )}
-                {kcalGoalLinked && <div>Итог дня автоматически идёт в цель «<b className="text-text">{kcalGoalLinked.title}</b>».</div>}
+                {kcalGoalLinked && <div>Цель «<b className="text-text">{kcalGoalLinked.title}</b>» связана с метрикой «Калории» в разделе «Здоровье».</div>}
               </div>
             </div>
           )}
@@ -321,7 +340,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                   return (
                     <button
                       key={x.key}
-                      onClick={() => toggleEaten(today, { key: x.key, title: x.title, kcal: x.kcal, meal: x.meal })}
+                      onClick={() => nutritionAction(() => toggleEaten(today, { key: x.key, title: x.title, kcal: x.kcal, meal: x.meal, ...readMacros(x) }))}
                       className={`w-full flex items-center gap-3 rounded-xl border p-2.5 text-left transition-colors ${
                         on ? 'border-accent/40 bg-accent/5' : 'border-border-soft hover:border-border'
                       }`}
@@ -331,7 +350,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                       </span>
                       <span className={`flex-1 min-w-0 text-sm truncate ${on ? 'text-text-muted line-through' : 'text-text'}`}>{x.title}</span>
                       {x.kind && x.kind !== 'Основное' && <span className="text-[10px] text-text-dim shrink-0">{x.kind}</span>}
-                      <span className="text-xs text-text-muted tabular-nums shrink-0">{x.kcal} ккал</span>
+                      <span className="text-xs text-text-muted tabular-nums shrink-0">{x.kcal === undefined ? 'ккал не указаны' : `${x.kcal} ккал`}</span>
                     </button>
                   );
                 })}
@@ -351,7 +370,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
               <div className="section-label mb-0">Мои продукты</div>
               <div className="flex items-center gap-3">
                 {foods.length > 0 && (
-                  <button onClick={exportFoods} className="text-xs text-text-muted flex items-center gap-1 hover:text-text" title="Выгрузить .json">
+                  <button onClick={() => nutritionAction(() => exportFoods())} className="text-xs text-text-muted flex items-center gap-1 hover:text-text" title="Выгрузить .json">
                     <Download className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -374,7 +393,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                   <div className="flex-1 space-y-2">
                     <input value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="Название продукта"
                       className="w-full h-8 rounded-lg bg-bg-soft border border-border-soft px-2.5 text-xs outline-none focus:border-border" />
-                    <input value={fKcal} onChange={(e) => setFKcal(e.target.value)} placeholder="ккal (на порцию)" inputMode="numeric"
+                    <input value={fKcal} onChange={(e) => setFKcal(e.target.value)} placeholder="ккал (на порцию)" inputMode="numeric"
                       className="w-full h-8 rounded-lg bg-bg-soft border border-border-soft px-2.5 text-xs tabular-nums outline-none focus:border-border" />
                   </div>
                 </div>
@@ -387,6 +406,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                     className="h-8 rounded-lg bg-bg-soft border border-border-soft px-2 text-xs tabular-nums outline-none focus:border-border" />
                 </div>
                 <button onClick={saveFood} className="w-full h-8 rounded-lg bg-accent text-white text-xs font-semibold hover:opacity-90">Сохранить в библиотеку</button>
+                {foodError && <p role="alert" className="text-xs text-danger">{foodError}</p>}
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadFoodImg} />
               </div>
             )}
@@ -401,13 +421,13 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-text truncate">{f.title}</div>
                     <div className="text-[10px] text-text-dim tabular-nums">
-                      {f.kcal} ккал{f.protein ? ` · Б ${f.protein}` : ''}{f.fat ? ` · Ж ${f.fat}` : ''}{f.carbs ? ` · У ${f.carbs}` : ''}
+                      {f.kcal} ккал{f.protein !== undefined ? ` · Б ${f.protein}` : ''}{f.fat !== undefined ? ` · Ж ${f.fat}` : ''}{f.carbs !== undefined ? ` · У ${f.carbs}` : ''}
                     </div>
                   </div>
-                  <button onClick={() => eatFood(today, f)} className="h-7 px-2.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent/20 shrink-0" title="Съел — учесть">
+                  <button onClick={() => nutritionAction(() => eatFood(today, f))} className="h-7 px-2.5 rounded-lg bg-accent/10 text-accent text-xs font-semibold hover:bg-accent/20 shrink-0" title="Съел — учесть">
                     Съел
                   </button>
-                  <button onClick={() => removeFood(f.id)} className="text-text-dim hover:text-danger shrink-0" title="Удалить продукт">
+                  <button onClick={() => nutritionAction(() => removeFood(f.id))} className="text-text-dim hover:text-danger shrink-0" title="Удалить продукт">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -423,7 +443,7 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                 <div key={x.key} className="flex items-center gap-3 rounded-xl border border-border-soft p-2.5">
                   <span className="flex-1 min-w-0 text-sm truncate">{x.title}</span>
                   <span className="text-xs text-text-muted tabular-nums shrink-0">{x.kcal} ккал</span>
-                  <button onClick={() => removeEaten(today, x.key)} className="text-text-dim hover:text-danger shrink-0" title="Удалить">
+                  <button onClick={() => nutritionAction(() => removeEaten(today, x.key))} className="text-text-dim hover:text-danger shrink-0" title="Удалить">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -435,10 +455,11 @@ const CaloriesExpand: React.FC<{ open: boolean; onClose: () => void }> = ({ open
                 <input value={addKcal} onChange={(e) => setAddKcal(e.target.value)} placeholder="ккал" inputMode="numeric"
                   onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
                   className="w-20 h-9 rounded-xl bg-bg-soft border border-border-soft px-3 text-sm tabular-nums outline-none focus:border-border" />
-                <button onClick={quickAdd} className="h-9 w-9 rounded-xl bg-accent text-white flex items-center justify-center hover:opacity-90 shrink-0">
+                <button onClick={quickAdd} aria-label="Добавить запись о еде" className="h-9 w-9 rounded-xl bg-accent text-white flex items-center justify-center hover:opacity-90 shrink-0">
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
+              {quickError && <p role="alert" className="text-xs text-danger">{quickError}</p>}
             </div>
           </div>
         </div>
@@ -458,6 +479,8 @@ export const CaloriesWidget: React.FC = () => {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const eaten = useMemo(() => eatenKcal(today), [tick, today]);
+  const caloriesIncomplete = getEaten(today).some(item => readCalories(item.kcal) === undefined);
+  const storageProblem = !isEatenStorageReadable() || !isFoodStorageReadable();
   const goal = getKcalGoal();
   const steps = healthLogs.find((l) => l.date === today && l.metric === 'steps')?.value ?? 0;
   const weight = resolveWeight(healthLogs);
@@ -466,7 +489,7 @@ export const CaloriesWidget: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bmr = useMemo(() => computeBMR(weight), [tick, weight]);
   const totalBurn = bmr + burned.total;
-  const balance = eaten - totalBurn;
+  const balance = bmr > 0 && hasCompleteEatenCalories(today) ? eaten - totalBurn : null;
   const pct = goal ? Math.min(100, Math.round((eaten / goal) * 100)) : 0;
 
   return (
@@ -491,8 +514,10 @@ export const CaloriesWidget: React.FC = () => {
 
       <div className="shrink-0 flex justify-between text-[11px] text-text-muted tabular-nums">
         <span>−{fmtNum(totalBurn, 0)} {bmr > 0 ? 'покой+актив' : 'активность'}</span>
-        <span className={balance <= 0 ? 'text-accent font-semibold' : ''}>{balance > 0 ? '+' : ''}{fmtNum(balance, 0)} баланс</span>
+        <span>{balance === null ? 'баланс: нет данных' : `${balance > 0 ? '+' : ''}${fmtNum(balance, 0)} баланс`}</span>
       </div>
+      {caloriesIncomplete && <p className="text-[10px] text-text-muted">Калорийность части блюд неизвестна</p>}
+      {storageProblem && <p className="text-[10px] text-danger">Данные питания недоступны. Откройте меню для подробностей.</p>}
 
       <CaloriesExpand open={open} onClose={() => setOpen(false)} />
     </div>

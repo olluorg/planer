@@ -22,9 +22,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
 
-/** Тяжёлый декоративный контент (обои — 29 МБ) в установщик не кладём: он и так
- *  весит больше сотни мегабайт из-за рантайма Electron. Такие файлы берём с сайта
- *  по требованию и кэшируем на диск, чтобы во второй раз работало офлайн. */
+/** Совместимость с предыдущими сборками без встроенных обоев: отсутствующие файлы
+ *  можно получить с сайта и сохранить в кэш. Новые сборки включают обои локально. */
 const REMOTE_ASSET_BASE = 'https://thedad.ru';
 const REMOTE_ASSET_PREFIXES = ['/wallpapers/'];
 const ASSET_CACHE_DIR = path.join(app.getPath('userData'), 'remote-assets');
@@ -51,11 +50,14 @@ async function serveRemoteAsset(rel) {
 function serveRenderer() {
   protocol.handle('app', (request) => {
     const { pathname } = new URL(request.url);
-    const rel = decodeURIComponent(pathname);
+    let rel;
+    try { rel = decodeURIComponent(pathname); }
+    catch { return new Response('Bad request', { status: 400 }); }
     const target = path.join(RENDERER_DIR, rel);
 
     // Не выпускаем чтение за пределы dist/
-    if (!target.startsWith(RENDERER_DIR)) {
+    const relativeTarget = path.relative(RENDERER_DIR, target);
+    if (relativeTarget === '..' || relativeTarget.startsWith(`..${path.sep}`) || path.isAbsolute(relativeTarget)) {
       return new Response('Forbidden', { status: 403 });
     }
     if (isRemoteAsset(rel) && !fs.existsSync(target)) return serveRemoteAsset(rel);

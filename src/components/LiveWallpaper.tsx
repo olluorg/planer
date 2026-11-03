@@ -33,11 +33,12 @@ export const YouTubeBg: React.FC<{ id: string; className?: string }> = ({ id, cl
 };
 
 /** Фон из локального видео-файла (object URL или путь). */
-export const VideoBg: React.FC<{ src: string; className?: string }> = ({ src, className }) => (
+export const VideoBg: React.FC<{ src: string; className?: string; onReady?: () => void; onError?: () => void }> = ({ src, className, onReady, onError }) => (
   <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className ?? ''}`}>
     <video
       src={src}
       autoPlay loop muted playsInline
+      onCanPlay={onReady} onError={onError}
       className="absolute inset-0 h-full w-full object-cover"
     />
   </div>

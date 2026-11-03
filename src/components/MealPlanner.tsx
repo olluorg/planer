@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { X, Shuffle, Save, Check, Utensils, Plus, BookOpen } from 'lucide-react';
 import { installPlugin, renderTemplate, type PluginWidgetDef } from '@/lib/plugins';
 import { toast } from '@/lib/toast';
-import { withDiningCollection, diningPreview, DINING_FILTERS, matchesDiningFilter, diningTotals, type DiningFilter } from '@/lib/diningCollection';
+import { withDiningCollection, diningPreview, DINING_COLLECTION, DINING_FILTERS, matchesDiningFilter, diningTotals, type DiningFilter } from '@/lib/diningCollection';
 import { RecipeModal } from './dashboard/RecipeModal';
 import type { PluginRow } from '@/lib/plugins';
+import { readCalories } from '@/lib/nutrition';
 
 /* Планер рациона для контентных плагинов (cards + static + dayField).
  * В одной ячейке (день × приём) может быть НЕСКОЛЬКО блюд: основное, гарнир,
@@ -113,12 +114,12 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
   const dishesOf = (meal: string) => [...library.keys()].filter((k) => k.startsWith(`${meal}¦`));
   const dishLabel = (key: string) => key.split('¦')[1] ?? '';
   const dishKind = (key: string) => String(library.get(key)?.kind ?? '');
-  const dishKcal = (key: string) => Number(library.get(key)?.kcal) || 0;
+  const dishKcal = (key: string) => readCalories(library.get(key)?.kcal);
   const dishImg = (key: string): string | null => {
     const v = imageField ? library.get(key)?.[imageField] : null;
     return typeof v === 'string' && v.startsWith('/') && !v.startsWith('//') ? v : null;
   };
-  const cellKcal = (cell: string) => (plan[cell] ?? []).reduce((s, k) => s + dishKcal(k), 0);
+  const cellKcal = (cell: string) => (plan[cell] ?? []).reduce((s, k) => s + (dishKcal(k) ?? 0), 0);
   const visibleDish = (key: string) => dishLabel(key).toLowerCase().includes(libraryQuery.trim().toLowerCase()) && (!studioOnly || library.get(key)?.collection === 'studio-2026') && matchesDiningFilter(library.get(key)!, diningFilter);
 
   /** Случайная раскладка: в каждый приём — по одному блюду каждого типа из стека
@@ -182,15 +183,16 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
 
   const addCustomDish = () => {
     const title = fTitle.trim();
-    const kcal = Math.max(0, Math.round(Number(fKcal) || 0));
+    const kcal = fKcal.trim() ? Number(fKcal.replace(',', '.')) : null;
     const meal = fMeal || meals[0] || '';
     if (!title) { toast.error('Название блюда пустое'); return; }
+    if (kcal !== null && (!Number.isFinite(kcal) || kcal < 0)) { toast.error('Укажите неотрицательное число калорий или оставьте поле пустым'); return; }
     const row: Row = {
       [badgeField || 'meal']: meal,
       kind: fKind,
       title,
       desc: `${fKind} · добавлено вручную`,
-      kcal,
+      kcal: kcal === null ? null : Math.round(kcal),
       image: '',
     };
     setCustomDishes((c) => [...c, row]);
@@ -262,7 +264,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
               </select>
               <p className="text-xs text-text-muted leading-relaxed">{DINING_FILTERS.find((f) => f.id === diningFilter)?.hint}</p>
             </div>}
-            {def.id === 'nutrition-month' && <button onClick={() => setStudioOnly((v) => !v)} aria-pressed={studioOnly} className={`rounded-lg px-3 py-2 text-xs border ${studioOnly ? 'bg-accent/10 text-accent border-accent' : 'border-border text-text-muted'}`}>Новая коллекция · 4 блюда</button>}
+            {def.id === 'nutrition-month' && <button onClick={() => setStudioOnly((v) => !v)} aria-pressed={studioOnly} className={`rounded-lg px-3 py-2 text-xs border ${studioOnly ? 'bg-accent/10 text-accent border-accent' : 'border-border text-text-muted'}`}>Новая коллекция · {DINING_COLLECTION.length} блюд</button>}
             <div className="text-[11px] text-text-muted leading-relaxed">
               Галочка — блюдо в <b className="text-text">стеке</b>: «Случайно» соберёт рацион из стека,
               по одному блюду каждого типа на приём.
@@ -316,10 +318,10 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
                       <Thumb src={dishImg(key)} size={52} />
                       <span className="flex-1 min-w-0">
                         <span className="block text-xs text-text leading-snug line-clamp-2">{dishLabel(key)}</span>
-                        <span className="block text-[10px] text-text-dim">{dishKind(key)}{dishKcal(key) ? ` · ${dishKcal(key)} ккал` : ''}</span>
+                        <span className="block text-[10px] text-text-dim">{dishKind(key)}{dishKcal(key) !== undefined ? ` · ${dishKcal(key)} ккал` : ' · ккал не указаны'}</span>
                       </span>
                       </button>
-                      <button type="button" aria-label={`Рецепт: ${dishLabel(key)}`} onClick={() => setPreview({ label: dishLabel(key), value: dishKcal(key), raw: library.get(key)! })} className="h-8 w-8 shrink-0 rounded-lg text-text-muted hover:text-accent hover:bg-bg-hover"><BookOpen className="h-4 w-4 mx-auto" /></button>
+                      <button type="button" aria-label={`Рецепт: ${dishLabel(key)}`} onClick={() => setPreview({ label: dishLabel(key), value: dishKcal(key) ?? 0, raw: library.get(key)! })} className="h-8 w-8 shrink-0 rounded-lg text-text-muted hover:text-accent hover:bg-bg-hover"><BookOpen className="h-4 w-4 mx-auto" /></button>
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleStack(key); }}
                         className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
@@ -374,7 +376,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
                               >
                                 <Thumb src={dishImg(key)} size={24} />
                                 <span className="flex-1 min-w-0 text-[11px] leading-tight truncate">{dishLabel(key)}</span>
-                                {dishKcal(key) > 0 && <span className="text-[9px] text-text-dim tabular-nums shrink-0">{dishKcal(key)}</span>}
+                                {dishKcal(key) !== undefined && <span className="text-[9px] text-text-dim tabular-nums shrink-0">{dishKcal(key)}</span>}
                                 <button
                                   onClick={(e) => { e.stopPropagation(); removeFromCell(cell, key); }}
                                   className="h-4 w-4 rounded flex items-center justify-center text-text-dim hover:text-danger opacity-0 group-hover/chip:opacity-100 transition-opacity shrink-0"
@@ -385,7 +387,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
                               </div>
                             ))}
                             <div className={`rounded-lg border border-dashed border-border flex items-center justify-center text-text-dim text-[10px] transition-colors ${keys.length ? 'h-6' : 'h-[38px]'} ${selected?.startsWith(`${meal}¦`) ? 'border-accent/50 text-accent' : ''}`}>
-                              {selected?.startsWith(`${meal}¦`) ? '+ кликни' : keys.length ? `${kcal} ккал` : '—'}
+                              {selected?.startsWith(`${meal}¦`) ? '+ кликни' : keys.length ? keys.some(k => dishKcal(k) === undefined) ? (keys.some(k => dishKcal(k) !== undefined) ? `${kcal} ккал + неизвестно` : 'ккал не указаны') : `${kcal} ккал` : '—'}
                             </div>
                           </div>
                         </td>
@@ -397,7 +399,7 @@ export const MealPlanner: React.FC<Props> = ({ def, open, onClose }) => {
                         const total = diningTotals(rows);
                         const macroText = (key: 'protein' | 'fat' | 'carbs') => rows.some((row) => typeof row[key] === 'number' && Number.isFinite(row[key]) && Number(row[key]) >= 0) ? total[key].toFixed(1) : '—';
                         return rows.length ? <div className="text-xs tabular-nums space-y-1" aria-label={`Питание за день ${d}`}>
-                          <div className="font-semibold">{Math.round(total.kcal)} ккал</div>
+                          <div className="font-semibold">{rows.some(row => readCalories(row.kcal) !== undefined) ? `${Math.round(total.kcal)} ккал${rows.some(row => readCalories(row.kcal) === undefined) ? ' + неизвестно' : ''}` : 'Калорийность не указана'}</div>
                           <div className="text-text-muted">Б {macroText('protein')} · Ж {macroText('fat')} · У {macroText('carbs')} г</div>
                           {total.missing > 0 && <div className="text-text-dim text-[10px]">Частичный итог: у {total.missing} блюд неполные БЖУК</div>}
                         </div> : <span className="text-text-dim">—</span>;

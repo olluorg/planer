@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Database } from 'sql.js';
 import { freshEnv } from './dbHarness';
-import { mergeInto } from '../merge';
+import { canMergeIndependentInserts, mergeInto } from '../merge';
 
 vi.mock('sql.js', async (orig) => (await import('./dbHarness')).sqlJsWithLocalWasm(orig));
 vi.mock('sql.js/dist/sql-wasm.wasm?url', () => ({ default: '' }));
@@ -37,6 +37,35 @@ const syncBoth = () => { mergeInto(A, B); const snap = new SQL.Database(A.export
 const titles = (d: Database) => q<{ title: string }>(d, 'SELECT title FROM goals ORDER BY id').map((g) => g.title);
 
 describe('слияние двух устройств', () => {
+  it('recognizes independent inserts without overwriting existing data', () => {
+    const base = new SQL.Database(A.export());
+    goal(A, 'a', 'Первая', '2026-09-20T10:00:00.000Z');
+    goal(B, 'b', 'Вторая', '2026-09-20T11:00:00.000Z');
+    expect(canMergeIndependentInserts(base, A, B)).toBe(true);
+    base.close();
+  });
+
+  it('does not automatically merge changes to an existing row or deletions', () => {
+    goal(A, 'original', 'Изначально', '2026-09-20T10:00:00.000Z');
+    const base = new SQL.Database(A.export());
+    B.close(); B = new SQL.Database(A.export());
+    A.exec("UPDATE goals SET title = 'Изменено' WHERE id = 'original'");
+    goal(B, 'new', 'Вторая вкладка', '2026-09-20T11:00:00.000Z');
+    expect(canMergeIndependentInserts(base, A, B)).toBe(false);
+    A.exec("DELETE FROM goals WHERE id = 'original'");
+    expect(canMergeIndependentInserts(base, A, B)).toBe(false);
+    base.close();
+  });
+
+  it('does not automatically merge competing natural keys or unknown tables', () => {
+    const base = new SQL.Database(A.export());
+    A.exec("INSERT INTO health_logs (id, date, metric, value) VALUES ('a', '2026-09-20', 'steps', 100)");
+    B.exec("INSERT INTO health_logs (id, date, metric, value) VALUES ('b', '2026-09-20', 'steps', 200)");
+    expect(canMergeIndependentInserts(base, A, B)).toBe(false);
+    B.exec('CREATE TABLE unexpected (id TEXT)');
+    expect(canMergeIndependentInserts(base, A, B)).toBe(false);
+    base.close();
+  });
   it('правки разных записей сохраняются обе', () => {
     goal(A, 'a', 'С ноутбука', '2026-09-20T10:00:00.000Z');
     goal(B, 'b', 'С телефона', '2026-09-20T11:00:00.000Z');

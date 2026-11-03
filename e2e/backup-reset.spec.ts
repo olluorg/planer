@@ -1,0 +1,113 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
+
+test('database export scope is explicit and cancelling reset preserves tasks', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  await page.getByPlaceholder('Новая задача...').fill('Сохранить данные');
+  await page.getByPlaceholder('Новая задача...').press('Enter');
+  await expect(page.getByText('Сохранить данные', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  await expect(page.getByText(/Экспорт и снимки содержат только базу/)).toBeVisible();
+  page.once('dialog', dialog => dialog.dismiss());
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', {name:'Сбросить', exact:true}).click();
+  expect((await download).suggestedFilename()).toMatch(/^thedad-\d{4}-\d{2}-\d{2}\.sqlite$/);
+  await page.goto('/tasks');
+  await expect(page.getByText('Сохранить данные', {exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Сохранить данные', {exact:true})).toBeVisible();
+});
+
+test('confirmed reset empties the database and keeps a local pre-reset snapshot', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  await page.getByPlaceholder('Новая задача...').fill('До сброса');
+  await page.getByPlaceholder('Новая задача...').press('Enter');
+  await expect(page.getByText('До сброса', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  const download = page.waitForEvent('download');
+  const reloaded = page.waitForEvent('load');
+  page.once('dialog', dialog => void dialog.accept('УДАЛИТЬ'));
+  await page.getByRole('button', {name:'Сбросить', exact:true}).click();
+  await download;
+  await reloaded;
+  await expect(page.getByText('Перед сбросом')).toBeVisible();
+  await page.goto('/tasks');
+  await expect(page.getByText('До сброса', {exact:true})).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText('До сброса', {exact:true})).toHaveCount(0);
+});
+
+test('exported database can be restored without retaining later changes', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  const input = page.getByPlaceholder('Новая задача...');
+  await input.fill('В копии');
+  await input.press('Enter');
+  await expect(page.getByText('В копии', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  const pendingDownload = page.waitForEvent('download');
+  await page.getByRole('button', {name:'Экспорт .sqlite'}).click();
+  const download = await pendingDownload;
+  const sourcePath = await download.path();
+  const data = await fs.readFile(sourcePath!);
+  await page.goto('/tasks');
+  await input.fill('После копии');
+  await input.press('Enter');
+  await expect(page.getByText('После копии', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  const cancelled = page.waitForEvent('dialog').then(dialog => dialog.dismiss());
+  await page.locator('input[accept=".sqlite,.db,application/octet-stream"]').setInputFiles({name:'backup.sqlite', mimeType:'application/octet-stream', buffer:data});
+  await cancelled;
+  await page.goto('/tasks');
+  await expect(page.getByText('После копии', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  const reloaded = page.waitForEvent('load');
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('input[accept=".sqlite,.db,application/octet-stream"]').setInputFiles({name:'backup.sqlite', mimeType:'application/octet-stream', buffer:data});
+  await reloaded;
+  await page.goto('/tasks');
+  await expect(page.getByText('В копии', {exact:true})).toBeVisible();
+  await expect(page.getByText('После копии', {exact:true})).toHaveCount(0);
+});
+
+test('encrypted import can be cancelled and the same file selected again', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  const input = page.getByPlaceholder('Новая задача...');
+  await input.fill('В зашифрованной копии');
+  await input.press('Enter');
+  await expect(page.getByText('В зашифрованной копии', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  const downloadPromise = page.waitForEvent('download');
+  page.once('dialog', dialog => void dialog.accept('password123'));
+  await page.getByRole('button', {name:'Зашифровать .sqlite.enc'}).click();
+  const encrypted = await fs.readFile((await (await downloadPromise).path())!);
+  await page.goto('/tasks');
+  await input.fill('После копии');
+  await input.press('Enter');
+  await expect(page.getByText('После копии', {exact:true})).toBeVisible();
+  await page.goto('/settings');
+  const fileInput = page.locator('input[accept=".enc,application/octet-stream"]');
+  const file = {name:'backup.sqlite.enc', mimeType:'application/octet-stream', buffer:encrypted};
+  const cancelConfirmation = new Promise<void>((resolve, reject) => {
+    page.once('dialog', dialog => {
+      page.once('dialog', confirm => { expect(confirm.message()).toContain('backup.sqlite.enc'); void confirm.dismiss().then(resolve, reject); });
+      void dialog.accept('password123').catch(reject);
+    });
+  });
+  await fileInput.setInputFiles(file);
+  await cancelConfirmation;
+  const currentDownload = page.waitForEvent('download');
+  await page.getByRole('button', {name:'Экспорт .sqlite'}).click();
+  const currentBytes = await fs.readFile((await (await currentDownload).path())!);
+  expect(currentBytes.includes(Buffer.from('После копии'))).toBe(true);
+  const reloaded = page.waitForEvent('load');
+  page.once('dialog', dialog => { page.once('dialog', confirm => { void confirm.accept(); }); void dialog.accept('password123'); });
+  await fileInput.setInputFiles(file);
+  await reloaded;
+  await page.goto('/tasks');
+  await expect(page.getByText('В зашифрованной копии', {exact:true})).toBeVisible();
+  await expect(page.getByText('После копии', {exact:true})).toHaveCount(0);
+});

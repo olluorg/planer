@@ -141,10 +141,13 @@ export const FocusMode: React.FC<Props> = ({ open, initialTaskId, onClose }) => 
   useEffect(() => { if (open) preloadImages([...customWp, ...WALLPAPERS.map(wallpaperPreview)]); }, [open, customWp]);
 
   const today = isoDate(new Date());
-  const sessionTasks = useMemo(
-    () => tasks.filter((t) => t.date === today && !t.parent_id).sort((a, b) => (a.status === b.status ? a.priority - b.priority : a.status === 'done' ? 1 : -1)).slice(0, 12),
-    [tasks, today],
-  );
+  const sessionTasks = useMemo(() => {
+    const sorted = tasks.filter((t) => t.date === today && !t.parent_id).sort((a, b) => (a.status === b.status ? a.priority - b.priority : a.status === 'done' ? 1 : -1));
+    const first = sorted.slice(0, 12);
+    const requested = initialTaskId ? tasks.find(t => t.id === initialTaskId && !t.parent_id) : undefined;
+    if (requested && !first.some(t => t.id === requested.id)) return [...first.slice(0, 11), requested];
+    return first;
+  }, [tasks, today, initialTaskId]);
   const doneCount = sessionTasks.filter((t) => t.status === 'done').length;
   const sessionPct = sessionTasks.length ? Math.round((doneCount / sessionTasks.length) * 100) : 0;
   const currentTask = selectedId ? sessionTasks.find((t) => t.id === selectedId) ?? null : null;

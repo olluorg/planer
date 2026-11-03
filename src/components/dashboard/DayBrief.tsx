@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { computeInsights } from '@/lib/insights';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode, ACCENTS } from '@/lib/theme';
 import { isoDate } from '@/lib/utils';
 import { ECharts } from '@/components/charts/ECharts';
 import { Sparkles, ArrowRight, TriangleAlert, TrendingUp, Info } from 'lucide-react';
@@ -27,9 +27,13 @@ function hourlyLoad(tasks: { start_time: string | null; time_block: string | nul
 
 export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
   const nav = useNavigate();
-  const { theme } = useTheme();
+  const { theme, accent: accentId } = useTheme();
   const { tasks, habits, habitLogs, reflections, timeEntries, goals, progress } = useStore();
-  const accent = theme === 'dark' ? '#818cf8' : '#6366f1';
+  const isWorkspace = theme === 'work' || theme === 'work-light';
+  const palette = ACCENTS.find(a => a.id === accentId);
+  const accent = isWorkspace ? (theme === 'work' && accentId === 'forest' ? '#b5cbbb' : palette?.color ?? '#405e4a') : isDarkMode(theme) ? '#818cf8' : '#6366f1';
+  const chartFill = isWorkspace ? `${accent}26` : isDarkMode(theme) ? 'rgba(129,140,248,0.25)' : 'rgba(99,102,241,0.14)';
+  const chartClear = isWorkspace ? `${accent}00` : 'rgba(99,102,241,0)';
 
   const insights = useMemo(
     () => computeInsights({ today: date, tasks, habits, habitLogs, reflections, timeEntries, goals, progress }).slice(0, 3),
@@ -40,10 +44,9 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
 
   const headline = useMemo(() => {
     const dt = tasks.filter((t) => t.date === todayIso && !t.parent_id);
-    const ratio = dt.length ? dt.filter((t) => t.status === 'done').length / dt.length : 0;
-    if (ratio >= 0.7) return 'Отличный темп — день под контролем.';
-    if (ratio >= 0.3) return 'Хороший день, продолжай по плану.';
-    return 'Высокий шанс выиграть день. Начни с главного.';
+    if (!dt.length) return 'На сегодня задач пока нет.';
+    const done = dt.filter((t) => t.status === 'done').length;
+    return `Задач на сегодня: ${dt.length}. Выполнено: ${done}.`;
   }, [tasks, todayIso]);
 
   // Накопительный план дня: сколько задач в плане к каждому часу — кривая всегда растёт
@@ -81,8 +84,8 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
         color: {
           type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: theme === 'dark' ? 'rgba(129,140,248,0.25)' : 'rgba(99,102,241,0.14)' },
-            { offset: 1, color: 'rgba(99,102,241,0)' },
+            { offset: 0, color: chartFill },
+            { offset: 1, color: chartClear },
           ],
         },
       },
@@ -145,7 +148,7 @@ export const DayBrief: React.FC<{ date: Date }> = ({ date }) => {
       {/* Футер */}
       <button
         onClick={() => nav('/analytics')}
-        className="mt-3 shrink-0 flex items-center gap-1.5 text-sm font-medium text-accent hover:gap-2.5 transition-all duration-base self-start"
+        className="mt-3 shrink-0 flex items-center gap-1.5 text-sm font-medium text-accent hover:opacity-80 transition-opacity duration-base self-start"
       >
         Полный анализ <ArrowRight className="h-4 w-4" />
       </button>

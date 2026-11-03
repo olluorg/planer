@@ -30,6 +30,9 @@ export interface Task {
   parent_id: string | null;
   title: string;
   notes: string | null;
+  place_name?: string | null;
+  place_lat?: number | null;
+  place_lon?: number | null;
   date: string;
   time_block: TimeBlock;
   priority: number;

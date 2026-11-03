@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import { isoDate, dayLabel } from '@/lib/utils';
 import { addDays, startOfWeek } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@/lib/theme';
 import { Button } from '@/components/ui/button';
 import { Check, Droplet, Dumbbell, BookOpen, Brain, Moon, Sparkles, ChevronDown } from 'lucide-react';
 
@@ -23,6 +24,7 @@ const LIMIT = 8;
 
 export const HabitDots: React.FC<{ date: Date }> = ({ date }) => {
   const { habits, habitLogs, toggleHabitLog } = useStore();
+  const { theme } = useTheme();
   const nav = useNavigate();
   const [showAll, setShowAll] = useState(false);
   const ws = useMemo(() => startOfWeek(date, { weekStartsOn: 1 }), [date]);
@@ -40,13 +42,13 @@ export const HabitDots: React.FC<{ date: Date }> = ({ date }) => {
       <div className="space-y-2.5">
         {habits.length === 0 && <div className="text-xs text-text-muted">Нет привычек</div>}
         {shown.map((h, i) => {
-          const color = h.color ?? COLORS[i % COLORS.length];
+          const color = h.color ?? (theme === 'work' || theme === 'work-light' ? 'var(--accent)' : COLORS[i % COLORS.length]);
           const Icon = habitIcon(h.title);
           const marks = weekDates.map((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d));
           const done = marks.filter(Boolean).length;
           return (
             <div key={h.id} className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}1f` }}>
+              <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: color.startsWith('var(') ? `color-mix(in srgb, ${color} 12%, transparent)` : `${color}1f` }}>
                 <Icon className="h-3.5 w-3.5" style={{ color }} />
               </div>
               <div className="flex-1 min-w-0 text-sm text-text truncate">{h.title}</div>
@@ -72,8 +74,8 @@ export const HabitDots: React.FC<{ date: Date }> = ({ date }) => {
                   );
                 })}
               </div>
-              <div className="text-[11px] font-medium tabular-nums w-7 text-right shrink-0" style={{ color: done >= 5 ? color : 'var(--text-muted)' }}>
-                {done}/7
+              <div className="text-[11px] font-medium tabular-nums w-7 text-right shrink-0" style={{ color: done >= h.target_per_week ? color : 'var(--text-muted)' }} title={`Выполнено за неделю: ${done}, цель: ${h.target_per_week}`}>
+                {done}/{h.target_per_week}
               </div>
             </div>
           );

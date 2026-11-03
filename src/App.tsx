@@ -27,6 +27,8 @@ import { MiniPlayer } from './components/MiniPlayer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { lazyNamed, MountOnce } from './components/lazy';
 import { FEATURE_PLUS } from './lib/features';
+import { CROSS_TAB_MERGED_EVENT, DbTooNewError } from './lib/db';
+import { StorageWarning } from './components/StorageWarning';
 
 // Окна, которые открываются по требованию, грузятся при первом открытии —
 // вместе ~2100 строк кода, которые раньше шли до первой отрисовки у всех.
@@ -46,6 +48,7 @@ const AnalyticsPage = lazy(() => import('./pages/Analytics').then((m) => ({ defa
 const ReflectionPage = lazy(() => import('./pages/Reflection').then((m) => ({ default: m.ReflectionPage })));
 const HistoryPage = lazy(() => import('./pages/History').then((m) => ({ default: m.HistoryPage })));
 const SettingsPage = lazy(() => import('./pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const ProfilePage = lazy(() => import('./pages/Profile').then((m) => ({ default: m.ProfilePage })));
 const AwardsPage = lazy(() => import('./pages/Awards').then((m) => ({ default: m.AwardsPage })));
 const TemplatesPage = lazy(() => import('./pages/Templates').then((m) => ({ default: m.TemplatesPage })));
 const CalendarPage = lazy(() => import('./pages/Calendar').then((m) => ({ default: m.CalendarPage })));
@@ -85,6 +88,11 @@ export default function App() {
   const [programId, setProgramId] = useState<string | null>(null);
   const [hubId, setHubId] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
+  useEffect(() => {
+    const refresh = () => useStore.getState().reload();
+    window.addEventListener(CROSS_TAB_MERGED_EVENT, refresh);
+    return () => window.removeEventListener(CROSS_TAB_MERGED_EVENT, refresh);
+  }, []);
   useEffect(() => { if (ready && !isOnboardingDone()) setOnboardOpen(true); }, [ready]);
   // Фокус-сессия ещё идёт (перезагрузили страницу / открыли в новой вкладке) — продолжаем с того же места
   useEffect(() => { if (ready && focusShouldResume()) setFocusOpen(true); }, [ready]);
@@ -117,7 +125,7 @@ export default function App() {
       } catch {}
       void init();
     })();
-    applyAccent(getAccent());
+    applyAccent(getAccent(), false);
     // Предустановленные виджеты-плагины (например, «Правильное питание на месяц»)
     void import('./lib/plugins').then((m) => m.ensureDefaultPlugins());
   }, [init]);
@@ -300,7 +308,9 @@ export default function App() {
           <div className="text-2xl font-semibold">Не удалось открыть базу данных</div>
           <div className="text-sm text-text-muted">{initError.message}</div>
           <div className="text-sm text-text-muted">
-            Данные не пострадали. Обновите приложение до последней версии — после этого база откроется.
+            {initError instanceof DbTooNewError
+              ? 'Обновите приложение до версии, которая поддерживает эту базу, и попробуйте снова.'
+              : 'Проверьте доступность хранилища устройства и повторите запуск. Не удаляйте данные приложения, пока не убедитесь, что у вас есть копия.'}
           </div>
           <button
             className="px-4 py-2 rounded-xl bg-accent text-white"
@@ -352,6 +362,7 @@ export default function App() {
     <div className="h-full flex bg-bg">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
+        <StorageWarning />
         <Topbar
           onAdd={() => setQuickTab('task')}
           onFocusMode={() => setFocusOpen(true)}
@@ -368,7 +379,7 @@ export default function App() {
             <Suspense fallback={<Loader />}>
               <Routes location={location}>
                 <Route path="/index.html" element={<Navigate to="/" replace />} />
-                <Route path="/" element={<Dashboard date={date} onStartFocus={() => setFocusOpen(true)} />} />
+                <Route path="/" element={<Dashboard date={date} onStartFocus={(taskId) => {setFocusTaskId(taskId); setFocusOpen(true);}} />} />
                 <Route path="/dashboard-bento" element={<Navigate to="/" replace />} />
                 <Route path="/goals" element={<GoalsPage />} />
                 <Route path="/tasks" element={<TasksPage date={date} />} />
@@ -382,6 +393,7 @@ export default function App() {
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/health" element={<HealthPage date={date} />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
               </Routes>
             </Suspense>
             </ErrorBoundary>

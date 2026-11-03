@@ -3,7 +3,7 @@ import {
   Sun, Moon, CalendarDays, CalendarClock, ListTodo, Repeat, BarChart3, PieChart,
   Target, NotebookPen, Bell, Sparkles, Crosshair, Trophy, Flag, Mail, Plus,
   Gauge, HeartPulse, Dumbbell, Smile, PenLine, Rocket, Newspaper, CircleDot,
-  Grid3x3, LayoutGrid, Flame, Activity, Volume2, Bot,
+  Grid3x3, LayoutGrid, Flame, Activity, Volume2, Bot, MapPin,
 } from 'lucide-react';
 
 /** Категории виджетов — фильтр в окне добавления («Все, Спорт, …»). */
@@ -41,6 +41,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   { id: 'today-plan',    label: 'План на сегодня',      description: 'Список задач дня с чекбоксами', category: 'plan', icon: ListTodo, w: 4, h: 6, minW: 3, minH: 4 },
   { id: 'upcoming',      label: 'Ближайшие события',    description: 'Что запланировано на ближайшие дни', category: 'plan', icon: CalendarClock, w: 4, h: 6, minW: 3, minH: 4 },
   { id: 'calendar',      label: 'Календарь',            description: 'Компактный календарь месяца', category: 'plan', icon: CalendarDays, w: 4, h: 7, minW: 3, minH: 6 },
+  { id: 'places',        label: 'Места задач',           description: 'Список мест и карта активных задач', category: 'plan', icon: MapPin, w: 6, h: 10, minW: 4, minH: 6 },
   { id: 'focus',         label: 'Топ-3 задачи',         description: 'Три главные задачи дня с подзадачами', category: 'plan', icon: Target, w: 6, h: 4, minW: 4, minH: 4 },
   { id: 'block-morning', label: 'Тайм-блок · Утро',     description: 'Задачи 06:00–12:00', category: 'plan', icon: Sun, w: 3, h: 7, minW: 2, minH: 5 },
   { id: 'block-day',     label: 'Тайм-блок · День',     description: 'Задачи 12:00–16:00', category: 'plan', icon: Sun, w: 3, h: 7, minW: 2, minH: 5 },

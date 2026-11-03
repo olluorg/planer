@@ -9,16 +9,39 @@ vi.mock('sql.js/dist/sql-wasm.wasm?url', () => ({ default: '' }));
 // оборачиваем set на уровне модуля.
 vi.mock('idb-keyval', async (orig) => {
   const m = (await orig()) as typeof import('idb-keyval');
-  return { ...m, set: (k: IDBValidKey, v: unknown) => { (globalThis as { __sets?: IDBValidKey[] }).__sets?.push(k); return m.set(k, v); } };
+  return { ...m, update: (k: IDBValidKey, updater: (old: unknown) => unknown) => {
+    const state = globalThis as { __sets?: IDBValidKey[]; __holdSet?: (key: IDBValidKey) => Promise<void> | undefined; __afterUpdate?: (key: IDBValidKey) => Promise<void> | undefined };
+    state.__sets?.push(k);
+    const hold = state.__holdSet?.(k);
+    const result = hold ? hold.then(() => m.update(k, updater)) : m.update(k, updater);
+    return result.then(() => state.__afterUpdate?.(k));
+  }, set: (k: IDBValidKey, v: unknown) => {
+    const state = globalThis as { __sets?: IDBValidKey[]; __failBackupSet?: boolean; __holdSet?: (key: IDBValidKey) => Promise<void> | undefined };
+    state.__sets?.push(k);
+    if (state.__failBackupSet && typeof k === 'string' && k.startsWith('thedad.backup.')) return Promise.reject(new Error('storage full'));
+    const hold = state.__holdSet?.(k);
+    if (hold) return hold.then(() => m.set(k, v));
+    return m.set(k, v);
+  } };
 });
 
 let env: Awaited<ReturnType<typeof freshEnv>>;
-beforeEach(async () => { env = await freshEnv(); });
+beforeEach(async () => { (globalThis as { __failBackupSet?: boolean; __holdSet?: unknown; __afterUpdate?: unknown }).__failBackupSet = false; (globalThis as { __holdSet?: unknown }).__holdSet = undefined; (globalThis as { __afterUpdate?: unknown }).__afterUpdate = undefined; env = await freshEnv(); });
 
 /** user_version — 4 байта big-endian по смещению 60 в заголовке файла SQLite. */
 const userVersionOf = (b: Uint8Array) => (b[60] << 24) | (b[61] << 16) | (b[62] << 8) | b[63];
 
 describe('база данных', () => {
+  it('сохраняет место при обновлении задачи из базы старой схемы', async () => {
+    const db = await env.db();
+    const active = await db.getDB();
+    db.exec("INSERT INTO tasks (id, title, date, status, created_at, updated_at, place_name, place_lat, place_lon) VALUES ('t1', 'Старая', '2026-10-27', 'active', 'x', '2026-10-27T10:00:00.000Z', 'Библиотека', 55.75, 37.62)");
+    const SQL = await (await import('sql.js')).default();
+    const remote = new SQL.Database(active.export());
+    remote.exec("ALTER TABLE tasks DROP COLUMN place_name; ALTER TABLE tasks DROP COLUMN place_lat; ALTER TABLE tasks DROP COLUMN place_lon; PRAGMA user_version = 2; UPDATE tasks SET title = 'Изменена на старом устройстве', updated_at = '2026-10-27T12:00:00.000Z' WHERE id = 't1'");
+    await db.mergeIncoming(remote.export()); remote.close();
+    expect(db.query("SELECT title, place_name, place_lat, place_lon FROM tasks WHERE id = 't1'")[0]).toEqual({title:'Изменена на старом устройстве', place_name:'Библиотека', place_lat:55.75, place_lon:37.62});
+  });
   it('новая база получает схему и текущую версию', async () => {
     const db = await env.db();
     await db.getDB();
@@ -55,6 +78,222 @@ describe('база данных', () => {
     expect(after).toEqual(before); // ни байта не изменено
   });
 
+  it('не заменяет работающую базу файлом будущей версии или повреждённым файлом с правильным заголовком', async () => {
+    let db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('keep', 'Сохранить', 'x', 'x')");
+    await db.persist();
+    const { get } = await env.idb();
+    const before = await get(db.DB_KEY);
+    const SQL = await (await import('sql.js')).default();
+    const future = new SQL.Database(current.export());
+    future.exec(`PRAGMA user_version = ${db.SCHEMA_VERSION + 1}`);
+    await expect(db.replaceDatabase(future.export(), 'pre-import')).rejects.toBeInstanceOf(db.DbTooNewError);
+    future.close();
+    const invalid = new Uint8Array(100);
+    invalid.set(new TextEncoder().encode('SQLite format 3\0'));
+    await expect(db.replaceDatabase(invalid, 'pre-import')).rejects.toThrow();
+    expect(await get(db.DB_KEY)).toEqual(before);
+    expect(db.query<{ title: string }>("SELECT title FROM goals WHERE id = 'keep'")[0].title).toBe('Сохранить');
+    await db.persist();
+    vi.resetModules();
+    db = await import('../db');
+    await db.getDB();
+    expect(db.query<{ title: string }>("SELECT title FROM goals WHERE id = 'keep'")[0].title).toBe('Сохранить');
+  });
+
+  it('отменяет замену, если снимок текущей базы сохранить не удалось', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('keep', 'Сохранить', 'x', 'x')");
+    await db.persist();
+    const candidate = current.export();
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = true;
+    await expect(db.replaceDatabase(candidate, 'pre-import')).rejects.toThrow('операция отменена');
+    expect(db.query("SELECT id FROM goals WHERE id = 'keep'")).toHaveLength(1);
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = false;
+  });
+
+  it('сброс создаёт снимок и не возвращает устаревшую базу при повторном открытии', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('old', 'Сохранить в снимке', 'x', 'x')");
+    await db.persist();
+    const { set } = await env.idb();
+    await set('reform.sqlite.v1', current.export());
+    await db.resetDB();
+    expect(db.query('SELECT id FROM goals')).toHaveLength(0);
+    expect((await db.listBackups()).map(item => item.reason)).toContain('pre-reset');
+    vi.resetModules();
+    const reopened = await import('../db');
+    await reopened.getDB();
+    expect(reopened.query('SELECT id FROM goals')).toHaveLength(0);
+  });
+
+  it('не сбрасывает базу, если снимок перед сбросом не записан', async () => {
+    const db = await env.db();
+    await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('keep', 'Останется', 'x', 'x')");
+    await db.persist();
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = true;
+    await expect(db.resetDB()).rejects.toThrow('операция отменена');
+    expect(db.query('SELECT id FROM goals')).toEqual([{ id: 'keep' }]);
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = false;
+  });
+
+  it('не объединяет конфликтующие вкладки без резервного снимка', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('shared', 'Общая', 'x', 'x')");
+    await db.persist();
+    const SQL = await (await import('sql.js')).default();
+    const other = new SQL.Database(current.export());
+    other.exec("UPDATE goals SET title = 'Изменена в другой вкладке' WHERE id = 'shared'");
+    other.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('remote', 'Другая вкладка', 'x', 'x')");
+    const { set, get } = await env.idb();
+    const otherBytes = other.export();
+    other.close();
+    await set(db.DB_KEY, otherBytes);
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('local', 'Эта вкладка', 'x', 'x')");
+    await expect(db.persist()).rejects.toThrow('другой вкладке');
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = true;
+    await expect(db.mergeTabConflict()).rejects.toThrow('снимок перед объединением');
+    expect(await get(db.DB_KEY)).toEqual(otherBytes);
+    expect(db.query("SELECT id FROM goals WHERE id = 'local'")).toHaveLength(1);
+    expect(db.hasCrossTabConflict()).toBe(true);
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = false;
+  });
+
+  it('сохраняет правку, сделанную после записи объединения, но до его завершения', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('shared', 'Общая', 'x', 'x')");
+    await db.persist();
+    const SQL = await (await import('sql.js')).default();
+    const other = new SQL.Database(current.export());
+    other.exec("UPDATE goals SET title = 'Изменена в другой вкладке' WHERE id = 'shared'");
+    other.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('remote', 'Другая вкладка', 'x', 'x')");
+    const { set } = await env.idb();
+    await set(db.DB_KEY, other.export());
+    other.close();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('local', 'Эта вкладка', 'x', 'x')");
+    await expect(db.persist()).rejects.toThrow('другой вкладке');
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let held = false;
+    (globalThis as { __afterUpdate?: (key: IDBValidKey) => Promise<void> | undefined }).__afterUpdate = (key) => {
+      if (!held && key === db.DB_KEY) { held = true; started(); return paused; }
+    };
+    const merging = db.mergeTabConflict();
+    await entered;
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('during', 'Во время объединения', 'x', 'x')");
+    release();
+    await merging;
+    await db.persist();
+    vi.resetModules();
+    const reopened = await import('../db');
+    await reopened.getDB();
+    expect(reopened.query('SELECT id FROM goals ORDER BY id')).toEqual([{ id: 'during' }, { id: 'local' }, { id: 'remote' }, { id: 'shared' }]);
+  });
+
+  it.each(['backup', 'database'])('не теряет правку во время замены базы: задержка %s', async (stage) => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('old', 'До импорта', 'x', 'x')");
+    await db.persist();
+    const candidate = current.export();
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let held = false;
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => {
+      if (!held && typeof key === 'string' && (stage === 'backup' ? key.includes('.pre-import') : key === db.DB_KEY)) {
+        held = true; started(); return paused;
+      }
+    };
+    const replacing = db.replaceDatabase(candidate, 'pre-import');
+    await entered;
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('new', 'Во время импорта', 'x', 'x')");
+    const queuedSave = db.persist();
+    release();
+    await expect(replacing).rejects.toThrow('Данные изменились во время восстановления');
+    await queuedSave;
+    expect(db.query("SELECT id FROM goals WHERE id = 'new'")).toHaveLength(1);
+    vi.resetModules();
+    const reopened = await import('../db');
+    await reopened.getDB();
+    expect(reopened.query("SELECT id FROM goals WHERE id = 'new'")).toHaveLength(1);
+  });
+
+  it('ожидающее сохранение не перезаписывает восстановленную базу старой', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('old', 'Старая', 'x', 'x')");
+    await db.persist();
+    const SQL = await (await import('sql.js')).default();
+    const incoming = new SQL.Database(current.export());
+    incoming.exec("DELETE FROM goals WHERE id = 'old'; INSERT INTO goals (id, title, created_at, updated_at) VALUES ('restored', 'Копия', 'x', 'x')");
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => {
+      if (typeof key === 'string' && key.includes('.pre-import')) { started(); return paused; }
+    };
+    const replacing = db.replaceDatabase(incoming.export(), 'pre-import');
+    incoming.close();
+    await entered;
+    const queuedSave = db.persist();
+    release();
+    await replacing;
+    await queuedSave;
+    vi.resetModules();
+    const reopened = await import('../db');
+    await reopened.getDB();
+    expect(reopened.query('SELECT id FROM goals')).toEqual([{ id: 'restored' }]);
+  });
+
+  it('дожидается ранее начатой записи перед заменой базы', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    const SQL = await (await import('sql.js')).default();
+    const incoming = new SQL.Database(current.export());
+    incoming.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('restored', 'Копия', 'x', 'x')");
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let held = false;
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => {
+      if (!held && key === db.DB_KEY) { held = true; started(); return paused; }
+    };
+    const priorSave = db.persist();
+    await entered;
+    const replacing = db.replaceDatabase(incoming.export(), 'pre-import');
+    incoming.close();
+    release();
+    await priorSave;
+    await replacing;
+    vi.resetModules();
+    const reopened = await import('../db');
+    await reopened.getDB();
+    expect(reopened.query('SELECT id FROM goals')).toEqual([{ id: 'restored' }]);
+  });
+
+  it('повторяет автоматическое резервное копирование после ошибки записи', async () => {
+    const db = await env.db();
+    await db.getDB();
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = true;
+    await db.autoBackup();
+    expect(localStorage.getItem('thedad.backup.last')).toBeNull();
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = false;
+    await db.autoBackup();
+    expect((await db.listBackups()).map(b => b.reason)).toContain('daily');
+  });
+
   it('старая база без версии мигрирует, а до миграции снимается бэкап', async () => {
     // Имитируем базу «до версионирования»: user_version 0, нет поздних колонок.
     const initSqlJs = (await import('sql.js')).default as unknown as (c?: object) => Promise<{ Database: new () => { exec(s: string): void; export(): Uint8Array } }>;
@@ -74,6 +313,36 @@ describe('база данных', () => {
     expect(row.recurrence).toBeNull();
     const backups = await db.listBackups();
     expect(backups.map((b) => b.reason)).toContain('pre-migrate-0');
+  });
+
+  it('не изменяет старую базу, если защитный снимок перед миграцией не записался', async () => {
+    const SQL = await (await import('sql.js')).default();
+    const legacy = new SQL.Database();
+    legacy.exec("CREATE TABLE tasks (id TEXT PRIMARY KEY, goal_id TEXT, title TEXT NOT NULL, notes TEXT, date TEXT NOT NULL, time_block TEXT, priority INTEGER DEFAULT 2, status TEXT NOT NULL DEFAULT 'active', completed_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); INSERT INTO tasks (id, title, date, status, created_at, updated_at) VALUES ('t1', 'Сохранить', '2026-01-01', 'active', 'x', 'x')");
+    const original = legacy.export();
+    legacy.close();
+    const { set, get } = await env.idb();
+    const db = await env.db();
+    await set(db.DB_KEY, original);
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = true;
+    await expect(db.getDB()).rejects.toThrow('Не удалось сохранить копию базы перед обновлением');
+    expect(await get(db.DB_KEY)).toEqual(original);
+    (globalThis as { __failBackupSet?: boolean }).__failBackupSet = false;
+    await db.getDB();
+    expect(db.query<{title:string}>("SELECT title FROM tasks WHERE id='t1'")[0].title).toBe('Сохранить');
+  });
+
+  it('мигрирует импорт старой базы до замены действующей', async () => {
+    const db = await env.db();
+    await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('old', 'До импорта', 'x', 'x')");
+    const SQL = await (await import('sql.js')).default();
+    const legacy = new SQL.Database();
+    legacy.exec("CREATE TABLE tasks (id TEXT PRIMARY KEY, goal_id TEXT, title TEXT NOT NULL, notes TEXT, date TEXT NOT NULL, time_block TEXT, priority INTEGER DEFAULT 2, status TEXT NOT NULL DEFAULT 'active', completed_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); INSERT INTO tasks (id, title, date, status, created_at, updated_at) VALUES ('t1', 'Импортирована', '2026-01-01', 'done', 'x', 'x')");
+    await db.replaceDatabase(legacy.export(), 'pre-import');
+    legacy.close();
+    expect(db.query<{title:string; stage:string}>("SELECT title, stage FROM tasks WHERE id='t1'")[0]).toEqual({title:'Импортирована',stage:'done'});
+    expect((await db.listBackups()).map(b => b.reason)).toContain('pre-import');
   });
 
   it('кольцо бэкапов держит три последних', async () => {

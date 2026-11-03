@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, Youtube, Flame, Utensils, CheckCircle2 } from 'lucide-react';
 import { renderTemplate, type PluginWidgetDef, type PluginRow } from '@/lib/plugins';
 import { parseYouTubeId } from '@/components/LiveWallpaper';
-import { isEaten, toggleEaten, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
+import { isEaten, toggleEaten, readCalories, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
+import { nutritionAction } from '@/lib/nutritionAction';
 import { isoDate } from '@/lib/utils';
 
 /** Локальные пути (внешние URL отсекаются). */
@@ -47,7 +48,7 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
   const title = row.label;
   const meal = r.badge ? renderTemplate(r.badge, row.raw) : '';
   const kind = typeof row.raw.kind === 'string' ? row.raw.kind : '';
-  const kcal = Number(row.raw.kcal) || 0;
+  const kcal = readCalories(row.raw.kcal);
   const desc = r.text ? renderTemplate(r.text, row.raw) : '';
   const { steps, nutrition } = parseSteps(r.detail ? renderTemplate(r.detail, row.raw) : '');
 
@@ -137,7 +138,7 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
 
               {/* Ккал + БЖУ */}
               <div className="flex flex-wrap gap-2 mt-4">
-                {kcal > 0 && (
+                {kcal !== undefined && (
                   <div className="rounded-xl border border-border-soft px-3 py-2 flex items-center gap-2">
                     <Flame className="h-4 w-4 text-accent" />
                     <span className="text-sm font-semibold tabular-nums">{kcal}</span>
@@ -151,6 +152,7 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
                   </div>
                 ))}
               </div>
+              {kcal === undefined && <p className="text-xs text-text-muted mt-2">Калорийность не указана.</p>}
 
               {/* Шаги */}
               {steps.length > 0 && (
@@ -171,7 +173,7 @@ export const RecipeModal: React.FC<{ def: PluginWidgetDef; row: PluginRow | null
               {/* Отметка «съел» */}
               {trackable && (
                 <button
-                  onClick={() => toggleEaten(today, { key: eatKey, title, kcal, meal, ...readMacros(row.raw) })}
+                  onClick={() => nutritionAction(() => toggleEaten(today, { key: eatKey, title, kcal, meal, ...readMacros(row.raw) }))}
                   className={`mt-6 w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
                     eaten ? 'bg-accent/12 text-accent' : 'bg-accent text-white hover:opacity-90'
                   }`}

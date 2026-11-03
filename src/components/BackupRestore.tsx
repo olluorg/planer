@@ -9,6 +9,8 @@ const REASON_LABEL: Record<string, string> = {
   daily: 'Автоматически, раз в сутки',
   'pre-import': 'Перед импортом файла',
   'pre-restore': 'Перед восстановлением',
+  'pre-reset': 'Перед сбросом',
+  'pre-tab-merge': 'Перед объединением вкладок',
   manual: 'Вручную',
 };
 
@@ -29,12 +31,15 @@ export function BackupRestore() {
   }, []);
 
   const makeNow = async () => {
-    await persist();
-    const data = await get<Uint8Array>(DB_KEY);
-    if (!data) return;
-    await saveBackup(data, 'manual');
-    await refresh();
-    toast.success('Снимок создан', 'Хранится локально, в браузере');
+    try {
+      await persist();
+      const data = await get<Uint8Array>(DB_KEY);
+      if (!data || !await saveBackup(data, 'manual')) throw new Error('Не удалось записать снимок');
+      await refresh();
+      toast.success('Снимок создан', 'Хранится локально, в браузере');
+    } catch (e) {
+      toast.error('Не удалось создать снимок', String((e as Error)?.message ?? e));
+    }
   };
 
   const restore = async (b: BackupEntry) => {

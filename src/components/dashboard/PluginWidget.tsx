@@ -6,11 +6,12 @@ import {
 } from 'lucide-react';
 import { MealPlanner } from '@/components/MealPlanner';
 import { RecipeModal } from '@/components/dashboard/RecipeModal';
-import { isEaten, toggleEaten, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
+import { isEaten, toggleEaten, readCalories, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
+import { nutritionAction } from '@/lib/nutritionAction';
 import { toast } from '@/lib/toast';
 import { isoDate } from '@/lib/utils';
 import { useStore } from '@/lib/store';
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 import { getChartColors } from '@/lib/chart-theme';
 import { Ring } from '@/components/ui/ring';
 import { ECharts } from '@/components/charts/ECharts';
@@ -58,7 +59,7 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
   const text = r.text ? renderTemplate(r.text, row.raw) : '';
   const detail = r.detail ? renderTemplate(r.detail, row.raw) : '';
   const kind = typeof row.raw.kind === 'string' ? row.raw.kind : '';
-  const kcal = Number(row.raw.kcal) || 0;
+  const kcal = readCalories(row.raw.kcal);
   const imgRaw = r.image ? row.raw[r.image] : null;
   const img = typeof imgRaw === 'string' && imgRaw.startsWith('/') && !imgRaw.startsWith('//') ? imgRaw : null;
   // Есть что показывать в развороте (рецепт/описание) — карточка кликабельна
@@ -78,8 +79,8 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
 
   const onToggleEaten = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleEaten(today, { key: eatKey, title, kcal, meal: badge, ...readMacros(row.raw) });
-    if (!eaten) toast.success(`Учтено: ${title}`, kcal ? `+${kcal} ккал` : undefined);
+    const saved = nutritionAction(() => toggleEaten(today, { key: eatKey, title, kcal, meal: badge, ...readMacros(row.raw) }));
+    if (saved && !eaten) toast.success(`Учтено: ${title}`, kcal ? `+${kcal} ккал` : undefined);
   };
 
   return (
@@ -99,7 +100,7 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
           {badge && (
             <span className="absolute top-1.5 left-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white">{badge}{kind && kind !== 'Основное' ? ` · ${kind}` : ''}</span>
           )}
-          {kcal > 0 && (
+          {kcal !== undefined && (
             <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-0.5 text-[10px] font-semibold text-white tabular-nums">{kcal} ккал</span>
           )}
         </div>
@@ -132,7 +133,7 @@ const ContentCard: React.FC<{ def: PluginWidgetDef; row: PluginRow }> = ({ def, 
 export const PluginWidget: React.FC<{ def: PluginWidgetDef }> = ({ def }) => {
   const { goals, tasks, habits, habitLogs, healthLogs, progress, reflections, timeEntries } = useStore();
   const { theme } = useTheme();
-  const cc = getChartColors(theme === 'dark' || theme === 'glass');
+  const cc = getChartColors(isDarkMode(theme));
 
   const rows = useMemo(() => {
     const snapshot = {

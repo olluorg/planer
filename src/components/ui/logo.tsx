@@ -4,7 +4,7 @@ import { useTheme } from '@/lib/theme';
 export const Logo: React.FC<{ size?: number; className?: string }> = ({ size = 40, className }) => {
   const { theme } = useTheme();
   // Тёмный орб (logo-light.png) — для светлых фонов: обычная светлая И стеклянная светлая.
-  const src = theme === 'light' || theme === 'glass-light' ? '/logo-light.png' : '/logo-dark.png';
+  const src = theme === 'light' || theme === 'glass-light' || theme === 'work-light' ? '/logo-light.png' : '/logo-dark.png';
   return (
     <img
       src={src}

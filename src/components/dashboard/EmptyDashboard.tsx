@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckSquare, Target, Repeat, Calendar, TrendingUp, NotebookPen, Sparkles, Bell, ArrowRight, Rocket } from 'lucide-react';
+import { CheckSquare, Target, Repeat, Calendar, TrendingUp, NotebookPen, Sparkles, Bell, ArrowRight, Rocket, Plus } from 'lucide-react';
 import { getUserName } from '@/lib/onboarding';
+import { useTheme } from '@/lib/theme';
 import { quoteOfDay } from '@/lib/quotes';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -51,6 +52,46 @@ const Illustration: React.FC<{ icon: React.ElementType; color: string }> = ({ ic
 export const EmptyDashboard: React.FC<{ date: Date }> = ({ date }) => {
   const nav = useNavigate();
   const quote = quoteOfDay(date);
+  const { theme } = useTheme();
+
+  const firstLook = localStorage.getItem('dashboard.first-look.v1') === '1';
+  if (theme === 'work' || theme === 'work-light' || (firstLook && (theme === 'glass' || theme === 'glass-light'))) {
+    return (
+      <main className="page py-6 sm:py-10 workspace-empty">
+        <div className="workspace-empty-header">
+          <div>
+            <p className="workspace-date">{format(date, 'EEEE, d MMMM', { locale: ru })}</p>
+            <h1>{greeting()}, {getUserName()}</h1>
+            <p className="workspace-intro">Здесь появятся ваши задачи, привычки и прогресс.</p>
+          </div>
+          <button type="button" onClick={() => nav('/tasks')} className="workspace-primary"><Plus size={17} /> Добавить задачу</button>
+        </div>
+
+        <div className="workspace-empty-grid">
+          <section className="workspace-today" aria-labelledby="workspace-today-title">
+            <div className="workspace-section-heading"><h2 id="workspace-today-title">Сегодня</h2><span>План дня</span></div>
+            <div className="workspace-today-content">
+              <Calendar className="workspace-outline-icon" size={24} strokeWidth={1.5} />
+              <h3>Пока ничего не запланировано</h3>
+              <p>Добавьте задачу или откройте календарь, чтобы выбрать время.</p>
+              <div className="workspace-actions">
+                <button type="button" onClick={() => nav('/tasks')}>Создать задачу <ArrowRight size={15} /></button>
+                <button type="button" onClick={() => nav('/calendar')}>Открыть календарь <ArrowRight size={15} /></button>
+              </div>
+            </div>
+          </section>
+          <section className="workspace-start" aria-labelledby="workspace-start-title">
+            <h2 id="workspace-start-title">Начните с важного</h2>
+            <p>Выберите то, что хотите отслеживать.</p>
+            <button type="button" onClick={() => nav('/goals')}><Target size={19} /><span><b>Цели</b><small>Измеряйте движение к результату</small></span><ArrowRight size={16} /></button>
+            <button type="button" onClick={() => nav('/habits')}><Repeat size={19} /><span><b>Привычки</b><small>Отмечайте регулярные действия</small></span><ArrowRight size={16} /></button>
+            <button type="button" onClick={() => nav('/health')}><TrendingUp size={19} /><span><b>Здоровье</b><small>Добавляйте показатели по желанию</small></span><ArrowRight size={16} /></button>
+          </section>
+        </div>
+        <p className="workspace-footer">Рабочий экран можно настроить, когда появятся первые записи.</p>
+      </main>
+    );
+  }
 
   return (
     <div className="page py-4 sm:py-6">

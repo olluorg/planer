@@ -66,6 +66,50 @@ describe('стор: цели, задачи, привычки', () => {
     expect(st().progress.filter((p) => p.goal_id === g.id)).toHaveLength(1);
   });
 
+  it('обновляет автоматический прогресс за день без дублей и не подменяет его старой датой', () => {
+    const g = st().addGoal({title:'Шаги', start_value:0, target_value:10000, health_metric:'steps'});
+    st().upsertHealthLog('2026-09-22', 'steps', 4000);
+    st().upsertHealthLog('2026-09-22', 'steps', 6000);
+    st().upsertHealthLog('2026-09-22', 'steps', 6000);
+    expect(st().progress.filter(p => p.goal_id === g.id)).toHaveLength(1);
+    expect(st().goals.find(x => x.id === g.id)!.current_value).toBe(6000);
+    st().upsertHealthLog('2026-09-21', 'steps', 1000);
+    expect(st().progress.filter(p => p.goal_id === g.id)).toHaveLength(2);
+    expect(st().goals.find(x => x.id === g.id)!.current_value).toBe(6000);
+    st().addProgress({goal_id:g.id,date:'2026-09-22',value:7000,note:'Ручная запись'});
+    st().upsertHealthLog('2026-09-22', 'steps', 8000);
+    expect(st().goals.find(x => x.id === g.id)!.current_value).toBe(7000);
+    expect(st().progress.filter(p => p.goal_id === g.id && p.note === 'Ручная запись')).toHaveLength(1);
+  });
+
+  it('связывает ранее внесённую метрику с новой целью при повторной записи', () => {
+    st().upsertHealthLog('2026-09-22', 'steps', 4000);
+    const goal = st().addGoal({title:'Шаги', start_value:0, target_value:10000, health_metric:'steps'});
+    st().upsertHealthLog('2026-09-22', 'steps', 4000);
+    expect(st().goals.find(x => x.id === goal.id)!.current_value).toBe(4000);
+    expect(st().progress.filter(p => p.goal_id === goal.id)).toHaveLength(1);
+  });
+
+  it('при удалении автозаписи возвращает цель к предыдущему прогрессу, сохраняя ручную историю', () => {
+    const g = st().addGoal({title:'Питание', start_value:0, target_value:2000, health_metric:'calories'});
+    st().addProgress({goal_id:g.id, date:'2026-09-21', value:1200, note:'Вручную'});
+    st().upsertHealthLog('2026-09-22', 'calories', 500);
+    const log = st().healthLogs.find(l => l.metric === 'calories')!;
+    st().removeHealthLog(log.id);
+    expect(st().goals.find(x => x.id === g.id)!.current_value).toBe(1200);
+    expect(st().progress.filter(p => p.goal_id === g.id).map(p => p.note)).toEqual(['Вручную']);
+  });
+
+  it('не отменяет более поздний ручной прогресс при удалении автозаписи', () => {
+    const g = st().addGoal({title:'Питание', start_value:0, target_value:2000, health_metric:'calories'});
+    st().upsertHealthLog('2026-09-22', 'calories', 500);
+    st().addProgress({goal_id:g.id, date:'2026-09-23', value:1500, note:'Вручную'});
+    const log = st().healthLogs.find(l => l.metric === 'calories')!;
+    st().removeHealthLog(log.id);
+    expect(st().goals.find(x => x.id === g.id)!.current_value).toBe(1500);
+    expect(st().progress.filter(p => p.goal_id === g.id).map(p => p.note)).toEqual(['Вручную']);
+  });
+
   it('отметка привычки переключается туда и обратно', () => {
     const h = st().addHabit({ title: 'Вода' });
     st().toggleHabitLog(h.id, '2026-09-22');

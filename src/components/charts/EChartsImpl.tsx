@@ -22,7 +22,7 @@ export interface EChartsProps {
   className?: string;
 }
 
-import { useTheme } from '@/lib/theme';
+import { useTheme, isDarkMode } from '@/lib/theme';
 
 const EChartsImpl: React.FC<EChartsProps> = ({ option, height = 240, className }) => {
   const { theme } = useTheme();
@@ -44,7 +44,7 @@ const EChartsImpl: React.FC<EChartsProps> = ({ option, height = 240, className }
       className={className}
       notMerge
       lazyUpdate
-      theme={theme === 'dark' ? 'dark' : undefined}
+      theme={isDarkMode(theme) ? 'dark' : undefined}
     />
   );
 };

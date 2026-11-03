@@ -1,0 +1,110 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
+
+test('changes in two open tabs are both preserved', async ({ context, page }) => {
+  await context.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  await expect(page.getByPlaceholder('Новая задача...')).toBeVisible();
+  const second = await context.newPage();
+  await second.goto('/tasks');
+  await expect(second.getByPlaceholder('Новая задача...')).toBeVisible();
+  const saved = async (text: string) => expect.poll(() => page.evaluate(async value => {
+    const request = indexedDB.open('keyval-store');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    const get = db.transaction('keyval').objectStore('keyval').get('thedad.sqlite.v1');
+    const bytes = await new Promise<Uint8Array>((resolve, reject) => { get.onsuccess = () => resolve(get.result); get.onerror = () => reject(get.error); });
+    db.close();
+    return new TextDecoder().decode(bytes).includes(value);
+  }, text)).toBe(true);
+  await page.getByPlaceholder('Новая задача...').fill('Первая вкладка');
+  await page.getByPlaceholder('Новая задача...').press('Enter');
+  await saved('Первая вкладка');
+  await second.getByPlaceholder('Новая задача...').fill('Вторая вкладка');
+  await second.getByPlaceholder('Новая задача...').press('Enter');
+  await saved('Вторая вкладка');
+  await expect(second.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  await expect(page.getByText('Вторая вкладка', {exact:true})).toBeVisible();
+});
+
+test('simultaneous independent task writes are merged', async ({context, page}) => {
+  await context.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  await expect(page.getByPlaceholder('Новая задача...')).toBeVisible();
+  const second = await context.newPage();
+  await second.goto('/tasks');
+  await expect(second.getByPlaceholder('Новая задача...')).toBeVisible();
+  await page.getByPlaceholder('Новая задача...').fill('Параллельно один');
+  await second.getByPlaceholder('Новая задача...').fill('Параллельно два');
+  await Promise.all([page.getByPlaceholder('Новая задача...').press('Enter'), second.getByPlaceholder('Новая задача...').press('Enter')]);
+  await expect.poll(() => page.evaluate(async () => {
+    const open = indexedDB.open('keyval-store');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+    const request = db.transaction('keyval').objectStore('keyval').get('thedad.sqlite.v1');
+    const bytes = await new Promise<Uint8Array>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    db.close();
+    const content = new TextDecoder().decode(bytes);
+    return content.includes('Параллельно один') && content.includes('Параллельно два');
+  })).toBe(true);
+  await page.reload();
+  await expect(page.getByText('Параллельно один', {exact:true})).toBeVisible();
+  await expect(page.getByText('Параллельно два', {exact:true})).toBeVisible();
+});
+
+test('stale tab cannot overwrite changes from another tab', async ({ context, page }) => {
+  await context.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/tasks');
+  await expect(page.getByPlaceholder('Новая задача...')).toBeVisible();
+  await page.getByPlaceholder('Новая задача...').fill('Первая вкладка');
+  await page.getByPlaceholder('Новая задача...').press('Enter');
+  await expect(page.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  const fingerprint = () => page.evaluate(async () => {
+    const open = indexedDB.open('keyval-store');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+    const request = db.transaction('keyval').objectStore('keyval').get('thedad.sqlite.v1');
+    const bytes = await new Promise<Uint8Array>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    db.close();
+    return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).join(',');
+  });
+  await expect.poll(() => page.evaluate(async () => {
+    const open = indexedDB.open('keyval-store');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+    const request = db.transaction('keyval').objectStore('keyval').get('thedad.sqlite.v1');
+    const bytes = await new Promise<Uint8Array>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    db.close();
+    return new TextDecoder().decode(bytes).includes('Первая вкладка');
+  })).toBe(true);
+  const second = await context.newPage();
+  await second.goto('/tasks');
+  await expect(second.getByPlaceholder('Новая задача...')).toBeVisible();
+  const before = await fingerprint();
+  await page.getByRole('checkbox', {name:'Первая вкладка'}).click();
+  await expect.poll(fingerprint).not.toBe(before);
+  await second.getByPlaceholder('Новая задача...').fill('Вторая вкладка');
+  await second.getByPlaceholder('Новая задача...').press('Enter');
+  const warning = second.getByRole('alert').filter({hasText:'Данные изменились в другой вкладке'});
+  await expect(warning).toBeVisible();
+  const downloading = second.waitForEvent('download');
+  await warning.getByRole('button', {name:'Скачать текущую базу'}).click();
+  const copy = await fs.readFile((await (await downloading).path())!);
+  expect(copy.includes(Buffer.from('Вторая вкладка'))).toBe(true);
+  await page.reload();
+  await expect(page.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  await expect(page.getByText('Вторая вкладка', {exact:true})).toHaveCount(0);
+  const cancelled = second.waitForEvent('dialog').then(dialog => dialog.dismiss());
+  await warning.getByRole('button', {name:'Объединить изменения'}).click();
+  await cancelled;
+  await expect(warning).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  await expect(page.getByText('Вторая вкладка', {exact:true})).toHaveCount(0);
+  second.once('dialog', dialog => void dialog.accept());
+  await warning.getByRole('button', {name:'Объединить изменения'}).click();
+  await expect(warning).toHaveCount(0);
+  await expect(second.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  await expect(second.getByText('Вторая вкладка', {exact:true})).toBeVisible();
+  await second.reload();
+  await expect(second.getByText('Первая вкладка', {exact:true})).toBeVisible();
+  await expect(second.getByText('Вторая вкладка', {exact:true})).toBeVisible();
+});

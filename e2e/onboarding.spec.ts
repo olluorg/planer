@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-test('знакомство: за три шага от нуля до цели с первой точкой', async ({ page }) => {
+test('знакомство: обзор планера и цель с первой точкой', async ({ page }) => {
   await page.goto('/');
   const dlg = page.getByRole('dialog', { name: 'Знакомство с THEDAD' });
   await expect(dlg).toBeVisible();
 
   await dlg.getByPlaceholder('Имя').fill('Аня');
   await dlg.getByRole('button', { name: 'Дальше' }).click();
+  await expect(dlg.getByText('Как устроен планер')).toBeVisible();
+  await dlg.getByRole('button', { name: 'Создать первую цель' }).click();
 
   // Нельзя создать «цель» без чисел.
   await expect(dlg.getByRole('button', { name: 'Создать цель' })).toBeDisabled();

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical, Search, Repeat, Pencil } from 'lucide-react';
+import { Trash2, Plus, ChevronRight, ChevronDown, CornerDownRight, Play, GripVertical, Search, Repeat, Pencil, MapPin } from 'lucide-react';
+import { TaskPlaceDialog } from '@/components/TaskPlaceDialog';
 import { PageContainer } from '@/components/ui/page-container';
 import { PriorityDot, PRIORITY_LEVELS, PRIORITY_LABEL, priorityColor } from '@/components/ui/priority-dot';
 import { useStore } from '@/lib/store';
@@ -41,6 +42,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
   const [filter, setFilter] = useState<'today' | 'all' | 'open' | 'done'>('today');
   const [tagFilter, setTagFilter] = useState<string>('__all');
   const [title, setTitle] = useState('');
+  const [placeTaskId, setPlaceTaskId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [goalId, setGoalId] = useState<string>('__none');
   const [block, setBlock] = useState<string>('day');
@@ -123,7 +125,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
     const dueLabel = task.date === today ? 'Сегодня' : task.date === tomorrowIso ? 'Завтра' : task.date.slice(5);
     return (
       <>
-        <div className="group flex items-center gap-3 px-3 py-2.5" style={{ paddingLeft: 12 + depth * 24 }}>
+        <div className="group flex flex-wrap sm:flex-nowrap items-center gap-3 px-3 py-2.5" style={{ paddingLeft: 12 + depth * 24 }}>
           {children.length > 0 ? (
             <button onClick={() => setCollapsed((c) => ({ ...c, [task.id]: !c[task.id] }))} className="text-text-muted shrink-0">
               {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -136,7 +138,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
           <Checkbox aria-label={task.title} checked={task.status === 'done'} onCheckedChange={() => toggleTask(task.id)} />
           {/* Кружок важности — клик открывает палитру (задача редактируется прямо здесь) */}
           <PriorityDot priority={task.priority} onChange={(p) => updateTask(task.id, { priority: p })} size={11} />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-[120px]">
             {editId === task.id ? (
               <Input
                 autoFocus
@@ -162,13 +164,15 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
                 {task.estimate_min && <span>~{task.estimate_min} мин</span>}
               </div>
             )}
+            {task.place_name && <div className="text-caption text-text-muted mt-0.5 flex items-center gap-1"><MapPin className="h-3 w-3" />{task.place_name}</div>}
           </div>
+          <Button variant="ghost" size="icon" aria-label={`Место задачи: ${task.title}`} title="Место задачи" onClick={() => setPlaceTaskId(task.id)}><MapPin className="h-4 w-4" /></Button>
           <div className="hidden sm:flex items-center gap-1.5 shrink-0">
             {goal && <Badge tone="accent">{goal.title}</Badge>}
             {tags.map((tg) => <Badge key={tg} tone="info">#{tg}</Badge>)}
           </div>
-          <div className="text-caption text-text-muted tabular-nums w-16 text-right shrink-0">{dueLabel}</div>
-          <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+          <div className="hidden sm:block text-caption text-text-muted tabular-nums w-16 text-right shrink-0">{dueLabel}</div>
+          <div className="flex items-center justify-end w-full sm:w-auto sm:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
             <Button variant="ghost" size="icon" title="Переименовать" onClick={() => startEdit(task)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -193,6 +197,7 @@ export const TasksPage: React.FC<{ date: Date }> = ({ date }) => {
 
   return (
     <PageContainer className="py-4 space-y-4">
+      {placeTaskId && tasks.find(t => t.id === placeTaskId) && <TaskPlaceDialog task={tasks.find(t => t.id === placeTaskId)!} onClose={() => setPlaceTaskId(null)} />}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-h1">Задачи</h1>
         <div className="flex flex-wrap gap-2 items-center">

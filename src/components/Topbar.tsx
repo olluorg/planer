@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Bell, Sun, Moon, Crosshair, Settings, Trophy, LayoutTemplate, History, ChevronDown, Download, Share } from 'lucide-react';
+import { Search, Plus, Bell, Sun, Moon, Crosshair, Settings, Trophy, LayoutTemplate, History, ChevronDown, Download, Share, UserRound } from 'lucide-react';
 import { Button } from './ui/button';
 import { useTheme, isDarkMode } from '@/lib/theme';
 import { Logo } from './ui/logo';
-import { getUserName } from '@/lib/onboarding';
+import { getUserName, PROFILE_CHANGED_EVENT } from '@/lib/onboarding';
+import { getProfilePhoto } from '@/lib/profileIdentity';
 import { GoogleIcon, openGoogleSearch } from './ui/google-icon';
 import { usePwaInstall, promptInstall } from '@/lib/pwa';
 import { toast } from '@/lib/toast';
@@ -33,8 +34,16 @@ const openPage = (page: string) => window.dispatchEvent(new CustomEvent('thedad:
 /** Меню-замена сайдбара: аватар → служебные страницы. */
 const AppMenu: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [, refreshProfile] = useState(0);
+  const nav = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
   const { canInstall, iosHint, standalone } = usePwaInstall();
+  useEffect(() => {
+    const refresh = () => refreshProfile(v => v + 1);
+    window.addEventListener(PROFILE_CHANGED_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {window.removeEventListener(PROFILE_CHANGED_EVENT, refresh); window.removeEventListener('storage', refresh);};
+  }, []);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -50,9 +59,11 @@ const AppMenu: React.FC = () => {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 rounded-lg pl-1 pr-1.5 h-9 hover:bg-bg-soft transition-colors"
         title={getUserName()}
+        aria-label="Меню профиля"
+        aria-expanded={open}
       >
         <span className="h-7 w-7 rounded-full bg-gradient-to-br from-accent to-accent-soft text-white flex items-center justify-center text-xs font-bold shrink-0">
-          {getUserName().slice(0, 1).toUpperCase()}
+          {getProfilePhoto() ? <img src={getProfilePhoto()} alt="" className="h-full w-full rounded-full object-cover" /> : getUserName().slice(0, 1).toUpperCase()}
         </span>
         <ChevronDown className="h-3.5 w-3.5 text-text-dim" />
       </button>
@@ -60,6 +71,7 @@ const AppMenu: React.FC = () => {
         <div className="absolute right-0 top-11 z-50 w-52 rounded-xl bg-bg-card border border-border shadow-card p-1.5 animate-[slide-up_140ms_ease-out]">
           <div className="px-2.5 py-1.5 text-[13px] font-semibold text-text truncate">{getUserName()}</div>
           <div className="my-1 border-t border-border-soft" />
+          <button onClick={() => {setOpen(false); window.dispatchEvent(new CustomEvent('thedad:expand', {detail: {page:null}})); nav('/profile');}} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-text-muted hover:bg-bg-soft hover:text-text transition-colors"><UserRound className="h-4 w-4" strokeWidth={1.75}/>Профиль</button>
           {UTILITY.map((it) => (
             <button
               key={it.page}

@@ -12,6 +12,15 @@ export const AppLiveWallpaper: React.FC<{ suspended?: boolean }> = ({ suspended 
   const { theme } = useTheme();
   const [wp, setWp] = useState<LiveWallpaper | null>(getLiveWallpaper);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setReducedMotion(media.matches);
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     const sync = () => setWp(getLiveWallpaper());
@@ -20,23 +29,26 @@ export const AppLiveWallpaper: React.FC<{ suspended?: boolean }> = ({ suspended 
     return () => { window.removeEventListener(LIVEWP_EVENT, sync); window.removeEventListener('storage', sync); };
   }, []);
 
-  const active = isGlass(theme) && !!wp && !suspended;
+  const active = isGlass(theme) && !!wp && !suspended && !reducedMotion;
+
+  useEffect(() => { setVideoReady(false); }, [wp, active]);
 
   // Прячем статичные обои, пока активны живые
   useEffect(() => {
-    document.documentElement.classList.toggle('live-wp', active);
+    document.documentElement.classList.toggle('live-wp', active && (wp?.kind === 'youtube' || videoReady));
     return () => document.documentElement.classList.remove('live-wp');
-  }, [active]);
+  }, [active, wp, videoReady]);
 
   // Object URL для видео-обоев
   useEffect(() => {
     let url: string | null = null;
+    let cancelled = false;
     if (active && wp?.kind === 'video') {
-      void loadVideoWallpaperUrl(wp.ref).then((u) => { url = u; setVideoUrl(u); });
+      void loadVideoWallpaperUrl(wp.ref).then((u) => { if (cancelled) { if (u) URL.revokeObjectURL(u); return; } url = u; setVideoUrl(u); });
     } else {
       setVideoUrl(null);
     }
-    return () => { if (url) URL.revokeObjectURL(url); };
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
   }, [active, wp]);
 
   if (!active || !wp) return null;
@@ -44,9 +56,10 @@ export const AppLiveWallpaper: React.FC<{ suspended?: boolean }> = ({ suspended 
   return createPortal(
     <div className="fixed inset-0 -z-[1] pointer-events-none">
       {wp.kind === 'youtube' && <YouTubeBg id={wp.ref} />}
-      {wp.kind === 'video' && videoUrl && <VideoBg src={videoUrl} />}
+      {wp.kind === 'video' && videoUrl && <VideoBg src={videoUrl} onReady={() => setVideoReady(true)} onError={() => setVideoReady(false)} />}
+      {wp.kind === 'builtin' && <VideoBg src={wp.ref} onReady={() => setVideoReady(true)} onError={() => setVideoReady(false)} />}
       {/* затемнение для читаемости панелей */}
-      <div className="absolute inset-0 bg-black/45" />
+      {(wp.kind === 'youtube' || videoReady) && <div className="absolute inset-0 bg-black/60" />}
     </div>,
     document.body,
   );

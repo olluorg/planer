@@ -8,6 +8,7 @@ import { Plus, Trash2, Check, Flame, Droplet, Dumbbell, BookOpen, Brain, Moon, S
 import { addDays, startOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useStore } from '@/lib/store';
+import { useTheme } from '@/lib/theme';
 import { isoDate, dayLabel } from '@/lib/utils';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -24,9 +25,13 @@ function habitIcon(title: string): React.ElementType {
 }
 
 export const HabitsPage = () => {
-  const { habits, habitLogs, goals, addHabit, removeHabit, toggleHabitLog } = useStore();
+  const { habits, habitLogs, goals, addHabit, updateHabit, removeHabit, toggleHabitLog } = useStore();
+  const { theme } = useTheme();
+  const workspace = theme === 'work' || theme === 'work-light';
+  const habitColor = (color: string | null, index: number) => workspace ? color ?? 'var(--accent)' : HABIT_PALETTE[index % HABIT_PALETTE.length];
   const [title, setTitle] = useState('');
   const [goalId, setGoalId] = useState<string>('__none');
+  const [weeklyTarget, setWeeklyTarget] = useState(7);
   const [view, setView] = useState<'week' | 'month'>('week');
 
   const weekDates = useMemo(() => {
@@ -51,7 +56,7 @@ export const HabitsPage = () => {
 
   const submit = () => {
     if (!title.trim()) return;
-    addHabit({ title: title.trim(), goal_id: goalId === '__none' ? null : goalId });
+    addHabit({ title: title.trim(), goal_id: goalId === '__none' ? null : goalId, target_per_week: weeklyTarget });
     setTitle('');
   };
 
@@ -79,6 +84,12 @@ export const HabitsPage = () => {
               {goals.map((g) => <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}
             </SelectContent>
           </Select>
+          <label className="flex items-center gap-2 text-sm text-text-muted">
+            Дней в неделю
+            <select aria-label="Дней в неделю для новой привычки" value={weeklyTarget} onChange={(e) => setWeeklyTarget(Number(e.target.value))} className="rounded-md border border-border bg-bg-card text-text px-2 py-2">
+              {Array.from({length: 7}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+            </select>
+          </label>
           <Button onClick={submit}><Plus /> Добавить</Button>
         </div>
       </Card>
@@ -88,7 +99,8 @@ export const HabitsPage = () => {
       )}
 
       {view === 'week' ? (
-        <Card className="p-0 overflow-hidden">
+        <Card className="p-0 overflow-x-auto">
+          <div className="min-w-[520px]">
           {/* header */}
           <div className="grid grid-cols-[1fr_56px_repeat(7,36px)_32px] items-center px-4 py-2 border-b border-border-soft text-caption text-text-muted">
             <div>Привычка</div>
@@ -100,19 +112,25 @@ export const HabitsPage = () => {
           </div>
           <div className="divide-y divide-border-soft">
             {habits.map((h, idx) => {
-              const sq = HABIT_PALETTE[idx % HABIT_PALETTE.length];
+              const sq = habitColor(h.color, idx);
               const Icon = habitIcon(h.title);
               const streak = habitStreak(h.id);
               const doneWeek = weekDates.filter((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d)).length;
               return (
                 <div key={h.id} className="grid grid-cols-[1fr_56px_repeat(7,36px)_32px] items-center px-4 py-3 hover:bg-bg-soft group">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${sq}1f` }}>
+                    <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: sq.startsWith('var(') ? `color-mix(in srgb, ${sq} 12%, transparent)` : `${sq}1f` }}>
                       <Icon className="h-5 w-5" style={{ color: sq }} />
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-text truncate">{h.title}</div>
-                      <div className="text-caption text-text-muted tabular-nums">{doneWeek}/7 на неделе</div>
+                      <label className="flex items-center gap-1 text-caption text-text-muted tabular-nums">
+                        {doneWeek} из
+                        <select aria-label={`Дней в неделю: ${h.title}`} value={h.target_per_week} onChange={(e) => updateHabit(h.id, {target_per_week: Number(e.target.value)})} className="rounded border border-border bg-bg-card text-text px-1">
+                          {Array.from({length: 7}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                        </select>
+                        <span>дней</span>
+                      </label>
                     </div>
                   </div>
                   <div className="flex items-center justify-center gap-1">
@@ -145,13 +163,14 @@ export const HabitsPage = () => {
                     );
                   })}
                   <div className="flex justify-center">
-                    <Button variant="ghost" size="icon" aria-label={`Удалить привычку: ${h.title}`} className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={() => removeHabit(h.id)}>
+                    <Button variant="ghost" size="icon" aria-label={`Удалить привычку: ${h.title}`} className="md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 h-7 w-7" onClick={() => removeHabit(h.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-text-muted" />
                     </Button>
                   </div>
                 </div>
               );
             })}
+          </div>
           </div>
         </Card>
       ) : (
@@ -171,7 +190,7 @@ export const HabitsPage = () => {
                 <tr key={h.id} className="border-t border-border-soft hover:bg-bg-soft">
                   <td className="p-3 sticky left-0 bg-bg-card">
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ background: HABIT_PALETTE[idx % HABIT_PALETTE.length] }} />
+                      <span className="h-2 w-2 rounded-full" style={{ background: habitColor(h.color, idx) }} />
                       <span>{h.title}</span>
                     </div>
                   </td>
@@ -181,6 +200,8 @@ export const HabitsPage = () => {
                       <td key={d} className="p-1 text-center">
                         <button
                           onClick={() => toggleHabitLog(h.id, d)}
+                          aria-label={`${h.title}, ${dayLabel(d)}`}
+                          aria-pressed={done}
                           className="h-6 w-6 rounded-md border border-border bg-bg-soft flex items-center justify-center hover:border-accent transition-colors"
                           style={{ background: done ? 'var(--accent)' : undefined, borderColor: done ? 'var(--accent)' : undefined }}
                         >

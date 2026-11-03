@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Lock, TrendingUp, Bell } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, TrendingUp, Bell, CalendarDays, ListTodo, LayoutGrid } from 'lucide-react';
 import { CATEGORIES, setOnboardingDone, setUserName } from '@/lib/onboarding';
 import { Logo } from '@/components/ui/logo';
 import { useStore } from '@/lib/store';
@@ -13,8 +13,8 @@ interface Props {
   onClose: () => void;
 }
 
-type Step = 'hello' | 'goal' | 'mark';
-const STEPS: Step[] = ['hello', 'goal', 'mark'];
+type Step = 'hello' | 'overview' | 'goal' | 'mark';
+const STEPS: Step[] = ['hello', 'overview', 'goal', 'mark'];
 
 /** Срок по умолчанию — через три месяца, в локальной дате. */
 function inThreeMonths(): string {
@@ -23,13 +23,7 @@ function inThreeMonths(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Знакомство в три шага: имя → одна цель числом → первая отметка.
- *
- *  Раньше шагов было девять (тема, направления, схема цикла, виджеты,
- *  профиль здоровья…), и до прогноза — главного, ради чего приложение
- *  существует, — мастер не доводил вовсе. Теперь человек выходит из него с
- *  целью, у которой уже есть первая точка, и видит, что нужно для прогноза.
- *  Всё остальное настраивается позже и по желанию. */
+/** Знакомство: имя, обзор планера, необязательная цель и первая отметка. */
 export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const addGoal = useStore((s) => s.addGoal);
   const addProgress = useStore((s) => s.addProgress);
@@ -98,20 +92,20 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
   const field = 'block text-caption text-text-muted mb-1.5';
 
   return (
-    <div className="fixed inset-0 z-[300] bg-bg flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Знакомство с THEDAD">
-      <div className="w-full max-w-lg rounded-2xl bg-bg-card border border-border-soft shadow-card overflow-hidden">
+    <div className="fixed inset-0 z-[300] bg-bg flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Знакомство с THEDAD">
+      <div className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl bg-bg-card border border-border-soft shadow-card">
         <div className="h-1 bg-bg-soft" aria-hidden>
-          <div className="h-full bg-accent transition-all duration-500" style={{ width: `${((idx + 1) / STEPS.length) * 100}%` }} />
+          <div className="h-full bg-accent origin-left transition-transform duration-500" style={{ transform: `scaleX(${(idx + 1) / STEPS.length})` }} />
         </div>
 
         <div className="p-7 sm:p-9 min-h-[420px] flex flex-col">
           {step === 'hello' && (
             <div className="flex-1 flex flex-col">
               <Logo size={52} className="mb-5 -ml-1.5" />
-              <h1 className="text-h2 font-bold text-text text-balance">Планер, который говорит, успеете ли вы</h1>
+              <h1 className="text-h2 font-bold text-text text-balance">Ваш день и ваши цели — в одном месте</h1>
               <p className="text-small text-text-muted mt-3 leading-relaxed">
-                Вы ставите цель числом и отмечаете, как движетесь. Приложение считает
-                темп и показывает, когда дойдёте — и предупреждает заранее, если не успеваете.
+                Планируйте задачи, отслеживайте привычки и отмечайте движение к целям.
+                Рабочий экран и оформление можно настроить под себя.
               </p>
               <label className="mt-7">
                 <span className={field}>Как к вам обращаться? (необязательно)</span>
@@ -119,8 +113,25 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
               </label>
               <p className="flex items-start gap-2 text-caption text-text-dim mt-auto pt-6">
                 <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                Регистрации нет. Всё хранится на этом устройстве и никуда не отправляется.
+                Регистрация не нужна. Данные хранятся на устройстве; подключаемые сервисы работают только после настройки.
               </p>
+            </div>
+          )}
+
+          {step === 'overview' && (
+            <div className="flex-1 flex flex-col">
+              <h2 className="text-h3 font-bold text-text">Как устроен планер</h2>
+              <p className="text-small text-text-muted mt-2">Начните с того, что нужно сегодня. Остальное можно включить позже.</p>
+              <div className="mt-5 space-y-4">
+                {[
+                  { icon: ListTodo, title: 'Задачи и привычки', description: 'Записывайте дела на день и отмечайте повторяющиеся действия.' },
+                  { icon: CalendarDays, title: 'Календарь и цели', description: 'Планируйте время и следите за измеримым прогрессом.' },
+                  { icon: LayoutGrid, title: 'Рабочий экран', description: 'Выбирайте виджеты и меняйте их расположение. Тему и фон можно выбрать в настройках.' },
+                ].map(({icon: Icon, title, description}) => <div key={title} className="flex gap-3">
+                  <Icon className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                  <div><h3 className="text-sm font-semibold text-text">{title}</h3><p className="text-small text-text-muted mt-1">{description}</p></div>
+                </div>)}
+              </div>
             </div>
           )}
 
@@ -202,7 +213,8 @@ export const Onboarding: React.FC<Props> = ({ open, onClose }) => {
             <button type="button" onClick={finish} className="text-caption text-text-dim hover:text-text-muted mr-auto">
               {step === 'mark' ? 'Отмечу позже' : 'Пропустить'}
             </button>
-            {step === 'hello' && <Button onClick={() => setStep('goal')}>Дальше <ChevronRight /></Button>}
+            {step === 'hello' && <Button onClick={() => setStep('overview')}>Дальше <ChevronRight /></Button>}
+            {step === 'overview' && <Button onClick={() => setStep('goal')}>Создать первую цель <ChevronRight /></Button>}
             {step === 'goal' && <Button disabled={!goalValid} onClick={createGoal}>Создать цель <ChevronRight /></Button>}
             {step === 'mark' && <Button onClick={saveMark}>Готово</Button>}
           </div>

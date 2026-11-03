@@ -5,7 +5,7 @@ import { resetDB, persist, DB_KEY, replaceDatabase } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme, isGlass } from "@/lib/theme";
 import {
-  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X, CalendarDays, Cpu, GraduationCap,
+  Download, Upload, RefreshCw, Sun, Moon, Bell, BellOff, Puzzle, FileText, FileJson, Sparkles, X, CalendarDays, Cpu, GraduationCap, LayoutGrid,
 } from "lucide-react";
 import { get, set } from "idb-keyval";
 import { useEffect, useState } from "react";
@@ -22,12 +22,13 @@ import { getAiConfig, setAiConfig, askAI, AI_PROVIDERS, type AiConfig } from "@/
 import { parseIcs } from "@/lib/ics";
 import { SyncSettings } from "@/components/SyncSettings";
 import { BackupRestore } from "@/components/BackupRestore";
+import { PersonalBackup } from "@/components/PersonalBackup";
 import { ImportFromServices } from "@/components/ImportFromServices";
 import { DriveBackupSettings } from "@/components/DriveBackupSettings";
 import { FEATURE_PLUS } from "@/lib/features";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
-import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, PLUGINS_EVENT } from "@/lib/plugins";
+import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, validatePlugin, PLUGINS_EVENT } from "@/lib/plugins";
 import { preloadImages } from "@/lib/preload";
 import { getLiveWallpaper, setYouTubeWallpaper, setVideoWallpaper, clearLiveWallpaper, LIVEWP_EVENT } from "@/lib/liveWallpaper";
 import { chromeAiPresent, chromeAvailability, chromePreferred, setChromePreferred, downloadChromeModel, type Availability } from "@/lib/aiProvider";
@@ -81,27 +82,34 @@ export const SettingsPage = () => {
   };
 
   const exportDb = async () => {
-    await persist();
-    const blob = await get<Uint8Array>(DB_KEY);
-    if (!blob) return;
-    const url = URL.createObjectURL(
-      new Blob([blob.buffer as ArrayBuffer], {
-        type: "application/octet-stream",
-      }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `thedad-${new Date().toISOString().slice(0, 10)}.sqlite`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await persist();
+      const blob = await get<Uint8Array>(DB_KEY);
+      if (!blob) throw new Error('База не найдена');
+      const url = URL.createObjectURL(new Blob([blob.buffer as ArrayBuffer], {type: 'application/octet-stream'}));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `thedad-${new Date().toISOString().slice(0, 10)}.sqlite`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (error) {
+      toast.error('Не удалось подготовить экспорт базы', String((error as Error)?.message ?? error));
+      return false;
+    }
   };
+
+  const confirmDatabaseImport = (name: string) => confirm(`Восстановить базу из файла «${name}»?\n\nТекущие задачи, цели и другие данные базы будут заменены; перед заменой приложение сохранит локальный снимок. Профиль и дневник питания не изменятся.`);
 
   const importDb = async (file: File) => {
     try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (new TextDecoder().decode(bytes.slice(0, 16)) !== 'SQLite format 3\u0000') throw new Error('Это не файл базы данных SQLite');
+      if (!confirmDatabaseImport(file.name)) return;
       // replaceDatabase проверяет, что это SQLite, снимает бэкап текущей базы
       // и меняет её и на диске, и в памяти — случайный файл больше не ломает
       // приложение, а открытая база не затирает импортированную.
-      await replaceDatabase(new Uint8Array(await file.arrayBuffer()), "pre-import");
+      await replaceDatabase(bytes, "pre-import");
       location.reload();
     } catch (e: any) {
       toast.error("Не удалось импортировать", String(e?.message ?? e));
@@ -111,16 +119,20 @@ export const SettingsPage = () => {
   const reset = async () => {
     // Экспорт принудительный: удаление всех данных не должно быть возможно
     // без файла на диске, из которого можно вернуться.
-    await exportDb();
+    if (!await exportDb()) return;
     const word = prompt(
-      "Сейчас скачался файл бэкапа — сохраните его.\n\n" +
-        "Это удалит ВСЕ данные без возможности отмены.\n" +
+      "Запущено скачивание копии базы. Проверьте, что файл сохранён.\n\n" +
+        "Сброс удалит данные базы, включая задачи, цели и привычки. Настройки, профиль и данные питания, сохранённые отдельно в браузере, останутся.\n" +
         'Чтобы подтвердить, введите слово: УДАЛИТЬ',
     );
     if (word?.trim().toUpperCase() !== "УДАЛИТЬ") return;
-    await resetDB();
-    reload();
-    location.reload();
+    try {
+      await resetDB();
+      reload();
+      location.reload();
+    } catch (error) {
+      toast.error('Не удалось сбросить базу', String((error as Error)?.message ?? error));
+    }
   };
 
   const [reminders, setReminders] = useState<Reminder[]>(() => loadReminders());
@@ -200,17 +212,22 @@ export const SettingsPage = () => {
 
   const exportEncrypted = async () => {
     const pass = window.prompt('Пароль для шифрования (минимум 8 символов):');
-    if (!pass || pass.length < 8) { alert('Слишком короткий пароль'); return; }
-    await persist();
-    const blob = await get<Uint8Array>(DB_KEY);
-    if (!blob) return;
-    const enc = await encryptBytes(blob, pass);
-    const url = URL.createObjectURL(new Blob([enc.buffer as ArrayBuffer], { type: "application/octet-stream" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `thedad-${new Date().toISOString().slice(0, 10)}.sqlite.enc`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (pass === null) return;
+    if (pass.length < 8) { alert('Слишком короткий пароль'); return; }
+    try {
+      await persist();
+      const blob = await get<Uint8Array>(DB_KEY);
+      if (!blob) throw new Error('База не найдена');
+      const enc = await encryptBytes(blob, pass);
+      const url = URL.createObjectURL(new Blob([enc.buffer as ArrayBuffer], { type: "application/octet-stream" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `thedad-${new Date().toISOString().slice(0, 10)}.sqlite.enc`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      toast.error('Не удалось подготовить зашифрованную копию', String((error as Error)?.message ?? error));
+    }
   };
 
   const importEncrypted = async (file: File) => {
@@ -219,10 +236,11 @@ export const SettingsPage = () => {
     try {
       const buf = new Uint8Array(await file.arrayBuffer());
       const dec = await decryptBytes(buf, pass);
+      if (!confirmDatabaseImport(file.name)) return;
       await replaceDatabase(dec, 'pre-import');
       location.reload();
     } catch (e: any) {
-      alert('Не удалось расшифровать: ' + (e?.message ?? e));
+      toast.error('Не удалось восстановить зашифрованную копию', String(e?.message ?? e));
     }
   };
 
@@ -277,7 +295,7 @@ export const SettingsPage = () => {
       <div className="columns-1 lg:columns-2 2xl:columns-3 gap-4 [&>*]:break-inside-avoid [&>*]:mb-4">
       <Card>
         <CardTitle>Внешний вид</CardTitle>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={theme === "light" ? "default" : "soft"}
             onClick={() => setTheme("light")}
@@ -296,7 +314,14 @@ export const SettingsPage = () => {
           >
             <Sparkles className="h-4 w-4" /> Glass
           </Button>
+          <Button variant={theme === 'work' || theme === 'work-light' ? 'default' : 'soft'} onClick={() => setTheme(theme === 'work-light' ? 'work-light' : 'work')}>
+            <LayoutGrid className="h-4 w-4" /> Workspace
+          </Button>
         </div>
+        {(theme === 'work' || theme === 'work-light') && <div className="mt-3 flex gap-2">
+          <Button variant={theme === 'work' ? 'default' : 'soft'} size="sm" onClick={() => setTheme('work')}><Moon className="h-3.5 w-3.5" /> Тёмная</Button>
+          <Button variant={theme === 'work-light' ? 'default' : 'soft'} size="sm" onClick={() => setTheme('work-light')}><Sun className="h-3.5 w-3.5" /> Светлая</Button>
+        </div>}
         {isGlass(theme) && (
           <div className="mt-3 flex gap-2">
             <Button variant={theme === "glass" ? "default" : "soft"} size="sm" onClick={() => setTheme("glass")}>
@@ -352,10 +377,16 @@ export const SettingsPage = () => {
       </Card>
 
       <Card>
+        <CardTitle>Копия личных данных</CardTitle>
+        <PersonalBackup />
+      </Card>
+
+      <Card>
         <CardTitle>База данных (SQLite WASM)</CardTitle>
         <div className="text-sm text-text-muted mb-4">
-          Все данные хранятся локально в IndexedDB через WebAssembly-сборку
-          SQLite. Можно выгрузить в файл или импортировать обратно.
+          Задачи, цели, привычки и другие данные базы хранятся локально в SQLite.
+          Экспорт и снимки содержат только базу: профиль, настройки, дневник питания,
+          свои продукты и сведения о тренировках в файле не сохраняются.
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="soft" onClick={exportDb}>
@@ -366,9 +397,7 @@ export const SettingsPage = () => {
               type="file"
               accept=".sqlite,.db,application/octet-stream"
               className="hidden"
-              onChange={(e) =>
-                e.target.files?.[0] && importDb(e.target.files[0])
-              }
+              onChange={(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) void importDb(file); }}
             />
             <Button variant="soft" asChild>
               <span>
@@ -382,7 +411,7 @@ export const SettingsPage = () => {
           <label>
             <input
               type="file" accept=".enc,application/octet-stream" className="hidden"
-              onChange={(e) => e.target.files?.[0] && importEncrypted(e.target.files[0])}
+              onChange={(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) void importEncrypted(file); }}
             />
             <Button variant="soft" asChild>
               <span><Upload /> Импорт .sqlite.enc</span>
@@ -603,7 +632,12 @@ const PluginsSettings: React.FC = () => {
     e.target.value = "";
     if (!file) return;
     try {
-      const p = installPlugin(JSON.parse(await file.text()));
+      const raw = JSON.parse(await file.text());
+      const checked = validatePlugin(raw);
+      if (!checked.ok) throw new Error(checked.errors.join('; '));
+      const existing = getInstalledPlugins().find(plugin => plugin.id === checked.plugin.id);
+      if (existing && !confirm(`Заменить установленный виджет «${existing.name}» данными из файла? Существующий план и другие данные этого виджета будут заменены. При необходимости сначала экспортируйте текущую версию.`)) return;
+      const p = installPlugin(checked.plugin);
       toast.success(`Плагин «${p.name}» установлен`, "Добавь его на дашборд через редактор раскладки → «+»");
     } catch (err: any) {
       toast.error("Плагин не установлен", String(err?.message ?? err));
@@ -662,7 +696,7 @@ const GlassWallpaperPicker: React.FC = () => {
   const [custom, setCustom] = useState<string[]>(getCustomWallpapers());
   // Прогреваем превью; новая коллекция не загружает все UHD-файлы заранее.
   useEffect(() => { preloadImages([...custom, ...APP_WALLPAPERS.map(wallpaperPreview)]); }, [custom]);
-  const pick = (src: string) => { applyAppWallpaper(src); setCurrent(src); };
+  const pick = (src: string) => { void clearLiveWallpaper(); applyAppWallpaper(src); setCurrent(src); };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";

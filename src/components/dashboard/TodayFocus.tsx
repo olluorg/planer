@@ -5,7 +5,7 @@ import { isoDate } from '@/lib/utils';
 import { Ring } from '@/components/ui/ring';
 import { Play, Pencil, Zap, Clock, ChevronRight } from 'lucide-react';
 
-interface Props { date: Date; onStartFocus: () => void }
+interface Props { date: Date; onStartFocus: (taskId: string) => void }
 
 const BLOCK_LABEL: Record<string, string> = {
   morning: 'Утро', day: 'День', evening: 'Вечер', night: 'Ночь',
@@ -42,8 +42,8 @@ export const TodayFocus: React.FC<Props> = ({ date, onStartFocus }) => {
 
   // Прогресс по целям (общий)
   const goalProgress = useMemo(() => {
-    const roots = goals.filter((g) => !g.parent_id);
-    if (!roots.length) return 0;
+    const roots = goals.filter((g) => !g.parent_id && g.status === 'active' && g.target_value !== g.start_value);
+    if (!roots.length) return null;
     const sum = roots.reduce((s, g) => {
       const denom = g.target_value - g.start_value || 1;
       return s + Math.max(0, Math.min(1, (g.current_value - g.start_value) / denom));
@@ -58,7 +58,7 @@ export const TodayFocus: React.FC<Props> = ({ date, onStartFocus }) => {
     : null;
 
   return (
-    <div className="h-full flex flex-col rounded-xl bg-bg-card border border-border shadow-card p-5 overflow-hidden">
+    <div className="focus-card h-full flex flex-col rounded-xl bg-bg-card border border-border shadow-card p-5 overflow-hidden">
       {/* Заголовок + действие */}
       <div className="flex items-center justify-between shrink-0">
         <div className="text-label text-text-muted">Фокус дня</div>
@@ -110,7 +110,7 @@ export const TodayFocus: React.FC<Props> = ({ date, onStartFocus }) => {
               {/* CTA */}
               <div className="flex items-center gap-2.5 mt-5">
                 <button
-                  onClick={onStartFocus}
+                  onClick={() => onStartFocus(focusTask.id)}
                   className="inline-flex items-center gap-2 rounded-lg bg-accent text-white px-4 h-10 text-sm font-semibold hover:bg-accent-soft transition-colors duration-base"
                 >
                   <Play className="h-4 w-4" fill="currentColor" /> Начать фокус
@@ -147,11 +147,11 @@ export const TodayFocus: React.FC<Props> = ({ date, onStartFocus }) => {
 
         {/* Ринг прогресса целей */}
         <button onClick={() => nav('/goals')} className="shrink-0 hidden sm:block" title="Все цели">
-          <Ring value={goalProgress} size={132} stroke={11} color="var(--accent)" trackColor="var(--accent-glow-sm)" glow={false}>
+          <Ring value={goalProgress ?? 0} size={132} stroke={11} color="var(--accent)" trackColor="var(--accent-glow-sm)" glow={false}>
             <div className="text-center leading-tight">
               <div className="text-[10px] text-text-muted">Прогресс целей</div>
-              <div className="text-[28px] font-bold text-text tabular-nums leading-9">{goalProgress}%</div>
-              <div className="text-[10px] text-text-muted">план недели</div>
+              <div className="text-[28px] font-bold text-text tabular-nums leading-9">{goalProgress === null ? '—' : `${goalProgress}%`}</div>
+              <div className="text-[10px] text-text-muted">{goalProgress === null ? 'нет активных целей' : 'среднее по целям'}</div>
             </div>
           </Ring>
         </button>
