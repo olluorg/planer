@@ -34,6 +34,8 @@ const STUDIO_BY_NAME: Record<string, string> = {
   'Наклоны к ногам': 'standing-forward-fold',
   'Круги тазом': 'hip-circles', 'Ягодичный мостик на одной ноге': 'single-leg-bridge',
   'Поза голубя': 'pigeon-pose',
+  'Отжимания узким хватом': 'close-grip-push-up', 'Болгарские выпады': 'bulgarian-split-squat',
+  'Отжимания «щучка»': 'pike-push-up',
 };
 
 export const LOW_IMPACT: Exercise[] = [
