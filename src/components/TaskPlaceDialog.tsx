@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { Task } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { parsePlaceCoordinates } from '@/lib/placeCoordinates';
+const PlaceMapPicker = lazy(() => import('./PlaceMapPicker').then(module => ({ default: module.PlaceMapPicker })));
 
 export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({task, onClose}) => {
   const updateTask = useStore((s) => s.updateTask);
@@ -13,6 +14,8 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
   const [lon, setLon] = useState(task.place_lon == null ? '' : String(task.place_lon));
   const [error, setError] = useState('');
   const [coordinateInput, setCoordinateInput] = useState('');
+  const [mapOpen, setMapOpen] = useState(false);
+  const initialPoint = parsePlaceCoordinates(`${lat};${lon}`);
   const fillCoordinates = () => {
     const point = parsePlaceCoordinates(coordinateInput);
     if (!point) { setError('Не удалось прочитать координаты. Вставьте широту и долготу или ссылку OpenStreetMap.'); return; }
@@ -41,6 +44,11 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
         <label className="block text-sm">Широта<Input className="mt-1" inputMode="decimal" value={lat} onChange={e=>setLat(e.target.value)} placeholder="55.75" /></label>
         <label className="block text-sm">Долгота<Input className="mt-1" inputMode="decimal" value={lon} onChange={e=>setLon(e.target.value)} placeholder="37.62" /></label>
       </div>
+      <Button variant="soft" type="button" onClick={() => setMapOpen(open => !open)}>{mapOpen ? 'Скрыть карту' : 'Выбрать на карте'}</Button>
+      {!mapOpen && <p className="text-xs text-text-muted">При открытии карты OpenStreetMap получит запросы на область карты и IP-адрес устройства.</p>}
+      {mapOpen && <Suspense fallback={<p className="text-xs text-text-muted">Открываем карту…</p>}>
+        <PlaceMapPicker initial={initialPoint} onSelect={({lat: selectedLat, lon: selectedLon}) => { setLat(String(selectedLat)); setLon(String(selectedLon)); setError(''); }} />
+      </Suspense>}
       {name.trim() && <a className="text-sm text-accent underline" href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(name.trim())}`} target="_blank" rel="noopener noreferrer">Найти место в OpenStreetMap</a>}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <DialogFooter><Button variant="ghost" onClick={onClose}>Отмена</Button><Button onClick={save}>Сохранить место</Button></DialogFooter>

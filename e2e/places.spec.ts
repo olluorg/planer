@@ -58,3 +58,31 @@ test('place is validated, persisted, displayed on the map and removed from activ
   await expect(remaining).toContainText('Добавьте координаты в задаче');
   await expect(remaining.getByLabel('Карта мест')).toHaveCount(0);
 });
+
+test('task location can be selected on a map and survives reload', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  let tileRequests = 0;
+  await page.route('https://tile.openstreetmap.org/**', route => { tileRequests++; return route.fulfill({ status: 404, body: '' }); });
+  await page.goto('/tasks');
+  await page.getByPlaceholder('Новая задача...').fill('Карта для встречи');
+  await page.getByPlaceholder('Новая задача...').press('Enter');
+  await page.getByRole('button', { name: 'Место задачи: Карта для встречи' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Место: Карта для встречи' });
+  await dialog.getByLabel('Место или адрес').fill('Место встречи');
+  expect(tileRequests).toBe(0);
+  await dialog.getByRole('button', { name: 'Выбрать на карте' }).click();
+  const map = dialog.getByLabel('Выбор точки на карте');
+  await expect(map.locator('.leaflet-control-zoom-in')).toBeVisible();
+  await map.click({ position: { x: 150, y: 120 } });
+  const latitude = await dialog.getByLabel('Широта').inputValue();
+  const longitude = await dialog.getByLabel('Долгота').inputValue();
+  expect(latitude).not.toBe('');
+  expect(longitude).not.toBe('');
+  await expect(map.locator('.leaflet-interactive')).toHaveCount(1);
+  await dialog.getByRole('button', { name: 'Сохранить место' }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('button', { name: 'Место задачи: Карта для встречи' }).click();
+  await expect(dialog.getByLabel('Широта')).toHaveValue(latitude);
+  await expect(dialog.getByLabel('Долгота')).toHaveValue(longitude);
+});
