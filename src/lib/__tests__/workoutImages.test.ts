@@ -4,6 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { WORKOUT_TYPES } from '@/components/WorkoutMode';
 
 describe('illustrated exercises', () => {
+  it('has an image file for every exercise in every workout', () => {
+    const missing = WORKOUT_TYPES.flatMap(workout => workout.exercises
+      .filter(exercise => !existsSync(`public${exercise.img}`))
+      .map(exercise => `${workout.id}: ${exercise.name} (${exercise.img})`));
+    expect(missing).toEqual([]);
+  });
   it.each([
     ['yoga', 'Поза горы', '/workout/studio/mountain-pose.webp'],
     ['calisthenics', 'Стул у стены', '/workout/studio/wall-sit.webp'],
@@ -22,6 +28,7 @@ describe('illustrated exercises', () => {
     ['charge', 'Круги тазом', '/workout/studio/hip-circles.webp'],
     ['calisthenics', 'Ягодичный мостик на одной ноге', '/workout/studio/single-leg-bridge.webp'],
     ['yoga', 'Поза голубя', '/workout/studio/pigeon-pose.webp'],
+    ['yoga', 'Скручивание сидя', '/workout/studio/seated-twist.webp'],
     ['calisthenics', 'Отжимания узким хватом', '/workout/studio/close-grip-push-up.webp'],
     ['calisthenics', 'Болгарские выпады', '/workout/studio/bulgarian-split-squat.webp'],
     ['calisthenics', 'Отжимания «щучка»', '/workout/studio/pike-push-up.webp'],
