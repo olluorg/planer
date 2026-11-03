@@ -25,7 +25,7 @@ import { getInstalledPlugins, selectRows, renderTemplate, PLUGINS_EVENT, type Pl
 
 /** Сегодняшнее меню из плагина питания (первый контентный «дневной» плагин). */
 function todayMenu(): { def: PluginWidgetDef | null; items: ({ key: string; title: string; kcal?: number; meal: string; kind: string } & Macros)[] } {
-  const def = getInstalledPlugins().find((p) => p.render.type === 'cards' && p.source.static && p.render.dayField) ?? null;
+  const def = getInstalledPlugins().find((p) => p.id === 'nutrition-month' && p.render.type === 'cards' && p.source.static && p.render.dayField) ?? null;
   if (!def) return { def: null, items: [] };
   const rows = selectRows(def, {} as PluginDataSnapshot);
   const badgeTpl = def.render.badge ?? '';

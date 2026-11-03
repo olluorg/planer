@@ -186,6 +186,27 @@ test('calorie menu records recipe macros and identifies incomplete entries', asy
   await expect(dialog.getByText(/Дни без записей о еде не показаны/)).toBeVisible();
 });
 
+test('calorie menu ignores unrelated daily card plugins', async ({ page }) => {
+  await page.evaluate((ids) => {
+    const plugins = JSON.parse(localStorage.getItem('plugins.installed.v1')!);
+    const nutrition = plugins.find((p: { id: string }) => p.id === 'nutrition-month');
+    nutrition.source.static = [nutrition.source.static[0]];
+    nutrition.source.static[0].day = 1;
+    const unrelated = structuredClone(nutrition);
+    unrelated.id = 'reading-calendar';
+    unrelated.name = 'Чтение по дням';
+    unrelated.source.static[0].title = 'Не блюдо';
+    localStorage.setItem('plugins.installed.v1', JSON.stringify([unrelated, nutrition]));
+    localStorage.setItem('dashboard.screens.v1', JSON.stringify([{id:'calories-test', name:'Калории', hidden:ids.filter((id: string) => id !== 'calories'), layout:[{i:'calories',x:0,y:0,w:6,h:8}]}]));
+    localStorage.setItem('dashboard.activeScreen.v1', 'calories-test');
+  }, DEFAULT_LAYOUT.map(l => l.i));
+  await page.goto('/');
+  await page.getByTitle('Открыть меню дня').click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('button', {name: /Овсянка с бананом/})).toBeVisible();
+  await expect(dialog.getByText('Не блюдо')).toHaveCount(0);
+});
+
 test('new workout has seven real images and supports start, pause and next', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Выбрать тренировку', exact: true }).click();
