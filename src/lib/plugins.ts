@@ -262,6 +262,20 @@ export function removePlugin(id: string) {
 const DEFAULTS_KEY = 'plugins.defaults.v4';
 const DEFAULT_PLUGINS = [{ id: 'nutrition-month', url: '/plugins/nutrition-month.thedad-widget.json' }];
 
+/** Восстановить отсутствующий встроенный рацион, не заменяя уже сохранённый. */
+export async function restoreDefaultNutrition(): Promise<boolean> {
+  const id = 'nutrition-month';
+  if (readPluginsForWrite().some((plugin) => plugin.id === id)) return false;
+  const response = await fetch('/plugins/nutrition-month.thedad-widget.json');
+  if (!response.ok) throw new Error(`Не удалось загрузить встроенный рацион (HTTP ${response.status})`);
+  const raw: unknown = await response.json();
+  const checked = validatePlugin(raw);
+  if (!checked.ok || checked.plugin.id !== id) throw new Error('Файл встроенного рациона повреждён');
+  if (readPluginsForWrite().some((plugin) => plugin.id === id)) return false;
+  installPlugin(checked.plugin);
+  return true;
+}
+
 export async function ensureDefaultPlugins(): Promise<void> {
   try {
     if (localStorage.getItem(DEFAULTS_KEY) === '1') return;

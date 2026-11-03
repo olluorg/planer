@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ensureDefaultPlugins, getInstalledPlugins, installPlugin, removePlugin, isPluginStorageReadable } from '../plugins';
+import { ensureDefaultPlugins, getInstalledPlugins, installPlugin, removePlugin, isPluginStorageReadable, restoreDefaultNutrition } from '../plugins';
 
 const fixture = JSON.parse(readFileSync('public/plugins/nutrition-month.thedad-widget.json', 'utf8'));
 
@@ -63,5 +63,36 @@ describe('default nutrition plugin installation', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(localStorage.getItem('plugins.installed.v1')).toBe(raw);
     expect(localStorage.getItem('plugins.defaults.v4')).toBeNull();
+  });
+
+  it('restores an absent plan even if initial setup is marked complete', async () => {
+    localStorage.setItem('plugins.defaults.v4', '1');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture))));
+    expect(await restoreDefaultNutrition()).toBe(true);
+    expect(getInstalledPlugins().map(p => p.id)).toEqual(['nutrition-month']);
+    expect(await restoreDefaultNutrition()).toBe(false);
+  });
+
+  it('does not overwrite a plan added while the default is downloading', async () => {
+    let resolveFetch!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveFetch = resolve; })));
+    const restore = restoreDefaultNutrition();
+    const custom = structuredClone(fixture);
+    custom.name = 'Сохранённый план';
+    installPlugin(custom);
+    resolveFetch(new Response(JSON.stringify(fixture)));
+    expect(await restore).toBe(false);
+    expect(getInstalledPlugins()[0].name).toBe('Сохранённый план');
+  });
+
+  it('does not restore over damaged data or mark failure as success', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(restoreDefaultNutrition()).rejects.toThrow(/503/);
+    expect(getInstalledPlugins()).toHaveLength(0);
+    localStorage.setItem('plugins.installed.v1', '{broken');
+    await expect(restoreDefaultNutrition()).rejects.toThrow(/повреждено/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('plugins.installed.v1')).toBe('{broken');
   });
 });

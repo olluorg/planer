@@ -28,7 +28,7 @@ import { DriveBackupSettings } from "@/components/DriveBackupSettings";
 import { FEATURE_PLUS } from "@/lib/features";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
-import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, validatePlugin, PLUGINS_EVENT, isPluginStorageReadable, exportRawPluginStorage } from "@/lib/plugins";
+import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, validatePlugin, PLUGINS_EVENT, isPluginStorageReadable, exportRawPluginStorage, restoreDefaultNutrition } from "@/lib/plugins";
 import { preloadImages } from "@/lib/preload";
 import { getLiveWallpaper, setYouTubeWallpaper, setVideoWallpaper, clearLiveWallpaper, LIVEWP_EVENT } from "@/lib/liveWallpaper";
 import { chromeAiPresent, chromeAvailability, chromePreferred, setChromePreferred, downloadChromeModel, type Availability } from "@/lib/aiProvider";
@@ -622,6 +622,7 @@ export const SettingsPage = () => {
 const PluginsSettings: React.FC = () => {
   const [plugins, setPlugins] = useState(getInstalledPlugins());
   const [storageReadable, setStorageReadable] = useState(isPluginStorageReadable());
+  const [restoringNutrition, setRestoringNutrition] = useState(false);
   useEffect(() => {
     const sync = () => { setPlugins(getInstalledPlugins()); setStorageReadable(isPluginStorageReadable()); };
     window.addEventListener(PLUGINS_EVENT, sync);
@@ -687,6 +688,17 @@ const PluginsSettings: React.FC = () => {
       {plugins.length === 0 && storageReadable && (
         <div className="text-xs text-text-dim mb-3">Пока ничего не установлено.</div>
       )}
+      {storageReadable && !plugins.some(plugin => plugin.id === 'nutrition-month') && <div className="mb-3">
+        <Button variant="soft" size="sm" disabled={restoringNutrition} onClick={async () => {
+          setRestoringNutrition(true);
+          try {
+            const installed = await restoreDefaultNutrition();
+            if (installed) toast.success('Встроенный план питания добавлен');
+            else toast.info('План питания уже установлен');
+          } catch (error) { toast.error('Не удалось восстановить план питания', String((error as Error)?.message ?? error)); }
+          finally { setRestoringNutrition(false); }
+        }}>{restoringNutrition ? 'Загрузка…' : 'Восстановить встроенный план питания'}</Button>
+      </div>}
       <label className="inline-flex">
         <span className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-bg-soft hover:bg-bg-hover text-sm cursor-pointer transition-colors">
           <Upload className="h-4 w-4" /> Импортировать .json

@@ -30,3 +30,19 @@ test('damaged plugin data is preserved and can be downloaded for recovery', asyn
   expect(await page.evaluate(() => localStorage.getItem('plugins.installed.v1'))).toBe(raw);
   expect(await page.evaluate(() => localStorage.getItem('plugins.defaults.v4'))).toBeNull();
 });
+
+test('a missing built-in nutrition plan can be restored from settings', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('onboarding.done.v1', '1');
+    localStorage.setItem('plugins.defaults.v4', '1');
+  });
+  await page.goto('/settings');
+  const restore = page.getByRole('button', { name: 'Восстановить встроенный план питания' });
+  await expect(restore).toBeVisible();
+  await restore.click();
+  await expect(page.getByText('Встроенный план питания добавлен')).toBeVisible();
+  await expect(restore).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText('Правильное питание на месяц', { exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('plugins.installed.v1') || '[]').filter((p: {id: string}) => p.id === 'nutrition-month').length)).toBe(1);
+});
