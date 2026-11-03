@@ -309,7 +309,7 @@ for (const exercise of [
   {type:'Калистеника', name:'Обратные отжимания от стула', file:'bench-dip', random:0, index:2},
   {type:'Калистеника', name:'Приседания с прыжком', file:'squat-jump', random:0.12, index:0},
   {type:'Йога', name:'Поза голубя', file:'pigeon-pose', random:0.28, index:0},
-  {type:'Йога', name:'Скручивание сидя', file:'seated-twist', random:0.1, index:0},
+  {type:'Йога', name:'Скручивание сидя', file:'seated-twist-v2', random:0.1, index:0},
   {type:'Зарядка', name:'Наклоны к ногам', file:'standing-forward-fold', random:0.3, index:3},
   {type:'Йога', name:'Мостик лёжа', file:'bridge', random:0.5, index:5},
   {type:'Йога', name:'Шавасана / дыхание', file:'savasana', random:0.3, index:3},

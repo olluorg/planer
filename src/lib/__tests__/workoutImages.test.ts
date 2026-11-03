@@ -28,7 +28,7 @@ describe('illustrated exercises', () => {
     ['charge', 'Круги тазом', '/workout/studio/hip-circles.webp'],
     ['calisthenics', 'Ягодичный мостик на одной ноге', '/workout/studio/single-leg-bridge.webp'],
     ['yoga', 'Поза голубя', '/workout/studio/pigeon-pose.webp'],
-    ['yoga', 'Скручивание сидя', '/workout/studio/seated-twist.webp'],
+    ['yoga', 'Скручивание сидя', '/workout/studio/seated-twist-v2.webp'],
     ['calisthenics', 'Отжимания узким хватом', '/workout/studio/close-grip-push-up.webp'],
     ['calisthenics', 'Болгарские выпады', '/workout/studio/bulgarian-split-squat.webp'],
     ['calisthenics', 'Отжимания «щучка»', '/workout/studio/pike-push-up.webp'],
