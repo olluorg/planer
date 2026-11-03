@@ -111,7 +111,7 @@ export function removeEaten(date: string, key: string): EatenItem[] {
 }
 
 export function eatenKcal(date: string): number {
-  return getEaten(date).reduce((s, x) => s + (x.kcal || 0), 0);
+  return getEaten(date).reduce((s, x) => s + (readCalories(x.kcal) ?? 0), 0);
 }
 
 export function hasCompleteEatenCalories(date: string): boolean {
@@ -122,7 +122,10 @@ export function hasCompleteEatenCalories(date: string): boolean {
 /** Сумма БЖУ съеденного за день (только по тем позициям, где макросы указаны). */
 export function eatenMacros(date: string): Required<Macros> {
   return getEaten(date).reduce(
-    (a, x) => ({ protein: a.protein + (x.protein || 0), fat: a.fat + (x.fat || 0), carbs: a.carbs + (x.carbs || 0) }),
+    (a, x) => {
+      const valid = readMacros(x);
+      return { protein: a.protein + (valid.protein ?? 0), fat: a.fat + (valid.fat ?? 0), carbs: a.carbs + (valid.carbs ?? 0) };
+    },
     { protein: 0, fat: 0, carbs: 0 },
   );
 }

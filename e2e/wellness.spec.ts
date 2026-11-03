@@ -207,6 +207,26 @@ test('calorie menu ignores unrelated daily card plugins', async ({ page }) => {
   await expect(dialog.getByText('Не блюдо')).toHaveCount(0);
 });
 
+test('calorie menu does not add malformed stored nutrition values', async ({ page }) => {
+  await page.evaluate((ids) => {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    localStorage.setItem('nutrition.eaten.v1', JSON.stringify({ [date]: [
+      { key: 'good', title: 'Завтрак', meal: 'Завтрак', kcal: 200, protein: 20, fat: 0, carbs: 30 },
+      { key: 'bad', title: 'Обед', meal: 'Обед', kcal: '500', protein: '30', fat: -5, carbs: null },
+    ] }));
+    localStorage.setItem('dashboard.screens.v1', JSON.stringify([{id:'calories-test', name:'Калории', hidden:ids.filter((id: string) => id !== 'calories'), layout:[{i:'calories',x:0,y:0,w:6,h:8}]}]));
+    localStorage.setItem('dashboard.activeScreen.v1', 'calories-test');
+  }, DEFAULT_LAYOUT.map(l => l.i));
+  await page.goto('/');
+  await page.getByTitle('Открыть меню дня').click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('200 ккал', { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByText(/Калорийность указана не для всех записей/)).toBeVisible();
+  await expect(dialog.getByText(/БЖУ указаны не для всех записей/)).toBeVisible();
+  await expect(dialog.getByText('200500', { exact: true })).toHaveCount(0);
+});
+
 test('new workout has seven real images and supports start, pause and next', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Выбрать тренировку', exact: true }).click();

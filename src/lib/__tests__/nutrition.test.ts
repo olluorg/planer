@@ -8,6 +8,19 @@ it('keeps zero distinct from missing or invalid macros', () => {
   expect(readMacros({ protein: null, fat: '', carbs: '20' })).toEqual({});
 });
 
+it('ignores invalid saved nutrition values in totals and leaves the diary unchanged', () => {
+  const date = '2026-11-02';
+  const raw = JSON.stringify({[date]: [
+    {key:'good', title:'Завтрак', meal:'Завтрак', kcal:200, protein:20, fat:0, carbs:30},
+    {key:'bad', title:'Обед', meal:'Обед', kcal:'500', protein:'30', fat:-5, carbs:null},
+  ]});
+  vi.stubGlobal('localStorage', {getItem: () => raw});
+  expect(eatenKcal(date)).toBe(200);
+  expect(eatenMacros(date)).toEqual({protein:20, fat:0, carbs:30});
+  expect(hasCompleteEatenCalories(date)).toBe(false);
+  expect(localStorage.getItem('nutrition.eaten.v1')).toBe(raw);
+});
+
 it('preserves an explicit zero and leaves unknown macros absent in personal foods and the food log', () => {
   const data = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value) });
