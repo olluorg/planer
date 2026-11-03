@@ -232,18 +232,25 @@ export function removePlugin(id: string) {
  *  (same-origin, не сеть). Флаг не даёт переустановить то, что пользователь удалил сам. */
 // v4: простые дешёвые рецепты по шагам + галерея/видео (страница рецепта)
 const DEFAULTS_KEY = 'plugins.defaults.v4';
-const DEFAULT_PLUGIN_FILES = ['/plugins/nutrition-month.thedad-widget.json'];
+const DEFAULT_PLUGINS = [{ id: 'nutrition-month', url: '/plugins/nutrition-month.thedad-widget.json' }];
 
 export async function ensureDefaultPlugins(): Promise<void> {
   try {
     if (localStorage.getItem(DEFAULTS_KEY) === '1') return;
-    for (const url of DEFAULT_PLUGIN_FILES) {
+    let complete = true;
+    for (const { id, url } of DEFAULT_PLUGINS) {
+      // При повторной попытке не заменяем уже установленный пользовательский план.
+      if (getInstalledPlugins().some((plugin) => plugin.id === id)) continue;
       try {
         const resp = await fetch(url);
-        if (resp.ok) installPlugin(await resp.json());
-      } catch {}
+        if (!resp.ok) { complete = false; continue; }
+        const raw = await resp.json();
+        if (raw?.id !== id) { complete = false; continue; }
+        // За время загрузки план могли установить или изменить в другой вкладке.
+        if (!getInstalledPlugins().some((plugin) => plugin.id === id)) installPlugin(raw);
+      } catch { complete = false; }
     }
-    localStorage.setItem(DEFAULTS_KEY, '1');
+    if (complete) localStorage.setItem(DEFAULTS_KEY, '1');
   } catch {}
 }
 
