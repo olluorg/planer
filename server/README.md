@@ -18,8 +18,14 @@ docker compose up --build
 | POST | `/vault` | создать анонимный vault (для QR-привязки) → `{syncId, authToken}` |
 | POST | `/register` | `{email, password, salt}` → `{syncId, authToken, salt}` |
 | POST | `/login` | `{email, password}` → `{syncId, authToken, salt}` |
-| PUT | `/vault/:id` | (Bearer authToken) `{ciphertext, updatedAt}` — залить блоб |
-| GET | `/vault/:id` | (Bearer authToken) → `{ciphertext, updatedAt}` |
+| PUT | `/vault/:id` | (Bearer authToken) `{ciphertext, updatedAt, expectedRevision}` — атомарно записать блоб; 409 при изменившейся версии |
+| GET | `/vault/:id` | (Bearer authToken) → `{ciphertext, updatedAt, revision}` |
+
+При обновлении сервер добавляет столбец `revision` к существующей базе. Сервер
+отклоняет старые клиенты без версии (HTTP 426), а новый клиент отказывается
+писать на старый сервер. Обновляйте сервер и приложения согласованно; до
+обновления всех устройств синхронизация на старых версиях будет недоступна.
+Перед обновлением сохраните резервную копию базы сервера.
 
 ## Как это E2E
 

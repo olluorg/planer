@@ -31,6 +31,7 @@ async function initDb() {
   // Каждый запрос к vault ищет строку по auth_token — без индекса это
   // последовательный скан по всей таблице.
   await pool.query('CREATE INDEX IF NOT EXISTS idx_vaults_auth_token ON vaults (auth_token)');
+  await pool.query('ALTER TABLE vaults ADD COLUMN IF NOT EXISTS revision BIGINT NOT NULL DEFAULT 0');
 }
 
 const token = () => randomBytes(32).toString('base64url');
@@ -117,18 +118,22 @@ app.post('/login', limit(10, '15 minutes'), async (req, reply) => {
 app.put('/vault/:id', async (req, reply) => {
   const v = await auth(req, reply); if (!v) return;
   if (v.id !== req.params.id) return reply.code(403).send({ error: 'forbidden' });
-  const { ciphertext, updatedAt } = req.body || {};
+  const { ciphertext, updatedAt, expectedRevision } = req.body || {};
   if (typeof ciphertext !== 'string') return reply.code(400).send({ error: 'ciphertext required' });
-  await pool.query('UPDATE vaults SET ciphertext = $1, updated_at = $2 WHERE id = $3',
-    [ciphertext, Number(updatedAt) || Date.now(), v.id]);
-  return { ok: true, updatedAt: Number(updatedAt) || Date.now() };
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)
+    return reply.code(426).send({ error: 'Обновите приложение: сервер требует безопасную синхронизацию' });
+  const timestamp = Number(updatedAt) || Date.now();
+  const result = await pool.query('UPDATE vaults SET ciphertext = $1, updated_at = $2, revision = revision + 1 WHERE id = $3 AND revision = $4 RETURNING revision',
+    [ciphertext, timestamp, v.id, expectedRevision]);
+  if (!result.rowCount) return reply.code(409).send({ error: 'vault changed' });
+  return { ok: true, updatedAt: timestamp, revision: Number(result.rows[0].revision) };
 });
 
 // Скачивание последнего блоба
 app.get('/vault/:id', async (req, reply) => {
   const v = await auth(req, reply); if (!v) return;
   if (v.id !== req.params.id) return reply.code(403).send({ error: 'forbidden' });
-  return { ciphertext: v.ciphertext || null, updatedAt: Number(v.updated_at) || 0 };
+  return { ciphertext: v.ciphertext || null, updatedAt: Number(v.updated_at) || 0, revision: Number(v.revision) };
 });
 
 const port = Number(process.env.PORT) || 8787;

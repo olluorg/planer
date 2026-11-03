@@ -57,7 +57,11 @@ async function api(serverUrl: string, path: string, opts: RequestInit = {}): Pro
   if (opts.body != null) headers['Content-Type'] = 'application/json';
   const res = await fetch(serverUrl.replace(/\/$/, '') + path, { ...opts, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const error = new Error(data?.error || `HTTP ${res.status}`) as Error & { status?: number };
+    error.status = res.status;
+    throw error;
+  }
   return data;
 }
 
@@ -121,13 +125,8 @@ async function localDbBytes(): Promise<Uint8Array | null> {
 
 /** Залить локальную БД на сервер (зашифровав). */
 export async function pushNow(): Promise<number> {
-  const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
-  const bytes = await localDbBytes(); if (!bytes) throw new Error('Нет локальной БД');
-  const cipher = toB64(await encryptBytes(bytes, c.encKey));
-  const updatedAt = Date.now();
-  await api(c.serverUrl, `/vault/${c.syncId}`, { method: 'PUT', headers: { Authorization: `Bearer ${c.authToken}` }, body: JSON.stringify({ ciphertext: cipher, updatedAt }) });
-  saveSync({ ...c, lastSync: updatedAt });
-  return updatedAt;
+  await syncNow();
+  return getSync()?.lastSync ?? 0;
 }
 
 /** Скачать БД с сервера и применить (перезаписывает локальную). */
@@ -157,22 +156,35 @@ let running: Promise<SyncOutcome> | null = null;
 /** Синхронизация со слиянием: скачать → расшифровать → слить построчно с
  *  локальной → залить результат. Раньше здесь побеждало последнее сохранение
  *  целиком, и правка, сделанная на другом устройстве офлайн, молча терялась.
- *  Если другое устройство зальёт своё между нашими скачиванием и заливкой, его
- *  правки не пропадут: они остаются у него и вернутся со следующим синком. */
+ *  Запись проверяет версию сервера; при одновременной записи повторяем слияние. */
 export function syncNow(): Promise<SyncOutcome> {
   // Два синка одновременно (кнопка + автосинк) слили бы одно и то же дважды.
   if (running) return running;
   running = (async () => {
     const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
-    const { ciphertext } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
     let outcome: SyncOutcome = { incoming: 0, deleted: 0 };
-    if (ciphertext) {
-      const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
-      outcome = await mergeIncoming(bytes);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { ciphertext, revision } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
+      if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('Обновите сервер синхронизации: текущая версия не защищает от одновременной записи');
+      if (ciphertext) {
+        const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
+        const merged = await mergeIncoming(bytes);
+        outcome = { incoming: outcome.incoming + merged.incoming, deleted: outcome.deleted + merged.deleted };
+        if (merged.incoming || merged.deleted) window.dispatchEvent(new CustomEvent(SYNC_MERGED_EVENT, { detail: merged }));
+      }
+      const bytes = await localDbBytes(); if (!bytes) throw new Error('Нет локальной БД');
+      const cipher = toB64(await encryptBytes(bytes, c.encKey));
+      const updatedAt = Date.now();
+      try {
+        await api(c.serverUrl, `/vault/${c.syncId}`, { method: 'PUT', headers: { Authorization: `Bearer ${c.authToken}` }, body: JSON.stringify({ ciphertext: cipher, updatedAt, expectedRevision: revision }) });
+        const current = getSync();
+        if (current?.syncId === c.syncId && current.authToken === c.authToken) saveSync({ ...current, lastSync: updatedAt });
+        return outcome;
+      } catch (error) {
+        if ((error as { status?: number }).status !== 409) throw error;
+      }
     }
-    await pushNow();
-    if (outcome.incoming || outcome.deleted) window.dispatchEvent(new CustomEvent(SYNC_MERGED_EVENT, { detail: outcome }));
-    return outcome;
+    throw new Error('Данные меняются на другом устройстве. Повторите синхронизацию.');
   })().finally(() => { running = null; });
   return running;
 }

@@ -8,7 +8,7 @@ vi.mock('sql.js/dist/sql-wasm.wasm?url', () => ({ default: '' }));
 /** Поддельный sync-сервер в памяти: то же API, что server/index.js. Хранит
  *  ровно то, что пришло по сети, — по этому и проверяем, что он видит. */
 function fakeServer() {
-  const vaults = new Map<string, { token: string; ciphertext: string | null; updatedAt: number; email?: string; salt?: string; pass?: string }>();
+  const vaults = new Map<string, { token: string; ciphertext: string | null; updatedAt: number; revision: number; email?: string; salt?: string; pass?: string }>();
   let n = 0;
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   const handler = async (url: string, init: RequestInit = {}) => {
@@ -16,11 +16,11 @@ function fakeServer() {
     const body = init.body ? JSON.parse(String(init.body)) : {};
     const auth = String((init.headers as Record<string, string> | undefined)?.Authorization ?? '').replace('Bearer ', '');
     if (path === '/vault' && init.method === 'POST') {
-      const id = `v${++n}`; vaults.set(id, { token: `t${n}`, ciphertext: null, updatedAt: 0 });
+      const id = `v${++n}`; vaults.set(id, { token: `t${n}`, ciphertext: null, updatedAt: 0, revision: 0 });
       return json(200, { syncId: id, authToken: `t${n}` });
     }
     if (path === '/register') {
-      const id = `v${++n}`; vaults.set(id, { token: `t${n}`, ciphertext: null, updatedAt: 0, email: body.email, salt: body.salt, pass: body.password });
+      const id = `v${++n}`; vaults.set(id, { token: `t${n}`, ciphertext: null, updatedAt: 0, revision: 0, email: body.email, salt: body.salt, pass: body.password });
       return json(200, { syncId: id, authToken: `t${n}`, salt: body.salt });
     }
     if (path === '/login') {
@@ -31,8 +31,12 @@ function fakeServer() {
     if (m) {
       const v = vaults.get(m[1]);
       if (!v || v.token !== auth) return json(401, { error: 'bad token' });
-      if (init.method === 'PUT') { v.ciphertext = body.ciphertext; v.updatedAt = body.updatedAt; return json(200, { ok: true }); }
-      return json(200, { ciphertext: v.ciphertext, updatedAt: v.updatedAt });
+      if (init.method === 'PUT') {
+        if (body.expectedRevision !== v.revision) return json(409, { error: 'vault changed' });
+        v.ciphertext = body.ciphertext; v.updatedAt = body.updatedAt; v.revision++;
+        return json(200, { ok: true, revision: v.revision });
+      }
+      return json(200, { ciphertext: v.ciphertext, updatedAt: v.updatedAt, revision: v.revision });
     }
     return json(404, {});
   };
@@ -150,6 +154,34 @@ describe('синхронизация', () => {
     const [a, b] = [sync.syncNow(), sync.syncNow()];
     expect(a).toBe(b); // второй вызов получает тот же синк, а не запускает новый
     await a;
+  });
+
+  it('повторяет синхронизацию после конфликта версии', async () => {
+    await withGoal('Цель');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    let conflict = true;
+    vi.stubGlobal('fetch', vi.fn((u: string, i?: RequestInit) => {
+      if (i?.method === 'PUT' && conflict) {
+        conflict = false;
+        return Promise.resolve(new Response(JSON.stringify({ error: 'vault changed' }), { status: 409 }));
+      }
+      return server.handler(u, i);
+    }));
+    await expect(sync.syncNow()).resolves.toEqual({ incoming: 0, deleted: 0 });
+    expect(conflict).toBe(false);
+    expect([...server.vaults.values()][0].revision).toBe(2);
+  });
+
+  it('не записывает данные на старый сервер без проверки версии', async () => {
+    await withGoal('Цель');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    const vault = [...server.vaults.values()][0];
+    const previous = vault.ciphertext;
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ ciphertext: previous }), { status: 200 }))));
+    await expect(sync.syncNow()).rejects.toThrow(/Обновите сервер/);
+    expect(vault.ciphertext).toBe(previous);
   });
 
   it('после входа на новом устройстве первая же правка не затирает скачанное', async () => {

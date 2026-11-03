@@ -66,3 +66,57 @@ test('правки с двух устройств сливаются без по
     await expect(laptop.getByText(t).first()).toBeVisible();
   }
 });
+
+test('сервер атомарно отклоняет устаревшую и старую запись', async ({ request }) => {
+  const created = await request.post(`${SERVER}/vault`);
+  expect(created.ok()).toBeTruthy();
+  const { syncId, authToken } = await created.json();
+  const url = `${SERVER}/vault/${syncId}`;
+  const headers = { Authorization: `Bearer ${authToken}` };
+  const initial = await (await request.get(url, { headers })).json();
+  expect(initial.revision).toBe(0);
+  const writes = await Promise.all(['first', 'second'].map(ciphertext => request.put(url, {
+    headers, data: { ciphertext, expectedRevision: initial.revision },
+  })));
+  expect(writes.map(r => r.status()).sort()).toEqual([200, 409]);
+  expect((await request.put(url, { headers, data: { ciphertext: 'legacy' } })).status()).toBe(426);
+  const result = await (await request.get(url, { headers })).json();
+  expect(result.revision).toBe(1);
+  expect(['first', 'second']).toContain(result.ciphertext);
+});
+
+test('одновременная синхронизация объединяет изменения обоих устройств', async ({ browser }) => {
+  const email = `race-${Date.now()}@example.com`;
+  const laptop = await device(browser);
+  const phone = await device(browser);
+  await addGoal(laptop, 'Общая цель');
+  await connect(laptop, email, 'Регистрация');
+  await connect(phone, email, 'Войти');
+  await addGoal(laptop, 'Изменение ноутбука');
+  await addGoal(phone, 'Изменение телефона');
+
+  let waiting = 0;
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  const intercept = async (route: import('@playwright/test').Route) => {
+    if (route.request().method() === 'PUT' && waiting < 2) {
+      if (++waiting === 2) release();
+      await barrier;
+    }
+    await route.continue();
+  };
+  await laptop.route('**/vault/*', intercept);
+  await phone.route('**/vault/*', intercept);
+  await Promise.all([sync(laptop), sync(phone)]);
+  expect(waiting).toBe(2);
+  await laptop.unroute('**/vault/*', intercept);
+  await phone.unroute('**/vault/*', intercept);
+  await sync(laptop);
+  await sync(phone);
+  for (const page of [laptop, phone]) {
+    await page.goto('/goals');
+    for (const title of ['Общая цель', 'Изменение ноутбука', 'Изменение телефона']) {
+      await expect(page.getByText(title).first()).toBeVisible();
+    }
+  }
+});
