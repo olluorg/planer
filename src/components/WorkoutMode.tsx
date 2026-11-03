@@ -15,7 +15,7 @@ export type WorkoutType = 'charge' | 'calisthenics' | 'yoga' | 'low-impact';
 
 const studioImage = (id: string) => `/workout/studio/${id}.webp`;
 const STUDIO_BY_NAME: Record<string, string> = {
-  'Приседания': 'squat', 'Отжимания': 'push-up', 'Выпады вперёд': 'forward-lunge',
+  'Приседания': 'squat', 'Отжимания': 'push-up', 'Выпады вперёд': 'forward-lunge-v2',
   'Планка': 'plank', 'Ягодичный мостик': 'bridge', 'Поза ребёнка': 'child-pose', 'Кошка-корова': 'cat-cow',
   'Джампинг джек': 'jumping-jack', 'Собака мордой вниз': 'downward-dog',
   'Боковая планка слева': 'side-plank', 'Боковая планка справа': 'side-plank',

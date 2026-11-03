@@ -225,7 +225,7 @@ test('charge workout loads the new push-up photograph', async ({ page }) => {
   await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
   await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
   const lunge = dialog.getByRole('img', {name:'Выпады вперёд', exact:true});
-  await expect(lunge).toHaveAttribute('src', '/workout/studio/forward-lunge.webp');
+  await expect(lunge).toHaveAttribute('src', '/workout/studio/forward-lunge-v2.webp');
   await expect.poll(() => lunge.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
   const crunch = dialog.getByRole('img', {name:'Скручивания', exact:true});
