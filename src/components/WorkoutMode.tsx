@@ -32,6 +32,8 @@ const STUDIO_BY_NAME: Record<string, string> = {
   'Захлёст голени': 'butt-kick',
   'Шавасана / дыхание': 'savasana', 'Мостик лёжа': 'bridge',
   'Наклоны к ногам': 'standing-forward-fold',
+  'Круги тазом': 'hip-circles', 'Ягодичный мостик на одной ноге': 'single-leg-bridge',
+  'Поза голубя': 'pigeon-pose',
 };
 
 export const LOW_IMPACT: Exercise[] = [
