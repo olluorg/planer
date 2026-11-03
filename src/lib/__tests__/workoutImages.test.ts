@@ -25,6 +25,8 @@ describe('illustrated exercises', () => {
     ['calisthenics', 'Отжимания узким хватом', '/workout/studio/close-grip-push-up.webp'],
     ['calisthenics', 'Болгарские выпады', '/workout/studio/bulgarian-split-squat.webp'],
     ['calisthenics', 'Отжимания «щучка»', '/workout/studio/pike-push-up.webp'],
+    ['calisthenics', 'Обратные отжимания от стула', '/workout/studio/bench-dip.webp'],
+    ['calisthenics', 'Приседания с прыжком', '/workout/studio/squat-jump.webp'],
     ['calisthenics', 'Супермен', '/workout/studio/superman.webp'],
     ['charge', 'Махи руками', '/workout/studio/arm-circles.webp'],
     ['calisthenics', 'Скалолаз', '/workout/studio/mountain-climber.webp'],

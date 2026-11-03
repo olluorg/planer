@@ -306,6 +306,8 @@ for (const exercise of [
   {type:'Калистеника', name:'Отжимания узким хватом', file:'close-grip-push-up', random:0, index:1},
   {type:'Калистеника', name:'Болгарские выпады', file:'bulgarian-split-squat', random:0.2, index:0},
   {type:'Калистеника', name:'Отжимания «щучка»', file:'pike-push-up', random:0.07, index:0},
+  {type:'Калистеника', name:'Обратные отжимания от стула', file:'bench-dip', random:0, index:2},
+  {type:'Калистеника', name:'Приседания с прыжком', file:'squat-jump', random:0.12, index:0},
   {type:'Йога', name:'Поза голубя', file:'pigeon-pose', random:0.28, index:0},
   {type:'Зарядка', name:'Наклоны к ногам', file:'standing-forward-fold', random:0.3, index:3},
   {type:'Йога', name:'Мостик лёжа', file:'bridge', random:0.5, index:5},

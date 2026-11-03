@@ -36,6 +36,7 @@ const STUDIO_BY_NAME: Record<string, string> = {
   'Поза голубя': 'pigeon-pose',
   'Отжимания узким хватом': 'close-grip-push-up', 'Болгарские выпады': 'bulgarian-split-squat',
   'Отжимания «щучка»': 'pike-push-up',
+  'Обратные отжимания от стула': 'bench-dip', 'Приседания с прыжком': 'squat-jump',
 };
 
 export const LOW_IMPACT: Exercise[] = [
