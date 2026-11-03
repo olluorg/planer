@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ensureDefaultPlugins, getInstalledPlugins, installPlugin, removePlugin } from '../plugins';
+import { ensureDefaultPlugins, getInstalledPlugins, installPlugin, removePlugin, isPluginStorageReadable } from '../plugins';
 
 const fixture = JSON.parse(readFileSync('public/plugins/nutrition-month.thedad-widget.json', 'utf8'));
 
@@ -49,6 +49,19 @@ describe('default nutrition plugin installation', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'other' }), { status: 200 })));
     await ensureDefaultPlugins();
     expect(getInstalledPlugins()).toHaveLength(0);
+    expect(localStorage.getItem('plugins.defaults.v4')).toBeNull();
+  });
+
+  it.each(['{broken', JSON.stringify([fixture, { id: 'partial' }])])('does not overwrite damaged plugin data', async (raw) => {
+    localStorage.setItem('plugins.installed.v1', raw);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    expect(isPluginStorageReadable()).toBe(false);
+    expect(() => installPlugin(fixture)).toThrow(/повреждено/);
+    expect(() => removePlugin('nutrition-month')).toThrow(/повреждено/);
+    await ensureDefaultPlugins();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem('plugins.installed.v1')).toBe(raw);
     expect(localStorage.getItem('plugins.defaults.v4')).toBeNull();
   });
 });

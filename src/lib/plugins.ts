@@ -203,6 +203,34 @@ export function validatePlugin(raw: unknown): { ok: true; plugin: PluginWidgetDe
 const STORE_KEY = 'plugins.installed.v1';
 export const PLUGINS_EVENT = 'thedad:plugins-changed';
 
+function readPluginsForWrite(): PluginWidgetDef[] {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw === null) return [];
+    const list: unknown = JSON.parse(raw);
+    if (!Array.isArray(list) || list.some((p) => !validatePlugin(p).ok)) throw new Error('invalid');
+    return list as PluginWidgetDef[];
+  } catch {
+    throw new Error('Хранилище виджетов повреждено или недоступно. Сначала сохраните исходную копию в настройках.');
+  }
+}
+
+export function isPluginStorageReadable(): boolean {
+  try { readPluginsForWrite(); return true; } catch { return false; }
+}
+
+/** Копия исходного содержимого, в том числе частично повреждённого. */
+export function exportRawPluginStorage(): void {
+  const raw = localStorage.getItem(STORE_KEY);
+  if (raw === null) throw new Error('Данные виджетов отсутствуют');
+  const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'thedad-plugins-recovery.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function getInstalledPlugins(): PluginWidgetDef[] {
   try {
     const list = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
@@ -219,13 +247,13 @@ function save(list: PluginWidgetDef[]) {
 export function installPlugin(raw: unknown): PluginWidgetDef {
   const res = validatePlugin(raw);
   if (!res.ok) throw new Error(res.errors.join('; '));
-  const list = getInstalledPlugins().filter((p) => p.id !== res.plugin.id);
+  const list = readPluginsForWrite().filter((p) => p.id !== res.plugin.id);
   save([...list, res.plugin]);
   return res.plugin;
 }
 
 export function removePlugin(id: string) {
-  save(getInstalledPlugins().filter((p) => p.id !== id));
+  save(readPluginsForWrite().filter((p) => p.id !== id));
 }
 
 /** Предустановленные плагины: ставятся один раз при первом запуске из статики приложения
@@ -237,6 +265,7 @@ const DEFAULT_PLUGINS = [{ id: 'nutrition-month', url: '/plugins/nutrition-month
 export async function ensureDefaultPlugins(): Promise<void> {
   try {
     if (localStorage.getItem(DEFAULTS_KEY) === '1') return;
+    if (!isPluginStorageReadable()) return;
     let complete = true;
     for (const { id, url } of DEFAULT_PLUGINS) {
       // При повторной попытке не заменяем уже установленный пользовательский план.

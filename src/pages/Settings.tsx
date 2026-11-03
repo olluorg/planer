@@ -28,7 +28,7 @@ import { DriveBackupSettings } from "@/components/DriveBackupSettings";
 import { FEATURE_PLUS } from "@/lib/features";
 import { buildWeeklyMarkdown, downloadText, printWeeklyReport } from "@/lib/report";
 import { encryptBytes, decryptBytes } from "@/lib/cryptoExport";
-import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, validatePlugin, PLUGINS_EVENT } from "@/lib/plugins";
+import { getInstalledPlugins, installPlugin, removePlugin, exportPlugin, validatePlugin, PLUGINS_EVENT, isPluginStorageReadable, exportRawPluginStorage } from "@/lib/plugins";
 import { preloadImages } from "@/lib/preload";
 import { getLiveWallpaper, setYouTubeWallpaper, setVideoWallpaper, clearLiveWallpaper, LIVEWP_EVENT } from "@/lib/liveWallpaper";
 import { chromeAiPresent, chromeAvailability, chromePreferred, setChromePreferred, downloadChromeModel, type Availability } from "@/lib/aiProvider";
@@ -621,8 +621,9 @@ export const SettingsPage = () => {
    Без исполняемого кода: только данные из белого списка коллекций + готовые примитивы. */
 const PluginsSettings: React.FC = () => {
   const [plugins, setPlugins] = useState(getInstalledPlugins());
+  const [storageReadable, setStorageReadable] = useState(isPluginStorageReadable());
   useEffect(() => {
-    const sync = () => setPlugins(getInstalledPlugins());
+    const sync = () => { setPlugins(getInstalledPlugins()); setStorageReadable(isPluginStorageReadable()); };
     window.addEventListener(PLUGINS_EVENT, sync);
     return () => window.removeEventListener(PLUGINS_EVENT, sync);
   }, []);
@@ -652,6 +653,12 @@ const PluginsSettings: React.FC = () => {
         импортированный виджет не может читать AI-ключ или отправлять данные в сеть.
         Примеры — в <code className="text-xs">docs/plugins</code> репозитория.
       </div>
+      {!storageReadable && <div role="alert" className="mb-3 rounded-lg border border-danger p-3 text-sm">
+        <p>Данные виджетов повреждены или недоступны. Изменения и установка заблокированы, чтобы не перезаписать их.</p>
+        <Button variant="soft" size="sm" className="mt-2" onClick={() => {
+          try { exportRawPluginStorage(); } catch (error) { toast.error('Не удалось сохранить копию', String((error as Error)?.message ?? error)); }
+        }}>Скачать исходную копию</Button>
+      </div>}
       {plugins.length > 0 && (
         <ul className="space-y-2 mb-3">
           {plugins.map((p) => (
@@ -668,7 +675,7 @@ const PluginsSettings: React.FC = () => {
               </Button>
               <Button
                 variant="ghost" size="sm"
-                onClick={() => { removePlugin(p.id); toast.success(`Плагин «${p.name}» удалён`); }}
+                onClick={() => { try { removePlugin(p.id); toast.success(`Плагин «${p.name}» удалён`); } catch (error) { toast.error('Не удалось удалить виджет', String((error as Error)?.message ?? error)); } }}
                 title="Удалить плагин"
               >
                 <X className="h-3.5 w-3.5" />
@@ -677,7 +684,7 @@ const PluginsSettings: React.FC = () => {
           ))}
         </ul>
       )}
-      {plugins.length === 0 && (
+      {plugins.length === 0 && storageReadable && (
         <div className="text-xs text-text-dim mb-3">Пока ничего не установлено.</div>
       )}
       <label className="inline-flex">

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
 
 test('default nutrition library retries after a temporary loading failure', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
@@ -12,4 +13,20 @@ test('default nutrition library retries after a temporary loading failure', asyn
   await expect.poll(() => page.evaluate(() => localStorage.getItem('plugins.defaults.v4'))).toBe('1');
   const ids = await page.evaluate(() => JSON.parse(localStorage.getItem('plugins.installed.v1') || '[]').map((p: {id: string}) => p.id));
   expect(ids).toContain('nutrition-month');
+});
+
+test('damaged plugin data is preserved and can be downloaded for recovery', async ({ page }) => {
+  const raw = '{"broken":';
+  await page.addInitScript(value => {
+    localStorage.setItem('onboarding.done.v1', '1');
+    localStorage.setItem('plugins.installed.v1', value);
+  }, raw);
+  await page.goto('/settings');
+  await expect(page.getByRole('alert').filter({ hasText: 'Данные виджетов повреждены' })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Скачать исходную копию' }).click();
+  const download = await downloadPromise;
+  expect(await fs.readFile((await download.path())!, 'utf8')).toBe(raw);
+  expect(await page.evaluate(() => localStorage.getItem('plugins.installed.v1'))).toBe(raw);
+  expect(await page.evaluate(() => localStorage.getItem('plugins.defaults.v4'))).toBeNull();
 });
