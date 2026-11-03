@@ -1,12 +1,35 @@
 import { test, expect } from '@playwright/test';
 
-test('first visit plays the bundled video locally', async ({ page }) => {
+test('first visit uses a still wallpaper without video', async ({ page }) => {
   await page.goto('/');
   expect(await page.evaluate(() => localStorage.getItem('accent'))).toBe('graphite');
-  const video = page.locator('video[src="/backgrounds/motion/city-fog.mp4"]');
-  await expect(video).toHaveCount(1);
-  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState)).toBeGreaterThan(1);
-  await expect(page.locator('html')).toHaveClass(/live-wp/);
+  expect(await page.evaluate(() => localStorage.getItem('app.livewallpaper.v1'))).toBeNull();
+  await expect(page.locator('html')).not.toHaveClass(/live-wp/);
+  await expect(page.locator('video')).toHaveCount(0);
+});
+
+test('removes the former automatic video without replacing the selected wallpaper', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'glass');
+    localStorage.setItem('onboarding.done.v1', '1');
+    localStorage.setItem('app.wallpaper.v1', '/wallpapers/wp14.jpg');
+    localStorage.setItem('app.livewallpaper.v1', JSON.stringify({ kind: 'builtin', ref: '/backgrounds/motion/city-fog.mp4' }));
+  });
+  await page.goto('/');
+  expect(await page.evaluate(() => localStorage.getItem('app.livewallpaper.v1'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('app.wallpaper.v1'))).toBe('/wallpapers/wp14.jpg');
+  await expect(page.locator('html')).not.toHaveClass(/live-wp/);
+});
+
+test('keeps a user-selected YouTube background', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'glass');
+    localStorage.setItem('onboarding.done.v1', '1');
+    localStorage.setItem('app.livewallpaper.v1', JSON.stringify({ kind: 'youtube', ref: 'abcdefghijk' }));
+  });
+  await page.goto('/');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('app.livewallpaper.v1')!).kind)).toBe('youtube');
+  await expect(page.locator('iframe[title="Живой фон"]')).toHaveCount(1);
 });
 
 test('an existing user without an accent retains the original default', async ({page}) => {
@@ -16,12 +39,12 @@ test('an existing user without an accent retains the original default', async ({
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())).toBe('#6366f1');
 });
 
-test('first visit starts glass with local motion and respects reduced motion', async ({ page }) => {
+test('first visit starts glass with a still wallpaper', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/glass/);
   await expect(page.locator('html')).not.toHaveClass(/live-wp/);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('app.livewallpaper.v1')!).kind)).toBe('builtin');
+  expect(await page.evaluate(() => localStorage.getItem('app.livewallpaper.v1'))).toBeNull();
   await page.getByRole('button', { name: 'Пропустить' }).click();
   await expect(page.getByRole('heading', { name: 'Пока ничего не запланировано' })).toBeVisible();
   await expect(page.getByText('Ты на правильном пути')).toHaveCount(0);
@@ -92,7 +115,8 @@ test('day summary shows actual task totals instead of an unsupported prediction'
   await page.goto('/tasks');
   await page.getByPlaceholder('Новая задача...').fill('Проверить документ');
   await page.getByPlaceholder('Новая задача...').press('Enter');
-  await page.goto('/');
+  await expect(page.getByText('Проверить документ', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Сегодня', exact: true }).click();
   await expect(page.getByText('Задач на сегодня: 1. Выполнено: 0.')).toBeVisible();
   await expect(page.getByText(/за неделю выполнено:/)).toContainText('0 из 1');
   await expect(page.getByText('Высокий шанс выиграть день. Начни с главного.')).toHaveCount(0);

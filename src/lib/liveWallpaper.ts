@@ -4,7 +4,6 @@
 import { get, set, del } from 'idb-keyval';
 
 export type LiveWallpaper =
-  | { kind: 'builtin'; ref: string }   // встроенный локальный ролик
   | { kind: 'youtube'; ref: string }   // ref = YouTube id
   | { kind: 'video'; ref: string };    // ref = ключ блоба в idb
 

@@ -6,8 +6,12 @@
     localStorage.setItem('theme', 'glass');
     if (!localStorage.getItem('accent')) localStorage.setItem('accent', 'graphite');
     if (!localStorage.getItem('app.wallpaper.v1')) localStorage.setItem('app.wallpaper.v1', '/backgrounds/diverse-2026-10/01-city-cloud.webp');
-    if (!localStorage.getItem('app.livewallpaper.v1')) localStorage.setItem('app.livewallpaper.v1', JSON.stringify({kind:'builtin', ref:'/backgrounds/motion/city-fog.mp4'}));
   }
+  // Убираем только прежний автоматически установленный ролик; выбор пользователя сохраняем.
+  try {
+    var live = JSON.parse(localStorage.getItem('app.livewallpaper.v1') || 'null');
+    if (live && live.kind === 'builtin' && live.ref === '/backgrounds/motion/city-fog.mp4') localStorage.removeItem('app.livewallpaper.v1');
+  } catch (_) {}
   var t = saved || (firstVisit ? 'glass' : 'dark');
   if (['light', 'dark', 'glass', 'glass-light', 'work', 'work-light'].indexOf(t) === -1) t = 'dark';
   var glass = t === 'glass' || t === 'glass-light';

@@ -57,7 +57,6 @@ export const AppLiveWallpaper: React.FC<{ suspended?: boolean }> = ({ suspended 
     <div className="fixed inset-0 -z-[1] pointer-events-none">
       {wp.kind === 'youtube' && <YouTubeBg id={wp.ref} />}
       {wp.kind === 'video' && videoUrl && <VideoBg src={videoUrl} onReady={() => setVideoReady(true)} onError={() => setVideoReady(false)} />}
-      {wp.kind === 'builtin' && <VideoBg src={wp.ref} onReady={() => setVideoReady(true)} onError={() => setVideoReady(false)} />}
       {/* затемнение для читаемости панелей */}
       {(wp.kind === 'youtube' || videoReady) && <div className="absolute inset-0 bg-black/60" />}
     </div>,
