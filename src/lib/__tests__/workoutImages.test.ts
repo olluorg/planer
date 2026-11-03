@@ -15,6 +15,7 @@ describe('illustrated exercises', () => {
     ['charge', 'Велосипед', '/workout/studio/bicycle-crunch.webp'],
     ['calisthenics', 'Подъём ног лёжа', '/workout/studio/leg-raise.webp'],
     ['charge', 'Бег на месте', '/workout/studio/jog-in-place.webp'],
+    ['charge', 'Захлёст голени', '/workout/studio/butt-kick.webp'],
     ['calisthenics', 'Супермен', '/workout/studio/superman.webp'],
     ['charge', 'Махи руками', '/workout/studio/arm-circles.webp'],
     ['calisthenics', 'Скалолаз', '/workout/studio/mountain-climber.webp'],

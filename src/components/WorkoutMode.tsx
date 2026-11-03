@@ -29,6 +29,7 @@ const STUDIO_BY_NAME: Record<string, string> = {
   'Бег на месте': 'jog-in-place', 'Супермен': 'superman', 'Махи руками': 'arm-circles', 'Скалолаз': 'mountain-climber',
   'Поза дерева (слева)': 'tree-pose', 'Поза дерева (справа)': 'tree-pose',
   'Поза лодки': 'boat-pose',
+  'Захлёст голени': 'butt-kick',
 };
 
 export const LOW_IMPACT: Exercise[] = [
