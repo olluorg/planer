@@ -17,7 +17,7 @@ export function getLiveWallpaper(): LiveWallpaper | null {
 }
 
 function save(w: LiveWallpaper | null) {
-  try { if (w) localStorage.setItem(KEY, JSON.stringify(w)); else localStorage.removeItem(KEY); } catch {}
+  if (w) localStorage.setItem(KEY, JSON.stringify(w)); else localStorage.removeItem(KEY);
   window.dispatchEvent(new CustomEvent(LIVEWP_EVENT));
 }
 
@@ -39,15 +39,16 @@ export async function setVideoWallpaper(file: File): Promise<void> {
   }
   // подчищаем прежний видео-блоб, если был
   const prev = getLiveWallpaper();
-  save({ kind: 'video', ref });
+  try { save({ kind: 'video', ref }); }
+  catch (error) { try { await del(ref); } catch {} throw error; }
   if (prev?.kind === 'video' && prev.ref !== ref) { try { await del(prev.ref); } catch {} }
 }
 
-export async function clearLiveWallpaper(): Promise<void> {
+export function clearLiveWallpaper(): void {
   selectionVersion++;
   const prev = getLiveWallpaper();
   save(null);
-  if (prev?.kind === 'video') { try { await del(prev.ref); } catch {} }
+  if (prev?.kind === 'video') void del(prev.ref).catch(() => {});
 }
 
 /** Object URL для видео-обоев из idb (null, если нет). Освобождать через revoke по надобности. */

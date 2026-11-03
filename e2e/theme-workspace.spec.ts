@@ -48,6 +48,26 @@ test('switching from YouTube to a still wallpaper persists after reload', async 
   await expect(page.getByRole('button', { name: 'Токио после дождя', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('a failed YouTube selection keeps the current background and shows an error', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'glass');
+    localStorage.setItem('onboarding.done.v1', '1');
+  });
+  await page.goto('/settings');
+  await page.getByPlaceholder('Ссылка YouTube…').fill('https://youtu.be/abcdefghijk');
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'app.livewallpaper.v1') throw new DOMException('Хранилище заполнено', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'Задать', exact: true }).click();
+  await expect(page.getByText('Не удалось сохранить фон')).toBeVisible();
+  await expect(page.getByPlaceholder('Ссылка YouTube…')).toHaveValue('https://youtu.be/abcdefghijk');
+  expect(await page.evaluate(() => localStorage.getItem('app.livewallpaper.v1'))).toBeNull();
+});
+
 test('an existing user without an accent retains the original default', async ({page}) => {
   await page.addInitScript(() => { localStorage.setItem('theme', 'glass'); localStorage.setItem('onboarding.done.v1', '1'); });
   await page.goto('/');

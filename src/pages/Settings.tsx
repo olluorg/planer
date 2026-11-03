@@ -696,7 +696,10 @@ const GlassWallpaperPicker: React.FC = () => {
   const [custom, setCustom] = useState<string[]>(getCustomWallpapers());
   // Прогреваем превью; новая коллекция не загружает все UHD-файлы заранее.
   useEffect(() => { preloadImages([...custom, ...APP_WALLPAPERS.map(wallpaperPreview)]); }, [custom]);
-  const pick = (src: string) => { void clearLiveWallpaper(); applyAppWallpaper(src); setCurrent(src); };
+  const pick = (src: string) => {
+    try { clearLiveWallpaper(); applyAppWallpaper(src); setCurrent(src); }
+    catch (err: any) { toast.error('Не удалось сменить фон', String(err?.message ?? err)); }
+  };
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -776,9 +779,11 @@ const LiveWallpaperControls: React.FC = () => {
   const onLink = () => {
     const id = parseYouTubeId(link.trim());
     if (!id) { toast.error("Не похоже на ссылку YouTube"); return; }
-    setYouTubeWallpaper(id);
-    setLink("");
-    toast.success("YouTube-обои установлены");
+    try {
+      setYouTubeWallpaper(id);
+      setLink("");
+      toast.success("YouTube-обои установлены");
+    } catch (err: any) { toast.error('Не удалось сохранить фон', String(err?.message ?? err)); }
   };
 
   return (
@@ -799,7 +804,9 @@ const LiveWallpaperControls: React.FC = () => {
         <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка YouTube…" className="h-9 flex-1 min-w-[160px]"
           onKeyDown={(e) => e.key === "Enter" && onLink()} />
         <Button size="sm" variant="soft" onClick={onLink}>Задать</Button>
-        {wp && <Button size="sm" variant="ghost" onClick={() => { void clearLiveWallpaper(); }}>Убрать</Button>}
+        {wp && <Button size="sm" variant="ghost" onClick={() => {
+          try { clearLiveWallpaper(); } catch (err: any) { toast.error('Не удалось убрать фон', String(err?.message ?? err)); }
+        }}>Убрать</Button>}
       </div>
     </div>
   );

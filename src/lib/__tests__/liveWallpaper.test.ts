@@ -44,4 +44,27 @@ describe('wallpaper selection', () => {
     wallpaper.setYouTubeWallpaper('abcdefghijk');
     expect(storage.del).toHaveBeenCalledWith('old');
   });
+
+  it('keeps the previous video if saving a YouTube selection fails', async () => {
+    const wallpaper = await import('../liveWallpaper');
+    localStorage.setItem('app.livewallpaper.v1', JSON.stringify({ kind: 'video', ref: 'old' }));
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('storage full'); });
+    try {
+      expect(() => wallpaper.setYouTubeWallpaper('abcdefghijk')).toThrow('storage full');
+      expect(wallpaper.getLiveWallpaper()).toEqual({ kind: 'video', ref: 'old' });
+      expect(storage.del).not.toHaveBeenCalled();
+    } finally { setItem.mockRestore(); }
+  });
+
+  it('deletes the new video and keeps the old selection if its config cannot be saved', async () => {
+    const wallpaper = await import('../liveWallpaper');
+    localStorage.setItem('app.livewallpaper.v1', JSON.stringify({ kind: 'video', ref: 'old' }));
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('storage full'); });
+    try {
+      await expect(wallpaper.setVideoWallpaper(new File(['video'], 'clip.mp4'))).rejects.toThrow('storage full');
+      expect(wallpaper.getLiveWallpaper()).toEqual({ kind: 'video', ref: 'old' });
+      expect(storage.del).toHaveBeenCalledOnce();
+      expect(storage.del).not.toHaveBeenCalledWith('old');
+    } finally { setItem.mockRestore(); }
+  });
 });
