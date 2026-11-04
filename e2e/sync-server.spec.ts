@@ -125,6 +125,21 @@ test('сервер атомарно отклоняет устаревшую и �
   expect(['first', 'second']).toContain(result.ciphertext);
 });
 
+test('registration with failed initial sync stays available for retry', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.route('**/register', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ syncId: 'retry-vault', authToken: 'retry-token' }) }));
+  await page.route('**/vault/retry-vault', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Сервер временно недоступен' }) }));
+  await page.goto('/settings');
+  await page.getByPlaceholder('email').fill('retry@example.com');
+  await page.getByPlaceholder('пароль').fill('password123');
+  await page.getByRole('button', { name: 'Регистрация' }).click();
+  await expect(page.getByText('Ожидает синхронизации', { exact: false })).toBeVisible();
+  await expect(page.getByText(/первая синхронизация не завершена/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Синхронизировать' })).toBeEnabled();
+  await page.reload();
+  await expect(page.getByText(/первая синхронизация не завершена/)).toBeVisible();
+});
+
 test('одновременная синхронизация объединяет изменения обоих устройств', async ({ browser }) => {
   const email = `race-${Date.now()}@example.com`;
   const laptop = await device(browser);

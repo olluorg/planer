@@ -24,7 +24,7 @@ export const SyncSettings: React.FC = () => {
   const run = async (fn: () => Promise<void>, ok: string) => {
     setBusy(true);
     try { await fn(); refresh(); if (ok) toast.success(ok); }
-    catch (e: any) { toast.error('Ошибка синхронизации', String(e?.message ?? e)); }
+    catch (e: any) { refresh(); toast.error('Ошибка синхронизации', String(e?.message ?? e)); }
     finally { setBusy(false); }
   };
 
@@ -42,10 +42,12 @@ export const SyncSettings: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-sm">
-          <span className="h-2 w-2 rounded-full bg-success" />
-          <span className="text-text">Подключено{cfg.email ? ` · ${cfg.email}` : ' · по ключу устройства'}</span>
+          <span className={`h-2 w-2 rounded-full ${cfg.lastSync ? 'bg-success' : 'bg-warning'}`} />
+          <span className="text-text">{cfg.lastSync ? 'Подключено' : 'Ожидает синхронизации'}{cfg.email ? ` · ${cfg.email}` : ' · по ключу устройства'}</span>
           <span className="text-text-muted text-xs ml-auto">{cfg.serverUrl}</span>
         </div>
+
+        {!cfg.lastSync && <div className="text-xs text-warning" role="status">Подключение создано, но первая синхронизация не завершена. Повторите синхронизацию.</div>}
 
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" disabled={busy} onClick={() => run(async () => {
