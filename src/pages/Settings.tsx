@@ -1,7 +1,7 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { todayISO } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
-import { resetDB, persist, DB_KEY, replaceDatabase } from "@/lib/db";
+import { resetDB, persist, persistBeforeReload, DB_KEY, replaceDatabase } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme, isGlass } from "@/lib/theme";
 import {
@@ -66,6 +66,16 @@ export const SettingsPage = () => {
     }
     setHeartbeatEnabled(v);
     setHeartbeat(v);
+  };
+
+  const restartOnboarding = async () => {
+    try {
+      await persistBeforeReload();
+      localStorage.removeItem('onboarding.done.v1');
+      location.reload();
+    } catch (error) {
+      toast.error('Не удалось открыть знакомство', String((error as Error)?.message ?? error));
+    }
   };
 
   useEffect(() => {
@@ -434,7 +444,7 @@ export const SettingsPage = () => {
           </Button>
           <Button
             variant="soft"
-            onClick={() => { localStorage.removeItem('onboarding.done.v1'); location.reload(); }}
+            onClick={() => void restartOnboarding()}
           >
             <Sparkles /> Пройти знакомство заново
           </Button>
