@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import type { Task } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { parsePlaceCoordinates } from '@/lib/placeCoordinates';
+import { persist } from '@/lib/db';
 const PlaceMapPicker = lazy(() => import('./PlaceMapPicker').then(module => ({ default: module.PlaceMapPicker })));
 
 export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({task, onClose}) => {
@@ -13,6 +14,7 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
   const [lat, setLat] = useState(task.place_lat == null ? '' : String(task.place_lat));
   const [lon, setLon] = useState(task.place_lon == null ? '' : String(task.place_lon));
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [coordinateInput, setCoordinateInput] = useState('');
   const [mapOpen, setMapOpen] = useState(false);
   const initialPoint = parsePlaceCoordinates(`${lat};${lon}`);
@@ -21,7 +23,8 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
     if (!point) { setError('Не удалось прочитать координаты. Вставьте широту и долготу или ссылку OpenStreetMap.'); return; }
     setLat(String(point.lat)); setLon(String(point.lon)); setError('');
   };
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     const title = name.trim();
     const hasLat = lat.trim() !== '', hasLon = lon.trim() !== '';
     const latitude = Number(lat.trim().replace(',', '.')), longitude = Number(lon.trim().replace(',', '.'));
@@ -29,10 +32,17 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
     if (hasLat !== hasLon || (hasLat && (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180))) {
       setError('Укажите обе координаты: широта от −90 до 90, долгота от −180 до 180.'); return;
     }
-    updateTask(task.id, {place_name: title || null, place_lat: hasLat ? latitude : null, place_lon: hasLon ? longitude : null});
-    onClose();
+    setSaving(true);
+    setError('');
+    try {
+      updateTask(task.id, {place_name: title || null, place_lat: hasLat ? latitude : null, place_lon: hasLon ? longitude : null});
+      await persist();
+      onClose();
+    } catch {
+      setError('Не удалось сохранить место на устройстве. Изменения остаются в памяти; проверьте хранилище и повторите попытку.');
+    } finally { setSaving(false); }
   };
-  return <Dialog open onOpenChange={(v) => {if (!v) onClose();}}>
+  return <Dialog open onOpenChange={(v) => {if (!v && !saving) onClose();}}>
     <DialogContent>
       <DialogHeader><DialogTitle>Место: {task.title}</DialogTitle></DialogHeader>
       <p className="text-sm text-text-muted">Название хранится в задаче. Координаты нужны, чтобы показать её на карте; их можно добавить позже.</p>
@@ -51,7 +61,7 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
       </Suspense>}
       {name.trim() && <a className="text-sm text-accent underline" href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(name.trim())}`} target="_blank" rel="noopener noreferrer">Найти место в OpenStreetMap</a>}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-      <DialogFooter><Button variant="ghost" onClick={onClose}>Отмена</Button><Button onClick={save}>Сохранить место</Button></DialogFooter>
+      <DialogFooter><Button variant="ghost" onClick={onClose} disabled={saving}>Отмена</Button><Button onClick={save} disabled={saving}>{saving ? 'Сохраняем…' : 'Сохранить место'}</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 };
