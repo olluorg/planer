@@ -17,6 +17,8 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState(false);
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [keyOpen, setKeyOpen] = useState(false);
   const [keyValue, setKeyValue] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -30,8 +32,17 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
 
   useEffect(() => {
     if (!open) return;
+    let active = true;
     setLoading(true);
-    fetchCatalog().then((c) => setItems(c.items)).finally(() => setLoading(false));
+    setCatalogError(false);
+    fetchCatalog().then((c) => { if (active) setItems(c.items); })
+      .catch(() => { if (active) setCatalogError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [open, catalogAttempt]);
+
+  useEffect(() => {
+    if (!open) return;
     refreshOwned();
     const onLic = () => refreshOwned();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -131,6 +142,11 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
             <div className="py-16 flex justify-center text-text-dim"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : catalogError ? (
+            <div role="alert" className="py-16 text-center text-sm text-text-muted space-y-3">
+              <p>Не удалось загрузить программы. Проверьте подключение и попробуйте ещё раз.</p>
+              <button className="rounded-lg bg-bg-soft border border-border px-4 py-2 text-text" onClick={() => setCatalogAttempt((n) => n + 1)}>Повторить</button>
+            </div>
           ) : items.length === 0 ? (
             <div className="py-16 text-center text-sm text-text-dim">Витрина пока пуста</div>
           ) : (

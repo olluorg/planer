@@ -189,15 +189,11 @@ function fromB64(s: string): Uint8Array {
 /* ==================== Каталог ==================== */
 
 export async function fetchCatalog(): Promise<Catalog> {
-  try {
-    const resp = await fetch('/marketplace/catalog.json', { cache: 'no-cache' });
-    if (!resp.ok) return { items: [] };
-    const data = await resp.json();
-    const items = Array.isArray(data?.items) ? data.items.filter((i: any) => i && typeof i.id === 'string') : [];
-    return { items };
-  } catch {
-    return { items: [] };
-  }
+  const resp = await fetch('/marketplace/catalog.json', { cache: 'no-cache' });
+  if (!resp.ok) throw new Error('Не удалось загрузить каталог');
+  const data = await resp.json();
+  if (!Array.isArray(data?.items)) throw new Error('Некорректный каталог');
+  return { items: data.items.filter((i: any) => i && typeof i.id === 'string') };
 }
 
 /* ==================== Лицензии ====================
