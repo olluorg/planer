@@ -1,22 +1,24 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import { MotionProvider } from '@/components/ui/motion';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { bindCrashHandlers } from '@/lib/crashlog';
+import { isExtension } from '@/lib/extension';
 import './index.css';
 
 bindCrashHandlers();
+const Router = isExtension ? HashRouter : BrowserRouter;
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
+      <Router>
         <MotionProvider>
           <App />
         </MotionProvider>
-      </BrowserRouter>
+      </Router>
     </ErrorBoundary>
   </React.StrictMode>,
 );

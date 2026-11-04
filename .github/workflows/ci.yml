@@ -53,6 +53,19 @@ jobs:
       - name: Test packaged desktop persistence
         run: bunx playwright test e2e/desktop-window.spec.ts --project=laptop --grep "packaged Windows app"
 
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build:ext
+      - run: bunx playwright install --with-deps chromium
+      - name: Verify extension navigation and reminders
+        run: bunx playwright test e2e/extension.spec.ts --project=laptop
+        env:
+          EXTENSION_E2E: '1'
+
   sync-integration:
     runs-on: ubuntu-latest
     services:
