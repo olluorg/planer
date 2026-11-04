@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, Notification, Tray, globalShortcut, ipcMain, s
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
+const { createReminderScheduler } = require('./reminder-scheduler.cjs');
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIR = path.join(__dirname, '..', 'dist');
@@ -79,34 +80,12 @@ function serveRenderer() {
  * вкладкой. Рендерер присылает расписание, main держит таймеры и показывает
  * системные уведомления, пока приложение живёт в трее.
  */
-let reminders = [];
-let reminderTimers = [];
-
-function clearReminderTimers() {
-  reminderTimers.forEach((t) => clearTimeout(t));
-  reminderTimers = [];
-}
-
-function scheduleReminders() {
-  clearReminderTimers();
-  if (!Notification.isSupported()) return;
-  for (const r of reminders) {
-    if (!r?.enabled || typeof r.time !== 'string') continue;
-    const [hh, mm] = r.time.split(':').map(Number);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
-    const at = new Date();
-    at.setHours(hh, mm, 0, 0);
-    if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
-    reminderTimers.push(setTimeout(() => {
-      new Notification({ title: 'THEDAD', body: r.text }).on('click', showWindow).show();
-      scheduleReminders(); // переставляем на следующие сутки
-    }, at.getTime() - Date.now()));
-  }
-}
+const reminderScheduler = createReminderScheduler({
+  notify: (r) => new Notification({ title: 'THEDAD', body: r.text }).on('click', showWindow).show(),
+});
 
 ipcMain.on('reminders:set', (_e, list) => {
-  reminders = Array.isArray(list) ? list : [];
-  scheduleReminders();
+  reminderScheduler.replace(Notification.isSupported() ? list : []);
 });
 
 /* ===== Окно и трей ===== */
