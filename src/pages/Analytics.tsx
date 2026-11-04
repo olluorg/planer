@@ -15,6 +15,7 @@ import { isoDate, fmtNum } from '@/lib/utils';
 import { useTheme, isDarkMode } from '@/lib/theme';
 import { forecastSummary } from '@/lib/forecastSummary';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
+import { recentFocusDays, timeByGoal } from '@/lib/analyticsTime';
 
 type Tab = 'overview' | 'focus' | 'tasks' | 'habits' | 'goals';
 
@@ -69,22 +70,11 @@ export const AnalyticsPage = () => {
 
   // Распределение времени по целям (из time_entries за 30 дней)
   const timeDistribution = useMemo(() => {
-    const last30 = new Set(Array.from({ length: 30 }, (_, i) => isoDate(addDays(new Date(), -i))));
-    const byGoal = new Map<string, number>();
-    let free = 0;
-    timeEntries.forEach((e) => {
-      if (!last30.has(isoDate(new Date(e.started_at))) || e.duration <= 0) return;
-      if (e.goal_id) byGoal.set(e.goal_id, (byGoal.get(e.goal_id) ?? 0) + e.duration);
-      else free += e.duration;
-    });
-    const palette = ['#6366f1', '#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4'];
-    const items = Array.from(byGoal.entries())
-      .map(([gid, sec]) => ({ name: goals.find((g) => g.id === gid)?.title ?? 'Цель', value: Math.round(sec / 60) }))
-      .sort((a, b) => b.value - a.value);
-    if (free > 0) items.push({ name: 'Свободный фокус', value: Math.round(free / 60) });
-    return items.slice(0, 6).map((it, i) => ({ ...it, color: palette[i % palette.length] }));
+    const palette = ['#64748b', '#78919b', '#8b9c88', '#ac9b80', '#9e9292', '#858585'];
+    const result = timeByGoal(timeEntries, goals, new Date());
+    return { ...result, items: result.items.map((item, i) => ({ ...item, color: palette[i % palette.length] })) };
   }, [timeEntries, goals]);
-  const timeTotalMin = timeDistribution.reduce((s, x) => s + x.value, 0);
+  const timeTotalMin = Math.round(timeDistribution.totalSeconds / 60);
 
   // Top-категории по тегам задач (за 60 дней)
   const topCategories = useMemo(() => {
@@ -178,7 +168,7 @@ export const AnalyticsPage = () => {
       : 0;
     const moods = reflections.filter((r) => last30.includes(r.date) && r.mood !== null).map((r) => r.mood as number);
     const mood = moods.length ? Math.round((moods.reduce((a, b) => a + b, 0) / moods.length / 4) * 100) : 0;
-    const focusDays = new Set(timeEntries.filter((e) => e.type === 'pomodoro' && e.duration >= 25 * 60).map((e) => isoDate(new Date(e.started_at)))).size;
+    const focusDays = recentFocusDays(timeEntries, new Date());
     const focus = Math.min(100, Math.round((focusDays / 30) * 100 * 2));
     const goalsAvg = goals.length
       ? Math.round((goals.reduce((s, g) => {
@@ -233,7 +223,7 @@ export const AnalyticsPage = () => {
     <Card>
       <CardTitle>Распределение времени</CardTitle>
       <div className="text-caption text-text-muted mb-2">По целям, за 30 дней{timeTotalMin > 0 ? ` · всего ${Math.floor(timeTotalMin / 60)}ч ${timeTotalMin % 60}м` : ''}</div>
-      {timeDistribution.length === 0 ? (
+      {timeDistribution.items.length === 0 ? (
         <div className="text-small text-text-dim py-8 text-center">Нет залогированного времени. Запускайте Pomodoro/Focus.</div>
       ) : (
         <ECharts height={240} option={{
@@ -244,7 +234,7 @@ export const AnalyticsPage = () => {
             avoidLabelOverlap: true,
             itemStyle: { borderColor: cc.tooltipBg, borderWidth: 2 },
             label: { show: false },
-            data: timeDistribution.map((d) => ({ name: d.name, value: d.value, itemStyle: { color: d.color } })),
+            data: timeDistribution.items.map((d) => ({ name: d.name, value: Math.round(d.seconds / 60 * 100) / 100, itemStyle: { color: d.color } })),
           }],
         }} />
       )}
