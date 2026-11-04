@@ -47,11 +47,14 @@ test('packaged Windows app keeps a task after restart', async () => {
     await expect(window.getByText('Проверка сохранения в Windows', { exact: true })).toBeVisible();
     await window.reload();
     await expect(window.getByText('Проверка сохранения в Windows', { exact: true })).toBeVisible();
+    await window.getByPlaceholder('Новая задача...').fill('Задача перед выходом');
+    await window.getByPlaceholder('Новая задача...').press('Enter');
     await quit();
     app = await launch();
     window = await app.firstWindow();
     await window.goto('app://planer/tasks');
     await expect(window.getByText('Проверка сохранения в Windows', { exact: true })).toBeVisible();
+    await expect(window.getByText('Задача перед выходом', { exact: true })).toBeVisible();
   } finally {
     await quit();
     await rm(profile, { recursive: true, force: true });
