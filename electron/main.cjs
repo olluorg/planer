@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { createReminderScheduler } = require('./reminder-scheduler.cjs');
+const { closeWindow } = require('./window-close.cjs');
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIR = path.join(__dirname, '..', 'dist');
@@ -148,15 +149,14 @@ function createWindow() {
   // Крестик прячет окно, а не завершает приложение: иначе напоминания
   // перестанут приходить ровно в тот момент, когда они нужны.
   win.on('close', (e) => {
-    if (quitting) return;
-    if (!tray) {
-      // Without a tray, hiding the only window would leave an inaccessible process.
-      quitting = true;
-      app.quit();
-      return;
-    }
-    e.preventDefault();
-    win.hide();
+    const action = closeWindow({
+      quitting,
+      hasTray: Boolean(tray),
+      quit: () => { quitting = true; app.quit(); },
+      preventClose: () => e.preventDefault(),
+      hide: () => win.hide(),
+    });
+    if (action !== 'hidden') return;
     // Один раз объясняем, куда делось окно: иначе «закрыл, а процесс висит»
     // выглядит как баг.
     if (!hintShown) {
