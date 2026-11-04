@@ -62,6 +62,13 @@ test('правки с двух устройств сливаются без по
 
   await addGoal(laptop, 'С ноутбука');
   await connect(laptop, email, 'Регистрация');
+  await expect(laptop.getByRole('button', { name: 'Заменить копией с сервера' })).toBeEnabled();
+  laptop.once('dialog', dialog => void dialog.accept());
+  const reloaded = laptop.waitForEvent('load');
+  await laptop.getByRole('button', { name: 'Заменить копией с сервера' }).click();
+  await reloaded;
+  await laptop.goto('/goals');
+  await expect(laptop.getByText('С ноутбука').first()).toBeVisible();
 
   // Телефон уже чем-то пользовался до входа — это не должно пропасть.
   await addGoal(phone, 'С телефона до входа');
@@ -104,23 +111,6 @@ test('правки с двух устройств сливаются без по
   await laptop.goto('/goals');
   for (const t of ['С ноутбука', 'С телефона до входа', 'Ноутбук, вечер', 'Телефон, вечер']) {
     await expect(laptop.getByText(t).first()).toBeVisible();
-  }
-});
-
-test('серверная копия восстанавливается через настройки и переживает перезагрузку', async ({ browser }) => {
-  const page = await device(browser);
-  try {
-    await addGoal(page, 'Цель в серверной копии');
-    await connect(page, `restore-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`, 'Регистрация');
-    await expect(page.getByRole('button', { name: 'Заменить копией с сервера' })).toBeEnabled();
-    page.once('dialog', dialog => void dialog.accept());
-    const reloaded = page.waitForEvent('load');
-    await page.getByRole('button', { name: 'Заменить копией с сервера' }).click();
-    await reloaded;
-    await page.goto('/goals');
-    await expect(page.getByText('Цель в серверной копии').first()).toBeVisible();
-  } finally {
-    await page.context().close();
   }
 });
 
