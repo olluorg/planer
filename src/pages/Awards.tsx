@@ -58,10 +58,11 @@ export const AwardsPage = () => {
   const { tasks, habitLogs, reflections, xpLog, achievements } = useStore();
   const iconStyle = useIconStyle();
   const [dailyGoal, setDailyGoal] = useLocalStorage<number>('gamification.dailyGoal', 100);
+  const [freezeTick, setFreezeTick] = useState(0);
 
   const total = xpTotal(xpLog);
   const day = xpToday(todayISO(), xpLog);
-  const streak = useMemo(() => computeStreak(new Date(), tasks, habitLogs, reflections), [tasks, habitLogs, reflections]);
+  const streak = useMemo(() => computeStreak(new Date(), tasks, habitLogs, reflections), [tasks, habitLogs, reflections, freezeTick]);
   const { level, pct, current, nextThreshold } = levelFromXp(total);
   const dayPct = Math.min(100, Math.round((day / Math.max(1, dailyGoal)) * 100));
 
@@ -74,14 +75,11 @@ export const AwardsPage = () => {
 
   const [editGoal, setEditGoal] = useState(false);
 
-  const [freezeTick, setFreezeTick] = useState(0);
-  // freezeTick used to force re-render after freeze usage
-  void freezeTick;
   const freezesLeft = availableFreezes(new Date());
   const yISO = isoDate(addDays(new Date(), -1));
 
   const applyFreezeYesterday = () => {
-    if (useFreeze(yISO)) { setFreezeTick((v) => v + 1); location.reload(); }
+    if (useFreeze(yISO)) setFreezeTick((v) => v + 1);
   };
 
   const handleShare = () => {
