@@ -24,6 +24,21 @@ async function addGoal(page: Page, title: string) {
   await page.getByPlaceholder('Цель', { exact: true }).fill('10');
   await page.getByRole('button', { name: 'Создать' }).click();
   await expect(page.getByText(title).first()).toBeVisible();
+  // Visibility only proves the in-memory update. A full page.goto immediately
+  // afterwards can accept beforeunload and interrupt the IndexedDB transaction.
+  await expect.poll(() => page.evaluate(async (name) => {
+    const bytes = await new Promise<Uint8Array | null>((resolve, reject) => {
+      const open = indexedDB.open('keyval-store');
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const request = db.transaction('keyval', 'readonly').objectStore('keyval').get('thedad.sqlite.v1');
+        request.onerror = () => { db.close(); reject(request.error); };
+        request.onsuccess = () => { db.close(); resolve(request.result ?? null); };
+      };
+    });
+    return bytes ? new TextDecoder().decode(bytes).includes(name) : false;
+  }, title), { message: `Дождаться записи цели «${title}» в IndexedDB` }).toBe(true);
 }
 
 async function connect(page: Page, email: string, mode: 'Регистрация' | 'Войти') {
