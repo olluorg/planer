@@ -255,6 +255,17 @@ describe('база данных', () => {
     incoming.close();
   });
 
+  it('не сливает удалённую базу, если подключение изменилось к моменту применения', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    const SQL = await (await import('sql.js')).default();
+    const incoming = new SQL.Database(current.export());
+    incoming.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('remote', 'Удалённая', 'x', 'x')");
+    await expect(db.mergeIncoming(incoming.export(), () => { throw new Error('Подключение изменилось'); })).rejects.toThrow('Подключение изменилось');
+    expect(db.query("SELECT id FROM goals WHERE id = 'remote'")).toHaveLength(0);
+    incoming.close();
+  });
+
   it('ожидающее сохранение не перезаписывает восстановленную базу старой', async () => {
     const db = await env.db();
     const current = await db.getDB();

@@ -181,7 +181,7 @@ export function syncNow(): Promise<SyncOutcome> {
       if (ciphertext) {
         const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
         assertConnection();
-        const merged = await mergeIncoming(bytes);
+        const merged = await mergeIncoming(bytes, assertConnection);
         outcome = { incoming: outcome.incoming + merged.incoming, deleted: outcome.deleted + merged.deleted };
         if (merged.incoming || merged.deleted) window.dispatchEvent(new CustomEvent(SYNC_MERGED_EVENT, { detail: merged }));
       }

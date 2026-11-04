@@ -407,7 +407,7 @@ async function replaceDatabaseLocked(bytes: Uint8Array, reason: string, replacin
  *  Снимок перед слиянием не делается: оно транзакционное и ничего не
  *  удаляет без надгробия, а снимок на каждый синк вытеснил бы из кольца
  *  суточные копии. */
-export async function mergeIncoming(bytes: Uint8Array): Promise<MergeStats> {
+export async function mergeIncoming(bytes: Uint8Array, validate?: () => void): Promise<MergeStats> {
   const head = new TextDecoder().decode(bytes.slice(0, 16));
   if (head !== SQLITE_MAGIC) throw new Error('Это не файл базы данных SQLite');
   const d = await getDB();
@@ -418,6 +418,7 @@ export async function mergeIncoming(bytes: Uint8Array): Promise<MergeStats> {
     // редактировать место: при слиянии не затираем ими локальные данные.
     const absentPlaceColumns = ['place_name', 'place_lat', 'place_lon'].filter(c => !columnExists(remote, 'tasks', c));
     await migrate(remote, null);
+    validate?.();
     const stats = mergeInto(d, remote, absentPlaceColumns);
     schedulePersist();
     return stats;
