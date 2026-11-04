@@ -317,7 +317,8 @@ export async function fetchProgram(id: string): Promise<ProgramPack> {
 
 /** Развернуть программу в стор: цели, привычки, задачи (по дням), плагин. */
 export function applyProgram(pack: ProgramPack, actions: ProgramActions): number {
-  if (isInstalled(pack.id)) throw new Error('Программа уже установлена. Откройте её из списка программ.');
+  if (installedPrograms(true).some((p) => p.id === pack.id)) throw new Error('Программа уже установлена. Откройте её из списка программ.');
+  allProgress(true);
   // SQLite и localStorage не имеют общей транзакции. При синхронной ошибке
   // откатываем SQLite через batch и возвращаем прежние значения localStorage.
   const keys = ['plugins.installed.v1', 'program.installed.v1', 'program.progress.v1'];
@@ -431,10 +432,10 @@ export interface InstalledProgram {
   kind: 'program' | 'hub';
 }
 
-export function installedPrograms(): InstalledProgram[] {
+export function installedPrograms(strict = false): InstalledProgram[] {
   try {
     const l = JSON.parse(localStorage.getItem(INSTALLED_KEY) || '[]');
-    if (!Array.isArray(l)) return [];
+    if (!Array.isArray(l) || !l.every((x) => typeof x === 'string' || (x && typeof x === 'object' && !Array.isArray(x) && typeof x.id === 'string' && (x.title == null || typeof x.title === 'string') && (x.emoji == null || typeof x.emoji === 'string') && (x.kind == null || x.kind === 'hub' || x.kind === 'program')))) throw new Error('invalid');
     // Миграция со старого формата (массив строк)
     return l
       .map((x): InstalledProgram | null =>
@@ -443,6 +444,7 @@ export function installedPrograms(): InstalledProgram[] {
           : (x && typeof x.id === 'string' ? { id: x.id, title: x.title ?? x.id, emoji: x.emoji ?? '🎯', kind: x.kind === 'hub' ? 'hub' : 'program' } : null))
       .filter((x): x is InstalledProgram => x !== null);
   } catch {
+    if (strict) throw new Error('Список программ повреждён или недоступен. Данные не изменены; восстановите резервную копию.');
     return [];
   }
 }
@@ -456,7 +458,7 @@ export function isInstalled(id: string): boolean {
 }
 
 function markInstalled(pack: ProgramPack) {
-  const list = installedPrograms().filter((p) => p.id !== pack.id);
+  const list = installedPrograms(true).filter((p) => p.id !== pack.id);
   list.push({ id: pack.id, title: pack.title, emoji: pack.emoji, kind: pack.hub ? 'hub' : 'program' });
   localStorage.setItem(INSTALLED_KEY, JSON.stringify(list));
   window.dispatchEvent(new CustomEvent(PROGRAMS_EVENT));
@@ -467,11 +469,13 @@ interface ProgressState {
   done: number[];        // отмеченные дни
 }
 
-function allProgress(): Record<string, ProgressState> {
+function allProgress(strict = false): Record<string, ProgressState> {
   try {
     const m = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
-    return m && typeof m === 'object' ? m : {};
+    if (!m || typeof m !== 'object' || Array.isArray(m) || !Object.values(m).every((item: any) => item && typeof item === 'object' && !Array.isArray(item) && typeof item.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.start) && Array.isArray(item.done) && item.done.every((day: unknown) => Number.isSafeInteger(day) && (day as number) > 0))) throw new Error('invalid');
+    return m;
   } catch {
+    if (strict) throw new Error('Прогресс программ повреждён или недоступен. Данные не изменены; восстановите резервную копию.');
     return {};
   }
 }
@@ -483,7 +487,7 @@ function saveProgress(m: Record<string, ProgressState>) {
 
 /** Зафиксировать дату старта при первой установке (для «День X из N»). */
 export function ensureProgramStart(id: string) {
-  const m = allProgress();
+  const m = allProgress(true);
   if (!m[id]) {
     m[id] = { start: todayISO(), done: [] };
     saveProgress(m);
@@ -504,7 +508,7 @@ export function currentDay(id: string, total: number): number {
 }
 
 export function toggleDayDone(id: string, day: number) {
-  const m = allProgress();
+  const m = allProgress(true);
   const st = m[id] ?? { start: todayISO(), done: [] };
   const set = new Set(st.done);
   set.has(day) ? set.delete(day) : set.add(day);

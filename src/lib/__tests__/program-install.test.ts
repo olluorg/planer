@@ -45,5 +45,20 @@ describe('program installation', () => {
       expect(localStorage.getItem('program.installed.v1')).toBeNull();
     } finally { spy.mockRestore(); }
   });
+  it.each([
+    ['program.installed.v1', '[{"id":"kept"},null]'],
+    ['program.progress.v1', '{"kept":{"start":"2026-11-01","done":"broken"}}'],
+  ])('does not overwrite damaged %s when installing', (key, raw) => {
+    localStorage.setItem(key, raw);
+    expect(() => marketplace.applyProgram(pack, store.getState())).toThrow('повреждён');
+    expect(localStorage.getItem(key)).toBe(raw);
+    expect(store.getState().tasks).toHaveLength(0);
+  });
+  it('does not overwrite damaged progress when marking a day', () => {
+    const raw = '{broken';
+    localStorage.setItem('program.progress.v1', raw);
+    expect(() => marketplace.toggleDayDone(pack.id, 1)).toThrow('повреждён');
+    expect(localStorage.getItem('program.progress.v1')).toBe(raw);
+  });
 });
 

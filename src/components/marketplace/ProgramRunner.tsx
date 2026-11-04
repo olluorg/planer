@@ -10,6 +10,7 @@ import {
 } from '@/lib/marketplace';
 import { analyzeProgram, type AdaptiveInsight } from '@/lib/programAdapt';
 import { useStore } from '@/lib/store';
+import { toast } from '@/lib/toast';
 
 /** Программа-плеер — направляемый режим «День X из N»: урок, тренировка (видео-демо),
  *  питание (фото+рецепт), акцент на привычках. Ядро премиум-опыта. */
@@ -72,7 +73,8 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
   const isDayDone = progress.done.includes(day);
 
   const markDone = () => {
-    toggleDayDone(programId, day);
+    try { toggleDayDone(programId, day); }
+    catch (error) { toast.error('Не удалось сохранить прогресс', error instanceof Error ? error.message : undefined); return; }
     setDoneTick((t) => t + 1);
     if (!isDayDone) {
       window.dispatchEvent(new CustomEvent('thedad:celebrate', { detail: { title: 'День пройден!', subtitle: pack?.title, emoji: '🎯' } }));
