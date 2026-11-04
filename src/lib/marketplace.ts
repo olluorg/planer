@@ -289,7 +289,7 @@ interface PackFile {
 /** Скачать зашифрованный пак и расшифровать ключом из лицензии. */
 export async function fetchProgram(id: string): Promise<ProgramPack> {
   const key = getContentKey(id);
-  if (!key) throw new Error('Пак не куплен');
+  if (!key) throw new Error('Для открытия программы активируйте её лицензионный ключ.');
   const resp = await fetch(`/marketplace/${id}.pack`, { cache: 'no-cache' });
   if (!resp.ok) throw new Error('Файл программы не найден');
   const file = (await resp.json()) as PackFile;

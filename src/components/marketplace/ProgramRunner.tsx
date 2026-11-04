@@ -5,7 +5,7 @@ import {
   GraduationCap, Flame, Loader2, Sparkles, TrendingUp, TriangleAlert, Info,
 } from 'lucide-react';
 import {
-  fetchProgram, getProgress, currentDay, toggleDayDone, safePhoto, youtubeId, openWorkoutHub,
+  fetchProgram, getProgress, currentDay, toggleDayDone, safePhoto, youtubeId, openWorkoutHub, openMarketplace,
   type ProgramPack, type ProgramDay,
 } from '@/lib/marketplace';
 import { analyzeProgram, type AdaptiveInsight } from '@/lib/programAdapt';
@@ -124,7 +124,7 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
         {/* Тело дня */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {loading && <div className="py-16 flex justify-center text-text-dim"><Loader2 className="h-6 w-6 animate-spin" /></div>}
-          {error && <div className="py-16 text-center text-sm text-red-400">{error}</div>}
+          {error && <div className="py-16 text-center text-sm space-y-4"><p className="text-text-muted">{error}</p>{error.includes('лицензионный ключ') && <button className="rounded-lg bg-accent px-4 py-2 text-white" onClick={() => { onClose(); openMarketplace(); }}>Открыть программы и ввести ключ</button>}</div>}
 
           {!loading && !error && insights.length > 0 && (
             <div className="rounded-xl border border-accent/25 bg-accent/[0.05] p-3.5">

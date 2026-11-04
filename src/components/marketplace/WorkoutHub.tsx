@@ -4,7 +4,7 @@ import {
   X, Dumbbell, Play, Flame, Check, Loader2, Clock, ArrowLeft, SkipForward, Pause, ChevronRight,
 } from 'lucide-react';
 import {
-  fetchProgram, safePhoto, youtubeId, workoutStreak,
+  fetchProgram, safePhoto, youtubeId, workoutStreak, openMarketplace,
   type ProgramPack, type WorkoutSession, type ProgramExercise,
 } from '@/lib/marketplace';
 import { useStore } from '@/lib/store';
@@ -78,7 +78,7 @@ export const WorkoutHub: React.FC<{ programId: string | null; onClose: () => voi
       </button>
 
       {loading && <div className="h-screen flex items-center justify-center text-text-dim"><Loader2 className="h-7 w-7 animate-spin" /></div>}
-      {error && <div className="h-screen flex items-center justify-center text-red-500 text-sm px-6 text-center">{error}</div>}
+      {error && <div className="h-screen flex flex-col gap-4 items-center justify-center text-sm px-6 text-center"><p className="text-text-muted">{error}</p>{error.includes('лицензионный ключ') && <button className="rounded-lg bg-accent px-4 py-2 text-white" onClick={() => { onClose(); openMarketplace(); }}>Открыть программы и ввести ключ</button>}</div>}
 
       {!loading && !error && hub && (
         <div className="min-h-screen pb-20">

@@ -185,14 +185,6 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
                         {isOwned && installed.has(it.id) ? (
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => install(it)}
-                              disabled={busy}
-                              title="Переустановить в планер"
-                              className="inline-flex items-center rounded-lg bg-bg-soft hover:bg-bg-hover text-text-muted px-2.5 py-2 text-xs disabled:opacity-60"
-                            >
-                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Обновить'}
-                            </button>
-                            <button
                               onClick={() => { it.kind === 'hub' ? openWorkoutHub(it.id) : openProgram(it.id); onClose(); }}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-accent text-white px-3.5 py-2 text-sm font-medium"
                             >
