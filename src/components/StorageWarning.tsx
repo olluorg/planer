@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
-import { getDB, hasCrossTabConflict, hasPersistFailure, mergeTabConflict, persist, PERSIST_STATUS_EVENT } from '../lib/db';
+import { getDB, hasCrossTabConflict, hasPendingPersist, hasPersistFailure, mergeTabConflict, persist, PERSIST_STATUS_EVENT } from '../lib/db';
 import { useStore } from '../lib/store';
 
 /** Ошибка записи не должна оставлять пользователя без способа спасти данные в памяти. */
 export function StorageWarning() {
   const [failed, setFailed] = useState(hasPersistFailure);
+  const [pending, setPending] = useState(hasPendingPersist);
   const [retrying, setRetrying] = useState(false);
   const [conflict, setConflict] = useState(hasCrossTabConflict);
   const [mergeError, setMergeError] = useState('');
   useEffect(() => {
-    const update = () => { setFailed(hasPersistFailure()); setConflict(hasCrossTabConflict()); };
+    const update = () => { setFailed(hasPersistFailure()); setConflict(hasCrossTabConflict()); setPending(hasPendingPersist()); };
     window.addEventListener(PERSIST_STATUS_EVENT, update);
     update();
     return () => window.removeEventListener(PERSIST_STATUS_EVENT, update);
   }, []);
-  if (!failed) return null;
+  if (!failed) return pending ? <div role="status" className="border-b border-border-soft px-4 py-1 text-xs text-text-muted">Сохраняем изменения…</div> : null;
 
   async function retry() {
     setRetrying(true);

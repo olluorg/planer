@@ -33,6 +33,7 @@ export const PERSIST_STATUS_EVENT = 'thedad-persist-status';
 export const CROSS_TAB_MERGED_EVENT = 'thedad-cross-tab-merged';
 export function hasPersistFailure() { return persistFailed; }
 export function hasCrossTabConflict() { return crossTabConflict; }
+export function hasPendingPersist() { return savedRevision < changeRevision && !persistFailed; }
 
 function sameBytes(a: Uint8Array | undefined, b: Uint8Array | undefined) {
   if (!a || !b) return !a && !b;
@@ -389,6 +390,7 @@ async function replaceDatabaseLocked(bytes: Uint8Array, reason: string, replacin
     ++persistAttempt;
     savedRevision = replacingRevision;
     setPersistFailure(false);
+    window.dispatchEvent(new Event(PERSIST_STATUS_EVENT));
     const old = db;
     db = candidate;
     try { old?.close(); } catch { /* replacement is already committed */ }
@@ -534,6 +536,7 @@ export async function persist() {
     if (attempt === persistAttempt) {
       savedRevision = revision;
       setPersistFailure(false);
+      window.dispatchEvent(new Event(PERSIST_STATUS_EVENT));
     }
   } catch (error) {
     if (attempt === persistAttempt) setPersistFailure(true);
@@ -553,7 +556,9 @@ export async function persist() {
  *  в один экспорт, который уходит в IndexedDB, как только обработчик отработал
  *  и интерфейс отрисовался. */
 export function schedulePersist() {
+  const wasPending = hasPendingPersist();
   changeRevision++;
+  if (!wasPending && hasPendingPersist()) window.dispatchEvent(new Event(PERSIST_STATUS_EVENT));
   if (saveTimer) return; // экспорт уже запланирован — он заберёт и эту правку
   saveTimer = window.setTimeout(() => {
     saveTimer = null;

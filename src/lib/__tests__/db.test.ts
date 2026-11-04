@@ -63,6 +63,37 @@ describe('база данных', () => {
     expect(db.query<{ title: string }>('SELECT title FROM goals')[0].title).toBe('Цель');
   });
 
+  it('сообщает об ожидающей записи до подтверждения IndexedDB', async () => {
+    const db = await env.db();
+    await db.getDB();
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => {
+      if (key === db.DB_KEY) { started(); return paused; }
+    };
+    const changes: boolean[] = [];
+    const listener = () => changes.push(db.hasPendingPersist());
+    window.addEventListener(db.PERSIST_STATUS_EVENT, listener);
+    try {
+      db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('pending', 'Цель', 'x', 'x')");
+      expect(db.hasPendingPersist()).toBe(true);
+      const saving = db.persist();
+      await entered;
+      expect(db.hasPendingPersist()).toBe(true);
+      release();
+      await saving;
+      await vi.waitFor(() => expect(db.hasPendingPersist()).toBe(false));
+      expect(changes).toContain(true);
+      expect(changes.at(-1)).toBe(false);
+    } finally {
+      release();
+      (globalThis as { __holdSet?: unknown }).__holdSet = undefined;
+      window.removeEventListener(db.PERSIST_STATUS_EVENT, listener);
+    }
+  });
+
   it('база из будущей версии не открывается и не портится', async () => {
     const db = await env.db();
     await db.getDB();
