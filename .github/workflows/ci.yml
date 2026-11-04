@@ -94,6 +94,14 @@ jobs:
           exit 1
       - run: bunx playwright install --with-deps chromium
       - name: Test concurrent sync against PostgreSQL
-        run: bunx playwright test e2e/sync-server.spec.ts --project=laptop --workers=1
+        run: bunx playwright test e2e/sync-server.spec.ts --project=laptop --workers=1 --repeat-each=2 --retries=0
         env:
           E2E_SYNC_SERVER: http://localhost:8787
+      - name: Save sync test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
