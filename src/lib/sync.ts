@@ -2,7 +2,7 @@
 // заливается на sync-сервер как непрозрачный блоб. Сервер не знает ключ.
 // encKey: из пароля (PBKDF2) для email-входа, либо случайный для QR-привязки.
 import { get } from 'idb-keyval';
-import { DB_KEY, persist, replaceDatabase, mergeIncoming } from './db';
+import { DB_KEY, persistBeforeReload, replaceDatabase, mergeIncoming } from './db';
 import { encryptBytes, decryptBytes } from './cryptoExport';
 
 export interface SyncConfig {
@@ -183,7 +183,7 @@ export async function importSyncFromHashIfPresent(): Promise<boolean> {
 /* ===== Обмен блобами ===== */
 
 async function localDbBytes(): Promise<Uint8Array | null> {
-  await persist();
+  await persistBeforeReload();
   return (await get<Uint8Array>(DB_KEY)) ?? null;
 }
 

@@ -9,8 +9,8 @@
  *  Остальные файлы Диска приложению не видны, доступ отзывается одной кнопкой
  *  в настройках Google-аккаунта.
  */
-import { get, set } from 'idb-keyval';
-import { DB_KEY, persist, saveBackup } from './db';
+import { get } from 'idb-keyval';
+import { DB_KEY, persistBeforeReload, replaceDatabase } from './db';
 import { encryptBytes, decryptBytes } from './cryptoExport';
 import { isExtension } from './extension';
 
@@ -205,7 +205,7 @@ async function deleteDriveFile(id: string) {
 
 /** Шифрует текущую БД и заливает в appDataFolder, подчищая старые копии. */
 export async function uploadBackup(passphrase: string, interactive = true): Promise<DriveBackup> {
-  await persist();
+  await persistBeforeReload();
   const bytes = await get<Uint8Array>(DB_KEY);
   if (!bytes) throw new Error('Локальной базы нет');
   const cipher = await encryptBytes(bytes, passphrase);
@@ -249,9 +249,7 @@ export async function restoreFromDrive(fileId: string, passphrase: string): Prom
   const plain = await decryptBytes(cipher, passphrase).catch(() => {
     throw new Error('Неверная парольная фраза или файл повреждён');
   });
-  const current = await get<Uint8Array>(DB_KEY);
-  if (current) await saveBackup(current, 'pre-restore');
-  await set(DB_KEY, plain);
+  await replaceDatabase(plain, 'pre-restore');
 }
 
 /** Отключает бэкап локально. Файлы в Диске остаются — их удаляет пользователь. */
