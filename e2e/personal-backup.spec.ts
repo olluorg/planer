@@ -8,6 +8,8 @@ test('personal data exports without credentials, restores, and can be rolled bac
     localStorage.setItem('personal.fixture','1');
     localStorage.setItem('user.name.v1','Анна');
     localStorage.setItem('nutrition.eaten.v1', JSON.stringify({'2026-10-29':[{key:'a',title:'Обед',meal:'Обед',kcal:400,protein:20}]}));
+    localStorage.setItem('hub.photos.home-gym', JSON.stringify({ before: 'data:image/jpeg;base64,YWJj' }));
+    localStorage.setItem('hub.goals.home-gym', JSON.stringify(['Сила']));
     localStorage.setItem('thedad.drive.pass','example-secret');
   });
   await page.goto('/health');
@@ -19,13 +21,15 @@ test('personal data exports without credentials, restores, and can be rolled bac
   const downloaded = await pending;
   const contents = await fs.readFile((await downloaded.path())!);
   expect(contents.toString()).not.toContain('example-secret');
-  await page.evaluate(() => {localStorage.setItem('user.name.v1','Иван'); localStorage.removeItem('nutrition.eaten.v1');});
+  await page.evaluate(() => {localStorage.setItem('user.name.v1','Иван'); localStorage.removeItem('nutrition.eaten.v1'); localStorage.removeItem('hub.photos.home-gym'); localStorage.setItem('hub.goals.home-gym', '["Другие"]');});
   page.once('dialog', dialog => dialog.accept());
   const reloaded = page.waitForEvent('load');
   await page.getByText('Копия личных данных', {exact:true}).locator('..').locator('input[type=file]').setInputFiles({name:'personal.json',mimeType:'application/json',buffer:contents});
   await reloaded;
   expect(await page.evaluate(() => localStorage.getItem('user.name.v1'))).toBe('Анна');
   expect(await page.evaluate(() => localStorage.getItem('nutrition.eaten.v1'))).toContain('Обед');
+  expect(await page.evaluate(() => localStorage.getItem('hub.photos.home-gym'))).toContain('data:image/jpeg;base64,YWJj');
+  expect(await page.evaluate(() => localStorage.getItem('hub.goals.home-gym'))).toBe('["Сила"]');
   expect(await page.evaluate(() => localStorage.getItem('thedad.drive.pass'))).toBe('example-secret');
   await page.goto('/health');
   await expect(page.getByText('1 850 ккал сегодня')).toBeVisible();
@@ -37,6 +41,8 @@ test('personal data exports without credentials, restores, and can be rolled bac
   await rollback;
   expect(await page.evaluate(() => localStorage.getItem('user.name.v1'))).toBe('Иван');
   expect(await page.evaluate(() => localStorage.getItem('nutrition.eaten.v1'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('hub.photos.home-gym'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('hub.goals.home-gym'))).toBe('["Другие"]');
 });
 
 test('invalid personal backup is rejected without changing local data', async ({page}) => {

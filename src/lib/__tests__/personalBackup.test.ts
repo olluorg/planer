@@ -8,6 +8,35 @@ beforeEach(async () => { localStorage.clear(); await clear(); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('personal data backup', () => {
+  it('backs up program photos and goals and restores the prior snapshot', async () => {
+    const photo = JSON.stringify({ before: 'data:image/jpeg;base64,YWJj' });
+    localStorage.setItem('hub.photos.home-gym', photo);
+    localStorage.setItem('hub.goals.home-gym', '["Сила"]');
+    localStorage.setItem('hub.secret.home-gym', 'do-not-export');
+    const file = parsePersonalData(exportPersonalData());
+    expect(JSON.stringify(file)).not.toContain('do-not-export');
+    localStorage.setItem('hub.goals.home-gym', '["До импорта"]');
+    localStorage.removeItem('hub.photos.home-gym');
+    await restorePersonalData(file);
+    expect(localStorage.getItem('hub.photos.home-gym')).toBe(photo);
+    expect(localStorage.getItem('hub.goals.home-gym')).toBe('["Сила"]');
+    await restorePersonalRecovery();
+    expect(localStorage.getItem('hub.photos.home-gym')).toBeNull();
+    expect(localStorage.getItem('hub.goals.home-gym')).toBe('["До импорта"]');
+  });
+
+  it('preserves program data when importing an older backup without it', async () => {
+    const { hubs: _hubs, ...old } = exportPersonalData();
+    localStorage.setItem('hub.goals.home-gym', '["Оставить"]');
+    await restorePersonalData(parsePersonalData(old));
+    expect(localStorage.getItem('hub.goals.home-gym')).toBe('["Оставить"]');
+  });
+
+  it('rejects non-allowlisted program keys and invalid photo data', () => {
+    const file = exportPersonalData();
+    expect(() => parsePersonalData({ ...file, hubs: { 'hub.secret.home-gym': 'secret' } })).toThrow();
+    expect(() => parsePersonalData({ ...file, hubs: { 'hub.photos.home-gym': '{"before":"https://example.com/image"}' } })).toThrow();
+  });
   it('round-trips a diary entry with unknown calories', async () => {
     const original = '{"2026-11-02":[{"key":"soup","title":"Суп","meal":"Обед"}]}';
     localStorage.setItem('nutrition.eaten.v1', original);

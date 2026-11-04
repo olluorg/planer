@@ -26,18 +26,18 @@ export function PersonalBackup() {
     try {
       if (file.size > 12_000_000) throw new Error('Файл слишком большой');
       const backup = parsePersonalData(JSON.parse(await file.text()));
-      if (!confirm('Заменить профиль, данные питания и тренировок из этой копии? Существующие значения будут сохранены отдельно в этом браузере. База SQLite не меняется.')) return;
+      if (!confirm('Заменить профиль, данные питания и тренировок, включая фото программ, из этой копии? Существующие значения будут сохранены отдельно в этом браузере. База SQLite не меняется.')) return;
       await restorePersonalData(backup);
       location.reload();
     } catch (error) { toast.error('Не удалось восстановить личные данные', String((error as Error)?.message ?? error)); void hasPersonalRecovery().then(setRecoverable).catch(() => {}); }
   };
   const recover = async () => {
-    if (!confirm('Вернуть профиль, питание и тренировки к состоянию перед последним импортом? База SQLite не меняется.')) return;
+    if (!confirm('Вернуть профиль, питание и тренировки, включая фото программ, к состоянию перед последним импортом? База SQLite не меняется.')) return;
     try { await restorePersonalRecovery(); location.reload(); }
     catch (error) { toast.error('Не удалось восстановить предыдущие данные', String((error as Error)?.message ?? error)); }
   };
   return <div className="space-y-3">
-    <p className="text-sm text-text-muted">Отдельная копия имени и фото профиля, данных питания и тренировок. Файл не зашифрован и может содержать личные сведения. Задачи и цели сохраняются отдельно через экспорт SQLite; настройки, плагины и видеообои в эту копию не входят. Ключи доступа не экспортируются.</p>
+    <p className="text-sm text-text-muted">Отдельная копия имени и фото профиля, данных питания и тренировок, включая фото и отметки целей тренировочных программ. Файл не зашифрован и может содержать личные сведения. Задачи и цели сохраняются отдельно через экспорт SQLite; настройки, плагины и видеообои в эту копию не входят. Ключи доступа не экспортируются.</p>
     <p className="text-sm text-text-muted">Сохранённый план питания хранится в виджете отдельно от дневника. Экспортируйте его отдельным файлом; для восстановления используйте «Плагины — свои виджеты» → «Импортировать .json».</p>
     <div className="flex flex-wrap gap-2">
       <Button variant="soft" onClick={download}><Download /> Экспорт личных данных</Button>

@@ -11,7 +11,8 @@ export const PERSONAL_BACKUP_KEYS = [
 const RECOVERY_KEY = 'thedad.personal-backup.recovery.v1';
 const SCHEMA = 'thedad.personal-data/v1';
 type Values = Record<string, string | null>;
-type PersonalBackup = { schema: typeof SCHEMA; exportedAt: string; values: Values };
+type PersonalBackup = { schema: typeof SCHEMA; exportedAt: string; values: Values; hubs?: Record<string, string> };
+const HUB_KEY = /^hub\.(photos|goals)\.[a-zA-Z0-9_-]{1,80}$/;
 const JSON_ARRAYS = new Set(['user.categories.v1', 'nutrition.foods.v1']);
 const JSON_OBJECTS = new Set(['nutrition.eaten.v1', 'activity.manual.v1', 'workout.sessions.v1', 'workout.met-seconds.v1']);
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -22,8 +23,20 @@ function snapshot(): Values {
   return Object.fromEntries(PERSONAL_BACKUP_KEYS.map(key => [key, localStorage.getItem(key)]));
 }
 
+function snapshotHubs(): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && HUB_KEY.test(key)) {
+      const value = localStorage.getItem(key);
+      if (value !== null) result[key] = value;
+    }
+  }
+  return result;
+}
+
 export function exportPersonalData(): PersonalBackup {
-  return {schema:SCHEMA, exportedAt:new Date().toISOString(), values:snapshot()};
+  return {schema:SCHEMA, exportedAt:new Date().toISOString(), values:snapshot(), hubs:snapshotHubs()};
 }
 
 export function parsePersonalData(raw: unknown): PersonalBackup {
@@ -55,12 +68,32 @@ export function parsePersonalData(raw: unknown): PersonalBackup {
     const ranges: Record<string, [number, number]> = {'profile.age.v1':[5,120], 'profile.height.v1':[80,250], 'profile.weight.v1':[30,300], 'nutrition.kcal-goal.v1':[500,10000]};
     if (ranges[key] && (!Number.isFinite(Number(value)) || Number(value) < ranges[key][0] || Number(value) > ranges[key][1])) throw new Error(`Неверные данные: ${key}`);
   }
-  return {schema:SCHEMA, exportedAt:file.exportedAt, values:values as Values};
+  let hubs: Record<string, string> | undefined;
+  if ('hubs' in file) {
+    if (!object(file.hubs) || Object.keys(file.hubs).length > 200) throw new Error('Неверные данные программ тренировок');
+    hubs = {};
+    for (const [key, value] of Object.entries(file.hubs)) {
+      if (!HUB_KEY.test(key) || typeof value !== 'string' || value.length > 6_000_000) throw new Error('Неверные данные программ тренировок');
+      let parsed: unknown;
+      try { parsed = JSON.parse(value); } catch { throw new Error('Неверные данные программ тренировок'); }
+      if (key.startsWith('hub.goals.')) {
+        if (!Array.isArray(parsed) || !parsed.every(item => typeof item === 'string')) throw new Error('Неверные цели программы');
+      } else if (!object(parsed) || Object.entries(parsed).some(([name, image]) => !['before', 'after'].includes(name) || typeof image !== 'string' || !/^data:image\/(?:png|jpeg|webp);base64,/i.test(image))) {
+        throw new Error('Неверные фотографии программы');
+      }
+      hubs[key] = value;
+    }
+  }
+  return {schema:SCHEMA, exportedAt:file.exportedAt, values:values as Values, ...(hubs ? { hubs } : {})};
 }
 
-function apply(values: Values) {
+function apply(values: Values, hubs?: Record<string, string>) {
   for (const key of PERSONAL_BACKUP_KEYS) localStorage.removeItem(key);
   for (const key of PERSONAL_BACKUP_KEYS) if (values[key] !== null) localStorage.setItem(key, values[key]!);
+  if (hubs) {
+    for (const key of Object.keys(snapshotHubs())) localStorage.removeItem(key);
+    for (const [key, value] of Object.entries(hubs)) localStorage.setItem(key, value);
+  }
 }
 
 /** Keep a separate recovery snapshot before touching localStorage. */
@@ -71,13 +104,13 @@ export async function restorePersonalData(file: PersonalBackup): Promise<void> {
   const before = exportPersonalData();
   await set(RECOVERY_KEY, before);
   try {
-    apply(next.values);
+    apply(next.values, next.hubs);
     // The SQLite health values were not restored with this file; do not claim ownership of them.
     localStorage.removeItem(NUTRITION_OWNER_KEY);
     localStorage.removeItem(WORKOUT_OWNER_KEY);
   }
   catch (error) {
-    try { apply(before.values); }
+    try { apply(before.values, before.hubs); }
     catch { throw new Error('Не удалось восстановить данные автоматически. Предыдущая копия сохранена для восстановления в настройках.'); }
     throw error;
   }
@@ -95,17 +128,18 @@ export async function restorePersonalRecovery(): Promise<void> {
   if (object(saved) && object(saved.values) && !('workout.met-seconds.v1' in saved.values)) saved.values['workout.met-seconds.v1'] = null;
   if (!object(saved) || saved.schema !== SCHEMA || !object(saved.values) ||
       Object.keys(saved.values).some(key => !PERSONAL_BACKUP_KEYS.includes(key as typeof PERSONAL_BACKUP_KEYS[number])) ||
-      PERSONAL_BACKUP_KEYS.some(key => !(key in saved.values) || (saved.values[key] !== null && typeof saved.values[key] !== 'string'))) {
+      PERSONAL_BACKUP_KEYS.some(key => !(key in saved.values) || (saved.values[key] !== null && typeof saved.values[key] !== 'string')) ||
+      (saved.hubs !== undefined && (!object(saved.hubs) || Object.entries(saved.hubs).some(([key, value]) => !HUB_KEY.test(key) || typeof value !== 'string')))) {
     throw new Error('Предыдущая копия повреждена');
   }
   const before = exportPersonalData();
   await set(RECOVERY_KEY, before);
   try {
-    apply(saved.values);
+    apply(saved.values, saved.hubs);
     localStorage.removeItem(NUTRITION_OWNER_KEY);
     localStorage.removeItem(WORKOUT_OWNER_KEY);
   } catch (error) {
-    try { apply(before.values); }
+    try { apply(before.values, before.hubs); }
     catch { throw new Error('Не удалось восстановить данные автоматически. Предыдущая копия сохранена для восстановления в настройках.'); }
     // A failed recovery must remain retryable after the current state is restored.
     await set(RECOVERY_KEY, saved);
