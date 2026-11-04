@@ -1,7 +1,7 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { todayISO } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
-import { resetDB, persist, persistBeforeReload, DB_KEY, replaceDatabase } from "@/lib/db";
+import { resetDB, persistBeforeReload, DB_KEY, replaceDatabase } from "@/lib/db";
 import { useStore } from "@/lib/store";
 import { useTheme, isGlass } from "@/lib/theme";
 import {
@@ -92,7 +92,7 @@ export const SettingsPage = () => {
 
   const exportDb = async () => {
     try {
-      await persist();
+      await persistBeforeReload();
       const blob = await get<Uint8Array>(DB_KEY);
       if (!blob) throw new Error('База не найдена');
       const url = URL.createObjectURL(new Blob([blob.buffer as ArrayBuffer], {type: 'application/octet-stream'}));
@@ -224,7 +224,7 @@ export const SettingsPage = () => {
     if (pass === null) return;
     if (pass.length < 8) { alert('Слишком короткий пароль'); return; }
     try {
-      await persist();
+      await persistBeforeReload();
       const blob = await get<Uint8Array>(DB_KEY);
       if (!blob) throw new Error('База не найдена');
       const enc = await encryptBytes(blob, pass);
