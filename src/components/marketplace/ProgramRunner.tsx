@@ -29,13 +29,15 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
   }, [pack]);
 
   useEffect(() => {
-    if (!programId) { setPack(null); setError(''); return; }
+    let active = true;
+    setPack(null); setError(''); setDay(1);
+    if (!programId) { setLoading(false); return () => { active = false; }; }
     setLoading(true);
-    setError('');
     fetchProgram(programId)
-      .then((p) => { setPack(p); setDay(currentDay(programId, p.duration_days || (p.days?.length ? Math.max(...p.days.map((d) => d.day)) : 1))); })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
-      .finally(() => setLoading(false));
+      .then((p) => { if (!active) return; setPack(p); setDay(currentDay(programId, p.duration_days || (p.days?.length ? Math.max(...p.days.map((d) => d.day)) : 1))); })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : 'Ошибка'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [programId]);
 
   useEffect(() => {

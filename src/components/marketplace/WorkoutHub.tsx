@@ -28,12 +28,15 @@ export const WorkoutHub: React.FC<{ programId: string | null; onClose: () => voi
   const [goalsTick, setGoalsTick] = useState(0);
 
   useEffect(() => {
-    if (!programId) { setPack(null); setError(''); setDetail(null); setPlayer(null); return; }
-    setLoading(true); setError('');
+    let active = true;
+    setPack(null); setError(''); setDetail(null); setPlayer(null);
+    if (!programId) { setLoading(false); return () => { active = false; }; }
+    setLoading(true);
     fetchProgram(programId)
-      .then((p) => { if (!p.hub) throw new Error('В этой программе нет фитнес-хаба'); setPack(p); })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
-      .finally(() => setLoading(false));
+      .then((p) => { if (!active) return; if (!p.hub) throw new Error('В этой программе нет фитнес-хаба'); setPack(p); })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : 'Ошибка'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [programId]);
 
   useEffect(() => {
