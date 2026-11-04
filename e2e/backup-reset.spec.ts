@@ -1,6 +1,25 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 
+test('snapshot list reports storage errors and can be retried', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('onboarding.done.v1', '1');
+    const original = IDBObjectStore.prototype.getAllKeys;
+    IDBObjectStore.prototype.getAllKeys = function (...args) {
+      if (sessionStorage.getItem('fail-backup-list') === '1') throw new Error('storage unavailable');
+      return original.apply(this, args);
+    };
+  });
+  await page.goto('/tasks');
+  await page.evaluate(() => sessionStorage.setItem('fail-backup-list', '1'));
+  await page.goto('/settings');
+  await expect(page.getByRole('alert').filter({ hasText: 'Не удалось прочитать список снимков' })).toBeVisible();
+  await page.evaluate(() => sessionStorage.removeItem('fail-backup-list'));
+  await page.getByRole('button', { name: 'Повторить', exact: true }).click();
+  await expect(page.getByText('Не удалось прочитать список снимков')).toHaveCount(0);
+  await expect(page.getByText(/Снимков пока нет|Автоматически, раз в сутки/).first()).toBeVisible();
+});
+
 test('database export scope is explicit and cancelling reset preserves tasks', async ({page}) => {
   await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
   await page.goto('/tasks');

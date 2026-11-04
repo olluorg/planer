@@ -21,7 +21,16 @@ const fmt = (ts: number) =>
  *  никто не делал, а данные уже испорчены или потеряны. */
 export function BackupRestore() {
   const [items, setItems] = useState<BackupEntry[]>([]);
-  const refresh = () => listBackups().then(setItems);
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const refresh = async () => {
+    setListState('loading');
+    try {
+      setItems(await listBackups());
+      setListState('ready');
+    } catch {
+      setListState('error');
+    }
+  };
 
   useEffect(() => {
     void refresh();
@@ -62,7 +71,14 @@ export function BackupRestore() {
       <div className="flex gap-2 flex-wrap">
         <Button variant="soft" onClick={makeNow}><History /> Сделать снимок сейчас</Button>
       </div>
-      {items.length === 0 ? (
+      {listState === 'loading' ? (
+        <div className="text-sm text-text-muted" role="status">Загрузка снимков…</div>
+      ) : listState === 'error' ? (
+        <div className="flex items-center gap-3 flex-wrap text-sm" role="alert">
+          <span>Не удалось прочитать список снимков. Проверьте доступ к хранилищу браузера.</span>
+          <Button variant="soft" onClick={refresh}>Повторить</Button>
+        </div>
+      ) : items.length === 0 ? (
         <div className="text-sm text-text-muted">Снимков пока нет.</div>
       ) : (
         <ul className="space-y-2">
