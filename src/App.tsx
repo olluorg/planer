@@ -19,7 +19,7 @@ import { useInbox } from './lib/inbox';
 import { ACHIEVEMENTS } from './lib/gamification';
 import { applyAccent, getAccent } from './lib/theme';
 import { useNavigate } from 'react-router-dom';
-import { loadReminders, scheduleHeartbeat } from './lib/notifications';
+import { HEARTBEAT_EVENT, loadReminders, scheduleHeartbeat } from './lib/notifications';
 import { useHealthSync } from './lib/healthSync';
 import { AppLiveWallpaper } from './components/AppLiveWallpaper';
 import { Celebration } from './components/Celebration';
@@ -204,7 +204,7 @@ export default function App() {
 
   useEffect(() => {
     if (!ready) return;
-    scheduleHeartbeat({
+    const reschedule = () => scheduleHeartbeat({
       morningBody: () => {
         const st = useStore.getState();
         const today = todayISO();
@@ -225,6 +225,9 @@ export default function App() {
         return `Закрой день: ${done}/${dt.length} задач. Запиши рефлексию.`;
       },
     });
+    reschedule();
+    window.addEventListener(HEARTBEAT_EVENT, reschedule);
+    return () => window.removeEventListener(HEARTBEAT_EVENT, reschedule);
   }, [ready]);
 
   useEffect(() => {

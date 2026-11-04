@@ -82,12 +82,14 @@ if (typeof document !== 'undefined') {
 }
 
 const HEARTBEAT_KEY = 'thedad.heartbeat.enabled.v1';
+export const HEARTBEAT_EVENT = 'thedad:heartbeat-changed';
 
 export function isHeartbeatEnabled(): boolean {
   return localStorage.getItem(HEARTBEAT_KEY) === '1';
 }
 export function setHeartbeatEnabled(enabled: boolean) {
   localStorage.setItem(HEARTBEAT_KEY, enabled ? '1' : '0');
+  window.dispatchEvent(new Event(HEARTBEAT_EVENT));
 }
 
 let heartbeatTimers: number[] = [];

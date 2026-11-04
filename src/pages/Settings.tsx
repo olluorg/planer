@@ -66,7 +66,6 @@ export const SettingsPage = () => {
     }
     setHeartbeatEnabled(v);
     setHeartbeat(v);
-    location.reload();
   };
 
   useEffect(() => {
