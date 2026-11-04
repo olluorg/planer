@@ -21,6 +21,8 @@ exampe.jpg
 # Проект на bun (bun.lock). package-lock.json — побочный продукт локальной
 # установки через npm, в репозиторий не идёт: два локфайла расходятся.
 package-lock.json
+# Отдельный Node-сервер собирается через npm ci и требует собственный lockfile.
+!server/package-lock.json
 
 # Кэш инкрементальной сборки TypeScript
 *.tsbuildinfo
