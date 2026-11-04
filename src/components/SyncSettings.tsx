@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
 import {
   getSync, disconnectSync, registerEmail, loginEmail, createVault,
-  buildSyncLink, pullNow, syncNow, type SyncConfig,
+  buildSyncLink, pullNow, syncNowFresh, type SyncConfig,
 } from '@/lib/sync';
 import { RefreshCw, QrCode, LogOut, DownloadCloud, Cloud } from 'lucide-react';
 
@@ -48,7 +48,7 @@ export const SyncSettings: React.FC = () => {
 
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" disabled={busy} onClick={() => run(async () => {
-            const r = await syncNow();
+            const r = await syncNowFresh();
             toast.success('Синхронизировано', r.incoming || r.deleted
               ? `С других устройств: ${r.incoming} изменений${r.deleted ? `, удалено ${r.deleted}` : ''}`
               : 'Всё и так совпадало');

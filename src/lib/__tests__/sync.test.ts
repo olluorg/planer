@@ -156,6 +156,33 @@ describe('синхронизация', () => {
     await a;
   });
 
+  it('ручной синк запускает новый обмен после уже начатого фонового', async () => {
+    await withGoal('Цель');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    let release!: () => void;
+    let started!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    let first = true;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      if (first && (!i?.method || i.method === 'GET') && u.includes('/vault/')) {
+        first = false;
+        const response = await server.handler(u, i);
+        started();
+        await gate;
+        return response;
+      }
+      return server.handler(u, i);
+    }));
+    const background = sync.syncNow();
+    await entered;
+    const manual = sync.syncNowFresh();
+    release();
+    await Promise.all([background, manual]);
+    expect([...server.vaults.values()][0].revision).toBe(3);
+  });
+
   it('повторяет синхронизацию после конфликта версии', async () => {
     await withGoal('Цель');
     const sync = await import('../sync');

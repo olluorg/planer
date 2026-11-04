@@ -189,6 +189,13 @@ export function syncNow(): Promise<SyncOutcome> {
   return running;
 }
 
+/** A manual request must also read server changes made after an ongoing background sync began. */
+export async function syncNowFresh(): Promise<SyncOutcome> {
+  const previous = running;
+  if (previous) await previous.catch(() => {});
+  return syncNow();
+}
+
 /** Фоновая синхронизация: при запуске, раз в 5 минут, при возврате сети и
  *  при возвращении на вкладку. Ошибки глотаем — нет сети не повод мешать. */
 export function startAutoSync(): () => void {
