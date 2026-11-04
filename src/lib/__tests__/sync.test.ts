@@ -205,6 +205,31 @@ describe('синхронизация', () => {
     expect(sync.getSync()).toBeNull();
   });
 
+  it('не возобновляет старый обмен после повторного входа в то же хранилище', async () => {
+    await withGoal('Цель');
+    const sync = await import('../sync');
+    await sync.registerEmail('https://sync.test', 'same@example.com', 'password123');
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    let held = false;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      const response = await server.handler(u, i);
+      if (!held && (!i?.method || i.method === 'GET') && u.includes('/vault/')) { held = true; entered(); await gate; }
+      return response;
+    }));
+    const oldSync = sync.syncNow();
+    const oldResult = expect(oldSync).rejects.toThrow(/Подключение изменилось/);
+    await started;
+    sync.disconnectSync();
+    const login = sync.loginEmail('https://sync.test', 'same@example.com', 'password123');
+    await vi.waitFor(() => expect(sync.getSync()?.email).toBe('same@example.com'));
+    release();
+    await oldResult;
+    await expect(login).resolves.toBeUndefined();
+    expect([...server.vaults.values()][0].revision).toBe(2);
+  });
+
   it('не заменяет базу и не возвращает подключение при отключении во время загрузки копии', async () => {
     const db = await withGoal('Исходная');
     const sync = await import('../sync');

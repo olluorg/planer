@@ -16,13 +16,21 @@ export interface SyncConfig {
 
 const CFG_KEY = 'thedad.sync.v1';
 const EVENT = 'thedad-sync-changed';
+let connectionGeneration = 0;
+
+function sameConnection(a: SyncConfig | null, b: SyncConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return a.serverUrl === b.serverUrl && a.syncId === b.syncId && a.authToken === b.authToken && a.encKey === b.encKey;
+}
 
 export function getSync(): SyncConfig | null {
   try { const raw = localStorage.getItem(CFG_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 function saveSync(cfg: SyncConfig | null) {
+  const changed = !sameConnection(getSync(), cfg);
   if (cfg) localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
   else localStorage.removeItem(CFG_KEY);
+  if (changed) connectionGeneration++;
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 export function onSyncChange(cb: () => void): () => void {
@@ -31,9 +39,9 @@ export function onSyncChange(cb: () => void): () => void {
 }
 export function disconnectSync() { saveSync(null); }
 
-function assertSyncConnection(expected: SyncConfig) {
+function assertSyncConnection(expected: SyncConfig, generation: number) {
   const current = getSync();
-  if (!current || current.serverUrl !== expected.serverUrl || current.syncId !== expected.syncId || current.authToken !== expected.authToken || current.encKey !== expected.encKey) {
+  if (generation !== connectionGeneration || !sameConnection(current, expected)) {
     throw new Error('Подключение изменилось во время синхронизации. Повторите действие.');
   }
 }
@@ -139,15 +147,16 @@ export async function pushNow(): Promise<number> {
 /** Скачать БД с сервера и применить (перезаписывает локальную). */
 export async function pullNow(): Promise<boolean> {
   const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
+  const generation = connectionGeneration;
   const { ciphertext, updatedAt } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
-  assertSyncConnection(c);
+  assertSyncConnection(c, generation);
   if (!ciphertext) return false; // на сервере пусто
   const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
-  assertSyncConnection(c);
+  assertSyncConnection(c, generation);
   // Не просто set(DB_KEY): открытая в памяти база иначе затёрла бы скачанную
   // первой же правкой. Текущее состояние уходит в локальный снимок.
-  await replaceDatabase(bytes, 'pre-sync-pull', () => assertSyncConnection(c));
-  assertSyncConnection(c);
+  await replaceDatabase(bytes, 'pre-sync-pull', () => assertSyncConnection(c, generation));
+  assertSyncConnection(c, generation);
   saveSync({ ...getSync()!, lastSync: updatedAt });
   return true;
 }
@@ -172,7 +181,8 @@ export function syncNow(): Promise<SyncOutcome> {
   if (running) return running;
   running = (async () => {
     const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
-    const assertConnection = () => assertSyncConnection(c);
+    const generation = connectionGeneration;
+    const assertConnection = () => assertSyncConnection(c, generation);
     let outcome: SyncOutcome = { incoming: 0, deleted: 0 };
     for (let attempt = 0; attempt < 5; attempt++) {
       const { ciphertext, revision } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
