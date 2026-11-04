@@ -17,4 +17,7 @@ test('графики подгружаются по требованию и ри�
   // которые начисляются при загрузке примеров.
   await expect(page.locator('[_echarts_instance_] canvas').first()).toBeVisible({ timeout: 15_000 });
   expect(chartChunk.length).toBeGreaterThan(0);
+  await page.getByRole('tab', { name: 'Привычки' }).click();
+  await expect(page.getByText('Выполнено / текущая цель на неделю')).toBeVisible();
+  await expect(page.locator('[_echarts_instance_] canvas').first()).toBeVisible();
 });

@@ -125,8 +125,8 @@ export const AnalyticsPage = () => {
     const days = Array.from({ length: 7 }, (_, i) => isoDate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), i)));
     return habits.map((h) => ({
       title: h.title,
-      done: days.filter((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d)).length,
-      target: 7,
+      done: days.filter((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d && l.done > 0)).length,
+      target: h.target_per_week ?? 7,
     }));
   }, [habits, habitLogs]);
 
@@ -405,17 +405,17 @@ export const AnalyticsPage = () => {
         <div className="bento-grid">
           <Card>
             <CardTitle>Привычки за неделю</CardTitle>
-            <ECharts height={260} option={{
-              grid: { left: 140, right: 20, top: 10, bottom: 24 },
+            <div className="text-caption text-text-muted mb-2">Выполнено / текущая цель на неделю</div>
+            {habitsBar.length === 0 ? <div className="text-small text-text-dim py-8 text-center">Добавьте привычку, чтобы увидеть её прогресс.</div> : <ECharts height={Math.max(200, habitsBar.length * 38 + 50)} option={{
+              grid: { left: 140, right: 55, top: 10, bottom: 24 },
               xAxis: { type: 'value', max: 7, axisLabel: { color: cc.axis }, splitLine: { lineStyle: { color: cc.splitLine } } },
               // длинные названия привычек не режем жёстко: даём ширину и аккуратное многоточие
               yAxis: { type: 'category', data: habitsBar.map((h) => h.title), axisLabel: { color: cc.axis, width: 128, overflow: 'truncate', ellipsis: '…' }, axisLine: { lineStyle: { color: cc.axisLine } } },
-              series: [{
-                type: 'bar', barWidth: 14,
-                data: habitsBar.map((h) => ({ value: h.done, itemStyle: { color: '#6366f1', borderRadius: [0, 4, 4, 0] } })),
-                markLine: { silent: true, symbol: 'none', data: [{ xAxis: 7, lineStyle: { color: cc.axis, type: 'dashed' } }] },
-              }],
-            }} />
+              series: [
+                { name: 'Цель', type: 'bar', barWidth: 14, barGap: '-100%', silent: true, data: habitsBar.map((h) => ({ value: h.target, itemStyle: { color: cc.emptyBar, borderRadius: [0, 4, 4, 0] } })) },
+                { name: 'Выполнено', type: 'bar', barWidth: 14, data: habitsBar.map((h) => ({ value: h.done, itemStyle: { color: '#64748b', borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', formatter: `${h.done}/${h.target}`, color: cc.axis } })) },
+              ],
+            }} />}
           </Card>
 
           <Card>

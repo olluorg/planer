@@ -107,7 +107,7 @@ export function buildWeekReview(s: WeekData, today = todayISO()): WeekReview {
 
   const habits = s.habits.map((h) => {
     const done = s.habitLogs.filter((l) => l.habit_id === h.id && inWeek(l.date) && l.done).length;
-    return { habit: h, done, target: h.schedule === 'daily' ? 7 : h.target_per_week ?? 7 };
+    return { habit: h, done, target: h.target_per_week ?? 7 };
   });
 
   const weekRefl = s.reflections.filter((r) => inWeek(r.date)).sort((a, b) => a.date.localeCompare(b.date));

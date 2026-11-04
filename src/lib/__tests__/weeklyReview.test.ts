@@ -81,6 +81,8 @@ describe('задачи, привычки, записи', () => {
     const habitLogs = ['2026-09-21', '2026-09-22', '2026-09-20'].map((date) => ({ id: date, habit_id: 'h', date, done: 1 } as HabitLog));
     const r = buildWeekReview({ ...empty, habits, habitLogs }, SUNDAY);
     expect(r.habits[0]).toMatchObject({ done: 2, target: 7 });
+    const reducedTarget = buildWeekReview({ ...empty, habits: [{ ...habits[0], target_per_week: 3 }], habitLogs }, SUNDAY);
+    expect(reducedTarget.habits[0]).toMatchObject({ done: 2, target: 3 });
   });
 
   it('из рефлексий берутся только непустые записи этой недели', () => {
