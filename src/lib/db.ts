@@ -582,6 +582,7 @@ export function bindPersistFlush() {
   if (flushBound) return;
   flushBound = true;
   window.addEventListener('beforeunload', (event) => {
+    flushPersist();
     if (persistFailed || savedRevision < changeRevision) {
       event.preventDefault();
       event.returnValue = '';

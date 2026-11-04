@@ -94,6 +94,30 @@ describe('база данных', () => {
     }
   });
 
+  it('предупреждает при уходе, пока запись не подтверждена', async () => {
+    const db = await env.db();
+    await db.getDB();
+    db.bindPersistFlush();
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => key === db.DB_KEY ? paused : undefined;
+    try {
+      db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('unload', 'Цель', 'x', 'x')");
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(db.hasPendingPersist()).toBe(true);
+      release();
+      await vi.waitFor(() => expect(db.hasPendingPersist()).toBe(false));
+      const savedEvent = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(savedEvent);
+      expect(savedEvent.defaultPrevented).toBe(false);
+    } finally {
+      release();
+      (globalThis as { __holdSet?: unknown }).__holdSet = undefined;
+    }
+  });
+
   it('база из будущей версии не открывается и не портится', async () => {
     const db = await env.db();
     await db.getDB();
