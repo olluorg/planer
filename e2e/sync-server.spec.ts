@@ -128,7 +128,16 @@ test('сервер атомарно отклоняет устаревшую и �
 test('registration with failed initial sync stays available for retry', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
   await page.route('**/register', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ syncId: 'retry-vault', authToken: 'retry-token' }) }));
-  await page.route('**/vault/retry-vault', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Сервер временно недоступен' }) }));
+  let unavailable = true;
+  let writes = 0;
+  await page.route('**/vault/retry-vault', route => {
+    if (unavailable) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Сервер временно недоступен' }) });
+    if (route.request().method() === 'PUT') {
+      writes++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, revision: 1 }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ciphertext: null, revision: 0 }) });
+  });
   await page.goto('/settings');
   await page.getByPlaceholder('email').fill('retry@example.com');
   await page.getByPlaceholder('пароль').fill('password123');
@@ -138,6 +147,11 @@ test('registration with failed initial sync stays available for retry', async ({
   await expect(page.getByRole('button', { name: 'Синхронизировать' })).toBeEnabled();
   await page.reload();
   await expect(page.getByText(/первая синхронизация не завершена/)).toBeVisible();
+  unavailable = false;
+  await page.getByRole('button', { name: 'Синхронизировать' }).click();
+  await expect(page.getByText('Подключено · retry@example.com')).toBeVisible();
+  await expect(page.getByText(/первая синхронизация не завершена/)).toHaveCount(0);
+  expect(writes).toBeGreaterThan(0);
 });
 
 test('одновременная синхронизация объединяет изменения обоих устройств', async ({ browser }) => {
