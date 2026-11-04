@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, redesign]
   pull_request:
-    branches: [main]
+    branches: [main, redesign]
 
 jobs:
   check:
@@ -36,3 +36,19 @@ jobs:
             echo "::error::Бандл вырос до ${SIZE} KiB (порог 4000). Проверьте, что попало в сборку."
             exit 1
           fi
+
+  desktop-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Package desktop application
+        run: bun run desktop:pack
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Verify packaged application exists
+        shell: pwsh
+        run: if (-not (Test-Path -LiteralPath 'release/win-unpacked/THEDAD.exe')) { throw 'Packaged executable not found' }
+      - name: Test packaged desktop persistence
+        run: bunx playwright test e2e/desktop-window.spec.ts --project=laptop --grep "packaged Windows app"
