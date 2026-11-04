@@ -118,6 +118,46 @@ describe('база данных', () => {
     }
   });
 
+  it('не сообщает о завершении, пока более новая запись ожидает сохранения', async () => {
+    const db = await env.db();
+    await db.getDB();
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    let firstStarted!: () => void;
+    let secondStarted!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const secondGate = new Promise<void>((resolve) => { releaseSecond = resolve; });
+    const firstEntered = new Promise<void>((resolve) => { firstStarted = resolve; });
+    const secondEntered = new Promise<void>((resolve) => { secondStarted = resolve; });
+    let writes = 0;
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => {
+      if (key !== db.DB_KEY) return;
+      writes++;
+      if (writes === 1) { firstStarted(); return firstGate; }
+      if (writes === 2) { secondStarted(); return secondGate; }
+    };
+    try {
+      db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('first', 'Первое', 'x', 'x')");
+      db.flushPersist();
+      await firstEntered;
+      db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('second', 'Второе', 'x', 'x')");
+      db.flushPersist();
+      releaseFirst();
+      await secondEntered;
+      expect(db.hasPendingPersist()).toBe(true);
+      releaseSecond();
+      await vi.waitFor(() => expect(db.hasPendingPersist()).toBe(false));
+      const stored = await (await env.idb()).get<Uint8Array>(db.DB_KEY);
+      const SQL = await (await import('sql.js')).default();
+      const reopened = new SQL.Database(stored);
+      try { expect(reopened.exec('SELECT count(*) FROM goals')[0].values[0][0]).toBe(2); }
+      finally { reopened.close(); }
+    } finally {
+      releaseFirst(); releaseSecond();
+      (globalThis as { __holdSet?: unknown }).__holdSet = undefined;
+    }
+  });
+
   it('база из будущей версии не открывается и не портится', async () => {
     const db = await env.db();
     await db.getDB();
