@@ -47,7 +47,7 @@ export const TaskPlaceDialog: React.FC<{task: Task; onClose: () => void}> = ({ta
       <Button variant="soft" type="button" onClick={() => setMapOpen(open => !open)}>{mapOpen ? 'Скрыть карту' : 'Выбрать на карте'}</Button>
       {!mapOpen && <p className="text-xs text-text-muted">При открытии карты OpenStreetMap получит запросы на область карты и IP-адрес устройства.</p>}
       {mapOpen && <Suspense fallback={<p className="text-xs text-text-muted">Открываем карту…</p>}>
-        <PlaceMapPicker initial={initialPoint} onSelect={({lat: selectedLat, lon: selectedLon}) => { setLat(String(selectedLat)); setLon(String(selectedLon)); setError(''); }} />
+        <PlaceMapPicker point={initialPoint} onSelect={({lat: selectedLat, lon: selectedLon}) => { setLat(String(selectedLat)); setLon(String(selectedLon)); setError(''); }} />
       </Suspense>}
       {name.trim() && <a className="text-sm text-accent underline" href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(name.trim())}`} target="_blank" rel="noopener noreferrer">Найти место в OpenStreetMap</a>}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}

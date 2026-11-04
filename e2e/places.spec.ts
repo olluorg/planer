@@ -73,6 +73,19 @@ test('task location can be selected on a map and survives reload', async ({ page
   await dialog.getByRole('button', { name: 'Выбрать на карте' }).click();
   const map = dialog.getByLabel('Выбор точки на карте');
   await expect(map.locator('.leaflet-control-zoom-in')).toBeVisible();
+  await dialog.getByLabel('Координаты или ссылка OpenStreetMap').fill('55.75, 37.62');
+  await dialog.getByRole('button', { name: 'Заполнить координаты' }).click();
+  await expect(dialog.getByLabel('Широта')).toHaveValue('55.75');
+  await expect(map.locator('.leaflet-interactive')).toHaveCount(1);
+  await expect.poll(async () => {
+    const bounds = await map.boundingBox();
+    const marker = await map.locator('.leaflet-interactive').boundingBox();
+    return bounds && marker ? Math.abs((marker.x + marker.width / 2) - (bounds.x + bounds.width / 2)) : Infinity;
+  }).toBeLessThan(5);
+  await dialog.getByLabel('Широта').fill('');
+  await expect(map.locator('.leaflet-interactive')).toHaveCount(0);
+  await dialog.getByLabel('Широта').fill('55.75');
+  await expect(map.locator('.leaflet-interactive')).toHaveCount(1);
   await map.click({ position: { x: 150, y: 120 } });
   const latitude = await dialog.getByLabel('Широта').inputValue();
   const longitude = await dialog.getByLabel('Долгота').inputValue();
