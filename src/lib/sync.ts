@@ -31,6 +31,13 @@ export function onSyncChange(cb: () => void): () => void {
 }
 export function disconnectSync() { saveSync(null); }
 
+function assertSyncConnection(expected: SyncConfig) {
+  const current = getSync();
+  if (!current || current.serverUrl !== expected.serverUrl || current.syncId !== expected.syncId || current.authToken !== expected.authToken || current.encKey !== expected.encKey) {
+    throw new Error('Подключение изменилось во время синхронизации. Повторите действие.');
+  }
+}
+
 /* base64 <-> bytes (чанками — спред большого массива переполняет стек) */
 function toB64(b: Uint8Array): string {
   let s = '';
@@ -133,12 +140,15 @@ export async function pushNow(): Promise<number> {
 export async function pullNow(): Promise<boolean> {
   const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
   const { ciphertext, updatedAt } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
+  assertSyncConnection(c);
   if (!ciphertext) return false; // на сервере пусто
   const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
+  assertSyncConnection(c);
   // Не просто set(DB_KEY): открытая в памяти база иначе затёрла бы скачанную
   // первой же правкой. Текущее состояние уходит в локальный снимок.
-  await replaceDatabase(bytes, 'pre-sync-pull');
-  saveSync({ ...c, lastSync: updatedAt });
+  await replaceDatabase(bytes, 'pre-sync-pull', () => assertSyncConnection(c));
+  assertSyncConnection(c);
+  saveSync({ ...getSync()!, lastSync: updatedAt });
   return true;
 }
 
@@ -162,12 +172,7 @@ export function syncNow(): Promise<SyncOutcome> {
   if (running) return running;
   running = (async () => {
     const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
-    const assertConnection = () => {
-      const current = getSync();
-      if (!current || current.serverUrl !== c.serverUrl || current.syncId !== c.syncId || current.authToken !== c.authToken || current.encKey !== c.encKey) {
-        throw new Error('Подключение изменилось во время синхронизации. Повторите действие.');
-      }
-    };
+    const assertConnection = () => assertSyncConnection(c);
     let outcome: SyncOutcome = { incoming: 0, deleted: 0 };
     for (let attempt = 0; attempt < 5; attempt++) {
       const { ciphertext, revision } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });

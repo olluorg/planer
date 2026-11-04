@@ -228,6 +228,33 @@ describe('база данных', () => {
     expect(reopened.query("SELECT id FROM goals WHERE id = 'new'")).toHaveLength(1);
   });
 
+  it('откатывает замену, если проверка подключения перестала выполняться во время записи', async () => {
+    const db = await env.db();
+    const current = await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('old', 'Локальная', 'x', 'x')");
+    await db.persist();
+    const SQL = await (await import('sql.js')).default();
+    const incoming = new SQL.Database(current.export());
+    incoming.exec("DELETE FROM goals WHERE id = 'old'");
+    let release!: () => void, started!: () => void;
+    const paused = new Promise<void>(resolve => { release = resolve; });
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    let held = false, valid = true;
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = key => {
+      if (!held && key === db.DB_KEY) { held = true; started(); return paused; }
+    };
+    const replacing = db.replaceDatabase(incoming.export(), 'pre-sync-pull', () => { if (!valid) throw new Error('Подключение изменилось'); });
+    await entered;
+    valid = false;
+    release();
+    await expect(replacing).rejects.toThrow('Подключение изменилось');
+    vi.resetModules();
+    const reopened = await import('../db');
+    await reopened.getDB();
+    expect(reopened.query("SELECT id FROM goals WHERE id = 'old'")).toHaveLength(1);
+    incoming.close();
+  });
+
   it('ожидающее сохранение не перезаписывает восстановленную базу старой', async () => {
     const db = await env.db();
     const current = await db.getDB();

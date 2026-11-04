@@ -346,21 +346,21 @@ const SQLITE_MAGIC = 'SQLite format 3\u0000';
  *  новой. Так терялись данные после входа в синхронизацию на новом
  *  устройстве — а ближайший синк заливал пустую базу на сервер.
  *  Текущее состояние перед заменой уходит в бэкап с меткой reason. */
-export async function replaceDatabase(bytes: Uint8Array, reason: string) {
+export async function replaceDatabase(bytes: Uint8Array, reason: string, validate?: () => void) {
   if (replacementDone) throw new Error('Восстановление базы уже выполняется');
   const replacingRevision = changeRevision;
   let releaseReplacement!: () => void;
   replacementDone = new Promise<void>((resolve) => { releaseReplacement = resolve; });
   try {
     await Promise.allSettled([...pendingWrites]);
-    await replaceDatabaseLocked(bytes, reason, replacingRevision);
+    await replaceDatabaseLocked(bytes, reason, replacingRevision, validate);
   } finally {
     replacementDone = null;
     releaseReplacement();
   }
 }
 
-async function replaceDatabaseLocked(bytes: Uint8Array, reason: string, replacingRevision: number) {
+async function replaceDatabaseLocked(bytes: Uint8Array, reason: string, replacingRevision: number, validate?: () => void) {
   const head = new TextDecoder().decode(bytes.slice(0, 16));
   if (head !== SQLITE_MAGIC) throw new Error('Это не файл базы данных SQLite');
   if (!SQL) SQL = await initSqlJs({ locateFile: () => sqlWasmUrl });
@@ -375,11 +375,16 @@ async function replaceDatabaseLocked(bytes: Uint8Array, reason: string, replacin
     const previous = db ? db.export() : await get<Uint8Array>(DB_KEY);
     if (previous && !await saveBackup(previous, reason)) throw new Error('Не удалось сохранить снимок текущей базы; операция отменена');
     if (changeRevision !== replacingRevision) throw new Error('Данные изменились во время восстановления. Повторите операцию.');
+    validate?.();
     await writeIfUnchanged(nextBytes);
-    if (changeRevision !== replacingRevision) {
+    try {
+      validate?.();
+      if (changeRevision !== replacingRevision) throw new Error('Данные изменились во время восстановления. Повторите операцию.');
+    } catch (error) {
       // Возвращаем актуальную открытую базу, если она изменилась во время записи.
       if (db) await writeIfUnchanged(db.export());
-      throw new Error('Данные изменились во время восстановления. Повторите операцию.');
+      else if (previous) await writeIfUnchanged(previous);
+      throw error;
     }
     ++persistAttempt;
     savedRevision = replacingRevision;

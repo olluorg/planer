@@ -205,6 +205,28 @@ describe('синхронизация', () => {
     expect(sync.getSync()).toBeNull();
   });
 
+  it('не заменяет базу и не возвращает подключение при отключении во время загрузки копии', async () => {
+    const db = await withGoal('Исходная');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('new', 'Поздняя', 'x', 'x')");
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      const response = await server.handler(u, i);
+      if ((!i?.method || i.method === 'GET') && u.includes('/vault/')) { entered(); await gate; }
+      return response;
+    }));
+    const pending = sync.pullNow();
+    await started;
+    sync.disconnectSync();
+    release();
+    await expect(pending).rejects.toThrow(/Подключение изменилось/);
+    expect(db.query<{ title: string }>('SELECT title FROM goals ORDER BY title').map(row => row.title)).toEqual(['Исходная', 'Поздняя']);
+    expect(sync.getSync()).toBeNull();
+  });
+
   it('повторяет синхронизацию после конфликта версии', async () => {
     await withGoal('Цель');
     const sync = await import('../sync');
