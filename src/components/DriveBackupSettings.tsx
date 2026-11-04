@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Cloud, CloudOff, RefreshCw, Download } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { persistBeforeReload } from '@/lib/db';
 import {
   driveConfigured, getDriveState, onDriveChange, listDriveBackups, uploadBackup,
   restoreFromDrive, disableDriveBackup, getDrivePassphrase, setDrivePassphrase, type DriveBackup,
@@ -78,6 +79,8 @@ export function DriveBackupSettings() {
     setBusy(true);
     try {
       await restoreFromDrive(b.id, p);
+      try { await persistBeforeReload(); }
+      catch { toast.error('Копия восстановлена, но обновить экран не удалось', 'Сохраните изменения базы или скачайте копию перед перезагрузкой.'); return; }
       location.reload();
     } catch (e) {
       toast.error('Не удалось восстановить', String((e as Error)?.message ?? e));

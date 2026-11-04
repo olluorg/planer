@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { listBackups, restoreBackup, saveBackup, persist, DB_KEY, BACKUPS_EVENT, type BackupEntry } from '@/lib/db';
+import { listBackups, restoreBackup, saveBackup, persistBeforeReload, DB_KEY, BACKUPS_EVENT, type BackupEntry } from '@/lib/db';
 import { toast } from '@/lib/toast';
 import { get } from 'idb-keyval';
 import { History } from 'lucide-react';
@@ -41,7 +41,7 @@ export function BackupRestore() {
 
   const makeNow = async () => {
     try {
-      await persist();
+      await persistBeforeReload();
       const data = await get<Uint8Array>(DB_KEY);
       if (!data || !await saveBackup(data, 'manual')) throw new Error('Не удалось записать снимок');
       await refresh();
@@ -55,6 +55,8 @@ export function BackupRestore() {
     if (!confirm(`Восстановить состояние от ${fmt(b.at)}?\n\nТекущие данные будут сохранены отдельным снимком.`)) return;
     try {
       await restoreBackup(b.key);
+      try { await persistBeforeReload(); }
+      catch { toast.error('Снимок восстановлен, но обновить экран не удалось', 'Сохраните изменения базы или скачайте копию перед перезагрузкой.'); return; }
       location.reload();
     } catch (e) {
       toast.error('Не удалось восстановить', String((e as Error)?.message ?? e));
