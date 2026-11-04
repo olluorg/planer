@@ -73,6 +73,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: npm ci --prefix server
+      - name: Build sync server image
+        run: docker build -t thedad-sync-ci ./server
       - name: Build with sync enabled
         run: bun run build
         env:
