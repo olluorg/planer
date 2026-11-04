@@ -125,6 +125,21 @@ describe('синхронизация', () => {
     const sync = await import('../sync');
     expect(await sync.importSyncFromHashIfPresent()).toBe(false);
     expect(sync.getSync()).toBeNull();
+    expect(location.hash).toBe('');
+  });
+
+  it('при ошибке сети сохраняет предыдущее подключение и убирает секреты QR из адреса', async () => {
+    await withGoal('Местная');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    const previous = sync.getSync()!;
+    const payload = btoa(JSON.stringify({ s: 'https://other.test', i: 'other', t: 'secret', k: previous.encKey })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    history.replaceState(null, '', `/?keep=1#sync=${payload}`);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Нет сети')));
+    await expect(sync.importSyncFromHashIfPresent()).rejects.toThrow('Нет сети');
+    expect(sync.getSync()).toEqual(previous);
+    expect(location.hash).toBe('');
+    expect(location.search).toBe('?keep=1');
   });
 
   it('неверный пароль не трогает локальную базу', async () => {

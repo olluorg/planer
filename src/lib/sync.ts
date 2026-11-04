@@ -158,14 +158,25 @@ export function buildSyncLink(): string | null {
 export async function importSyncFromHashIfPresent(): Promise<boolean> {
   const m = location.hash.match(/[#&]sync=([^&]+)/);
   if (!m) return false;
+  // Remove credentials even if the payload is malformed or the server is offline.
+  history.replaceState(null, '', location.pathname + location.search);
+  let obj: { s: string; i: string; t: string; k: string };
   try {
-    const obj = JSON.parse(fromB64Url(m[1]));
-    if (!obj?.s || !obj?.i || !obj?.t || !obj?.k) return false;
-    saveSync({ serverUrl: obj.s, syncId: obj.i, authToken: obj.t, encKey: obj.k });
-    history.replaceState(null, '', location.pathname); // чистим хеш с секретами
+    obj = JSON.parse(fromB64Url(m[1]));
+    if (!obj || ![obj.s, obj.i, obj.t, obj.k].every(value => typeof value === 'string' && value.length > 0)) return false;
+    const url = new URL(obj.s);
+    if (!['http:', 'https:'].includes(url.protocol) || fromB64(obj.k).length !== 32) return false;
+  } catch { return false; }
+  const previous = getSync();
+  const incoming: SyncConfig = { serverUrl: obj.s, syncId: obj.i, authToken: obj.t, encKey: obj.k };
+  saveSync(incoming);
+  try {
     await syncNowFresh();
     return true;
-  } catch { return false; }
+  } catch (error) {
+    if (sameConnection(getSync(), incoming)) saveSync(previous);
+    throw error;
+  }
 }
 
 /* ===== Обмен блобами ===== */

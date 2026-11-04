@@ -122,7 +122,10 @@ export default function App() {
       try {
         const m = await import('./lib/sync');
         if (await m.importSyncFromHashIfPresent()) { window.location.reload(); return; }
-      } catch {}
+      } catch (error) {
+        const { toast } = await import('./lib/toast');
+        toast.error('Не удалось подключить устройство', String((error as Error)?.message ?? error));
+      }
       void init();
     })();
     applyAccent(getAccent(), false);
