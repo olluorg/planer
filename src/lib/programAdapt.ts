@@ -57,26 +57,18 @@ export function analyzeProgram({ healthLogs, start, currentDay }: AnalyzeOpts): 
 
   /* ── Тренировки за последние 7 дней ── */
   if (currentDay >= 4) {
-    const wk = logsSince(healthLogs, 'workout', daysAgoISO(6));
+    const wk = logsSince(healthLogs, 'workout', daysAgoISO(6)).filter((log) => log.date <= daysAgoISO(0) && Number.isFinite(log.value) && log.value > 0);
     const sessions = new Set(wk.map((l) => l.date)).size; // по дням, не по минутам
-    if (sessions >= 3) {
-      out.push({
-        tone: 'good',
-        title: 'Тренировки за неделю',
-        message: `Активность записана в ${sessions} днях за последние 7 дней. Выбирайте нагрузку с учётом самочувствия и восстановления.`,
-      });
-    } else if (sessions <= 1) {
-      out.push({
-        tone: 'warn',
-        title: 'Тренировки за неделю',
-        message: `За последние 7 дней отмечено дней с тренировками: ${sessions}. План можно подстроить под доступное время и самочувствие.`,
-      });
-    }
+    out.push({
+      tone: 'info',
+      title: 'Тренировки за неделю',
+      message: `За последние 7 дней отмечено дней с тренировками: ${sessions}. План можно подстроить под доступное время и самочувствие.`,
+    });
   }
 
   /* ── Логирование калорий ── */
   if (currentDay >= 3 && out.length < 3) {
-    const cal = logsSince(healthLogs, 'calories', daysAgoISO(2));
+    const cal = logsSince(healthLogs, 'calories', daysAgoISO(2)).filter((log) => log.date <= daysAgoISO(0));
     if (cal.length === 0) {
       out.push({
         tone: 'info',

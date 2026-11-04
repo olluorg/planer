@@ -22,6 +22,16 @@ describe('program progress summary', () => {
     const result = analyzeProgram({ pack, start: date, currentDay: 3, healthLogs: [log(date, 81), log(date, 80)] });
     expect(result[0].title).toBe('Нужны данные веса');
   });
+
+  it('counts only positive workouts in the last seven days, including a two-day result', () => {
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const older = new Date(today); older.setDate(older.getDate() - 7);
+    const workout = (date: Date, value: number) => ({ date: isoDate(date), value, metric: 'workout' } as HealthLog);
+    const result = analyzeProgram({ pack, start: isoDate(older), currentDay: 7, healthLogs: [
+      workout(today, 30), workout(yesterday, 20), workout(today, 0), workout(tomorrow, 45), workout(older, 30),
+    ] });
+    expect(result.find(item => item.title === 'Тренировки за неделю')?.message).toContain('тренировками: 2');
+  });
 });
 
 afterEach(() => vi.useRealTimers());
