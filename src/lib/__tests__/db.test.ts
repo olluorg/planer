@@ -158,6 +158,35 @@ describe('база данных', () => {
     }
   });
 
+  it('перед перезагрузкой сохраняет и правки, внесённые во время записи', async () => {
+    const db = await env.db();
+    await db.getDB();
+    let release!: () => void;
+    let started!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let held = false;
+    (globalThis as { __holdSet?: (key: IDBValidKey) => Promise<void> | undefined }).__holdSet = (key) => {
+      if (key === db.DB_KEY && !held) { held = true; started(); return gate; }
+    };
+    try {
+      db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('first', 'Первое', 'x', 'x')");
+      const ready = db.persistBeforeReload();
+      await entered;
+      db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('second', 'Второе', 'x', 'x')");
+      release();
+      await ready;
+      const stored = await (await env.idb()).get<Uint8Array>(db.DB_KEY);
+      const SQL = await (await import('sql.js')).default();
+      const reopened = new SQL.Database(stored);
+      try { expect(reopened.exec('SELECT count(*) FROM goals')[0].values[0][0]).toBe(2); }
+      finally { reopened.close(); }
+    } finally {
+      release();
+      (globalThis as { __holdSet?: unknown }).__holdSet = undefined;
+    }
+  });
+
   it('база из будущей версии не открывается и не портится', async () => {
     const db = await env.db();
     await db.getDB();

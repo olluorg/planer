@@ -62,11 +62,20 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       });
 
       let reloading = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
+      const finishUpdate = async () => {
         if (!updateRequested || reloading) return;
         reloading = true;
-        window.location.reload();
-      });
+        try {
+          const { persistBeforeReload } = await import('@/lib/db');
+          await persistBeforeReload();
+          window.location.reload();
+        } catch {
+          reloading = false;
+          const { toast } = await import('@/lib/toast');
+          toast.action('Не удалось обновить приложение', { label: 'Повторить', onClick: () => void finishUpdate() }, { description: 'Сначала сохраните текущие изменения или скачайте копию данных.', duration: 0 });
+        }
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', () => void finishUpdate());
     } catch {
       // Без service worker приложение работает, только без офлайна.
     }

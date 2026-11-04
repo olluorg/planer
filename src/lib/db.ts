@@ -546,6 +546,11 @@ export async function persist() {
   }
 }
 
+/** Дождаться сохранения всех правок, включая появившиеся во время записи. */
+export async function persistBeforeReload() {
+  do { await persist(); } while (hasPendingPersist());
+}
+
 /** Запись на диск сразу после текущей задачи.
  *
  *  Раньше здесь был debounce на 250 мс, а правки из этого окна должен был
