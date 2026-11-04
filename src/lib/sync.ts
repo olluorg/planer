@@ -81,7 +81,7 @@ export async function loginEmail(serverUrl: string, email: string, password: str
   saveSync({ serverUrl, syncId, authToken, encKey, email });
   // Слияние, а не замена: если на этом устройстве уже что-то было, оно
   // не теряется, а уезжает на сервер вместе с остальным.
-  await syncNow();
+  await syncNowFresh();
 }
 
 /** Аноним/QR-хост: создаёт vault и случайный encKey. */
@@ -111,7 +111,7 @@ export async function importSyncFromHashIfPresent(): Promise<boolean> {
     if (!obj?.s || !obj?.i || !obj?.t || !obj?.k) return false;
     saveSync({ serverUrl: obj.s, syncId: obj.i, authToken: obj.t, encKey: obj.k });
     history.replaceState(null, '', location.pathname); // чистим хеш с секретами
-    await syncNow();
+    await syncNowFresh();
     return true;
   } catch { return false; }
 }
@@ -125,7 +125,7 @@ async function localDbBytes(): Promise<Uint8Array | null> {
 
 /** Залить локальную БД на сервер (зашифровав). */
 export async function pushNow(): Promise<number> {
-  await syncNow();
+  await syncNowFresh();
   return getSync()?.lastSync ?? 0;
 }
 
@@ -162,21 +162,31 @@ export function syncNow(): Promise<SyncOutcome> {
   if (running) return running;
   running = (async () => {
     const c = getSync(); if (!c) throw new Error('Синхронизация не настроена');
+    const assertConnection = () => {
+      const current = getSync();
+      if (!current || current.serverUrl !== c.serverUrl || current.syncId !== c.syncId || current.authToken !== c.authToken || current.encKey !== c.encKey) {
+        throw new Error('Подключение изменилось во время синхронизации. Повторите действие.');
+      }
+    };
     let outcome: SyncOutcome = { incoming: 0, deleted: 0 };
     for (let attempt = 0; attempt < 5; attempt++) {
       const { ciphertext, revision } = await api(c.serverUrl, `/vault/${c.syncId}`, { headers: { Authorization: `Bearer ${c.authToken}` } });
+      assertConnection();
       if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('Обновите сервер синхронизации: текущая версия не защищает от одновременной записи');
       if (ciphertext) {
         const bytes = await decryptBytes(fromB64(ciphertext), c.encKey);
+        assertConnection();
         const merged = await mergeIncoming(bytes);
         outcome = { incoming: outcome.incoming + merged.incoming, deleted: outcome.deleted + merged.deleted };
         if (merged.incoming || merged.deleted) window.dispatchEvent(new CustomEvent(SYNC_MERGED_EVENT, { detail: merged }));
       }
       const bytes = await localDbBytes(); if (!bytes) throw new Error('Нет локальной БД');
       const cipher = toB64(await encryptBytes(bytes, c.encKey));
+      assertConnection();
       const updatedAt = Date.now();
       try {
         await api(c.serverUrl, `/vault/${c.syncId}`, { method: 'PUT', headers: { Authorization: `Bearer ${c.authToken}` }, body: JSON.stringify({ ciphertext: cipher, updatedAt, expectedRevision: revision }) });
+        assertConnection();
         const current = getSync();
         if (current?.syncId === c.syncId && current.authToken === c.authToken) saveSync({ ...current, lastSync: updatedAt });
         return outcome;
