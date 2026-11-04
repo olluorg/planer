@@ -58,8 +58,33 @@ test('правки с двух устройств сливаются без по
   // Оба правят «офлайн» (без синка), потом синхронизируются.
   await addGoal(laptop, 'Ноутбук, вечер');
   await addGoal(phone, 'Телефон, вечер');
-  await sync(phone);
-  await sync(laptop);
+  // Hold the completed background PUT response: phone changes the server
+  // while laptop still considers that older exchange in flight.
+  let release!: () => void;
+  let captured!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const responseCaptured = new Promise<void>((resolve) => { captured = resolve; });
+  let held = false;
+  await laptop.route('**/vault/*', async (route) => {
+    if (!held && route.request().method() === 'PUT') {
+      held = true;
+      const response = await route.fetch();
+      captured();
+      await gate;
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  try {
+    await laptop.goto('/settings');
+    await Promise.race([responseCaptured, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Фоновая синхронизация не началась')), 15_000))]);
+    await sync(phone);
+    await laptop.getByRole('button', { name: 'Синхронизировать' }).click();
+    release();
+    await expect(laptop.getByText('Синхронизировано').first()).toBeVisible({ timeout: 15_000 });
+  } finally {
+    release();
+    await laptop.unroute('**/vault/*');
+  }
 
   await laptop.goto('/goals');
   for (const t of ['С ноутбука', 'С телефона до входа', 'Ноутбук, вечер', 'Телефон, вечер']) {
