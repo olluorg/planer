@@ -39,11 +39,23 @@ async function scheduleAlarms() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(scheduleAlarms);
-chrome.runtime.onStartup.addListener(scheduleAlarms);
+let scheduling = Promise.resolve();
+function requestSchedule() {
+  scheduling = scheduling.catch(() => {}).then(scheduleAlarms);
+  void scheduling.catch((error) => console.error('[alarms] Не удалось обновить напоминания', error));
+  return scheduling;
+}
 
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === 'reschedule') void scheduleAlarms();
+chrome.runtime.onInstalled.addListener(requestSchedule);
+chrome.runtime.onStartup.addListener(requestSchedule);
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type !== 'reschedule') return;
+  requestSchedule().then(
+    () => sendResponse({ ok: true }),
+    () => sendResponse({ ok: false }),
+  );
+  return true; // keep the response channel open until alarms are scheduled
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {

@@ -24,12 +24,18 @@ export async function setExtSetting(key: string, value: unknown): Promise<void> 
 
 /** Отдаёт личные напоминания фону расширения: только он может показать их,
  *  когда вкладка закрыта. Вне расширения — no-op. */
+let reminderWriteQueue: Promise<void> = Promise.resolve();
+
 export function syncRemindersToExtension(
   reminders: Array<{ id: string; text: string; time: string; enabled: boolean }>,
 ): void {
   if (!isExtension) return;
-  void cr().storage.local.set({ planer_reminders: reminders });
-  cr().runtime.sendMessage({ type: 'reschedule' }).catch(() => {});
+  reminderWriteQueue = reminderWriteQueue.catch(() => {}).then(async () => {
+    await cr().storage.local.set({ planer_reminders: reminders });
+    const result = await cr().runtime.sendMessage({ type: 'reschedule' });
+    if (result?.ok === false) throw new Error('Не удалось обновить будильники расширения');
+  });
+  void reminderWriteQueue.catch((error) => console.error('[extension] Не удалось обновить напоминания', error));
 }
 
 export function syncTasksToExtension(
