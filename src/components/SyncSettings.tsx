@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
+import { persistBeforeReload } from '@/lib/db';
 import {
   getSync, onSyncChange, disconnectSync, registerEmail, loginEmail, createVault,
   buildSyncLink, syncLinkWarning, pullNow, syncNowFresh, type SyncConfig,
@@ -59,7 +60,10 @@ export const SyncSettings: React.FC = () => {
           }, '')}><RefreshCw className="h-4 w-4" /> Синхронизировать</Button>
           <Button variant="soft" size="sm" disabled={busy} title="Заменить данные на этом устройстве копией с сервера — на случай, если что-то пошло не так. Текущие данные сохранятся снимком." onClick={() => run(async () => {
             if (!confirm('Заменить данные на этом устройстве копией с сервера?\n\nТекущие данные сохранятся локальным снимком.')) return;
-            if (await pullNow()) { toast.success('Данные загружены'); setTimeout(() => location.reload(), 600); } else toast.info('На сервере пока пусто');
+            if (await pullNow()) {
+              await persistBeforeReload();
+              location.reload();
+            } else toast.info('На сервере пока пусто');
           }, '')}><DownloadCloud className="h-4 w-4" /> Заменить копией с сервера</Button>
           <Button variant="ghost" size="sm" disabled={busy} className="text-danger" onClick={() => { disconnectSync(); refresh(); }}><LogOut className="h-4 w-4" /> Отключить</Button>
         </div>
