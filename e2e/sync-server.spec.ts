@@ -154,6 +154,28 @@ test('registration with failed initial sync stays available for retry', async ({
   expect(writes).toBeGreaterThan(0);
 });
 
+test('settings reflects successful background sync without reload', async ({ page }) => {
+  const key = Buffer.alloc(32, 9).toString('base64');
+  await page.addInitScript((encKey) => {
+    localStorage.setItem('onboarding.done.v1', '1');
+    localStorage.setItem('thedad.sync.v1', JSON.stringify({ serverUrl: 'http://localhost:8787', syncId: 'background-vault', authToken: 'token', encKey }));
+  }, key);
+  let online = false;
+  await page.route('**/vault/background-vault', route => {
+    if (!online) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"offline"}' });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: route.request().method() === 'PUT' ? '{"ok":true,"revision":1}' : '{"ciphertext":null,"revision":0}' });
+  });
+  const failedAttempt = page.waitForResponse(response => response.url().includes('/vault/background-vault') && response.status() === 503);
+  await page.goto('/settings');
+  await expect(page.getByText(/первая синхронизация не завершена/)).toBeVisible();
+  // Let the initial background attempt fail before simulating network recovery.
+  await failedAttempt;
+  online = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.getByText('Подключено · по ключу устройства')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/первая синхронизация не завершена/)).toHaveCount(0);
+});
+
 test('одновременная синхронизация объединяет изменения обоих устройств', async ({ browser }) => {
   const email = `race-${Date.now()}@example.com`;
   const laptop = await device(browser);

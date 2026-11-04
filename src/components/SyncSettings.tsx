@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
 import {
-  getSync, disconnectSync, registerEmail, loginEmail, createVault,
+  getSync, onSyncChange, disconnectSync, registerEmail, loginEmail, createVault,
   buildSyncLink, syncLinkWarning, pullNow, syncNowFresh, type SyncConfig,
 } from '@/lib/sync';
 import { RefreshCw, QrCode, LogOut, DownloadCloud, Cloud } from 'lucide-react';
@@ -20,6 +20,7 @@ export const SyncSettings: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const refresh = () => setCfg(getSync());
+  useEffect(() => onSyncChange(() => setCfg(getSync())), []);
 
   const run = async (fn: () => Promise<void>, ok: string) => {
     setBusy(true);

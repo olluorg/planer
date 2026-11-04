@@ -27,12 +27,13 @@ function sameConnection(a: SyncConfig | null, b: SyncConfig | null): boolean {
 // Ignore timestamp-only updates, which are emitted after an ordinary sync.
 if (typeof window !== 'undefined') window.addEventListener('storage', (event) => {
   if (event.key !== CFG_KEY && event.key !== null) return;
-  if (event.key === null) { connectionGeneration++; return; }
+  if (event.key === null) { connectionGeneration++; window.dispatchEvent(new CustomEvent(EVENT)); return; }
   try {
     const before = event.oldValue ? JSON.parse(event.oldValue) as SyncConfig : null;
     const after = event.newValue ? JSON.parse(event.newValue) as SyncConfig : null;
     if (!sameConnection(before, after)) connectionGeneration++;
   } catch { connectionGeneration++; }
+  window.dispatchEvent(new CustomEvent(EVENT));
 });
 
 export function getSync(): SyncConfig | null {
