@@ -129,6 +129,23 @@ export function syncLinkBase(href: string): string {
     : 'https://thedad.ru/';
 }
 
+/** Explain common cases where a QR link cannot connect from a second device. */
+export function syncLinkWarning(serverUrl: string, pageUrl: string): string | null {
+  try {
+    const server = new URL(serverUrl);
+    const host = server.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (host === 'localhost' || host.endsWith('.localhost') || host === '::1' || host === '0.0.0.0' || /^127\./.test(host)) {
+      return 'Адрес сервера указывает на это устройство. На телефоне localhost будет означать сам телефон; укажите доступный ему адрес сервера.';
+    }
+    if (new URL(syncLinkBase(pageUrl)).protocol === 'https:' && server.protocol !== 'https:') {
+      return 'Страница открывается по HTTPS, а сервер указан по HTTP. Браузер телефона может заблокировать соединение; используйте HTTPS для сервера.';
+    }
+    return null;
+  } catch {
+    return 'Не удалось определить адрес сервера. Проверьте настройки подключения.';
+  }
+}
+
 /** URL для QR: телефон открывает нативной камерой → приложение подхватит #sync=. */
 export function buildSyncLink(): string | null {
   const c = getSync();

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
 import {
   getSync, disconnectSync, registerEmail, loginEmail, createVault,
-  buildSyncLink, pullNow, syncNowFresh, type SyncConfig,
+  buildSyncLink, syncLinkWarning, pullNow, syncNowFresh, type SyncConfig,
 } from '@/lib/sync';
 import { RefreshCw, QrCode, LogOut, DownloadCloud, Cloud } from 'lucide-react';
 
@@ -36,6 +36,7 @@ export const SyncSettings: React.FC = () => {
   };
 
   useEffect(() => { if (cfg) void showQr(); else setQr(null); /* eslint-disable-next-line */ }, [cfg?.syncId]);
+  const qrWarning = cfg ? syncLinkWarning(cfg.serverUrl, window.location.href) : null;
 
   if (cfg) {
     return (
@@ -63,6 +64,7 @@ export const SyncSettings: React.FC = () => {
         <div className="rounded-xl border border-border bg-bg-soft p-4">
           <div className="flex items-center gap-2 text-sm font-medium mb-2"><QrCode className="h-4 w-4 text-accent" /> Привязать другое устройство</div>
           <div className="text-xs text-text-muted mb-3">Отсканируй этот QR камерой телефона — приложение откроется и подтянет твои данные. Код содержит ключ доступа, не показывай чужим.</div>
+          {qrWarning && <div className="text-xs text-warning mb-3" role="status">{qrWarning}</div>}
           {qr && <img src={qr} alt="Sync QR" className="rounded-lg bg-white p-2 w-[200px]" />}
         </div>
       </div>

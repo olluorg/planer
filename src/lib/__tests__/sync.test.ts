@@ -67,6 +67,14 @@ describe('синхронизация', () => {
     expect(syncLinkBase('app://planer/settings')).toBe('https://thedad.ru/');
     expect(syncLinkBase('https://planner.example/settings?x=1')).toBe('https://planner.example/settings');
   });
+
+  it('предупреждает о недоступном телефону сервере и небезопасном протоколе', async () => {
+    const { syncLinkWarning } = await import('../sync');
+    expect(syncLinkWarning('http://localhost:8787', 'app://planer/')).toMatch(/сам телефон/);
+    expect(syncLinkWarning('http://127.0.0.1:8787', 'https://thedad.ru/')).toMatch(/сам телефон/);
+    expect(syncLinkWarning('http://192.168.1.2:8787', 'https://thedad.ru/')).toMatch(/HTTPS/);
+    expect(syncLinkWarning('https://sync.example.com', 'app://planer/')).toBeNull();
+  });
   it('сервер получает только шифр — ни названий, ни заголовка SQLite', async () => {
     await withGoal('Секретная цель');
     const sync = await import('../sync');
