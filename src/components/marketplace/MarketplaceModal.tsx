@@ -4,7 +4,7 @@ import { X, ShoppingBag, KeyRound, Check, ExternalLink, Loader2, ShieldCheck, Sp
 import {
   fetchCatalog, ownedPackIds, redeemLicense, fetchProgram, applyProgram,
   installedProgramIds, openProgram, openWorkoutHub, PROGRAMS_EVENT,
-  LICENSES_EVENT, type CatalogItem,
+  LICENSES_EVENT, purchaseUrl, type CatalogItem,
 } from '@/lib/marketplace';
 import { useStore } from '@/lib/store';
 import { toast } from '@/lib/toast';
@@ -139,6 +139,7 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
                 const isOwned = owned.has(it.id);
                 const isDone = done.has(it.id);
                 const busy = installing === it.id;
+                const buyUrl = purchaseUrl(it.buyUrl);
                 return (
                   <div key={it.id} className="flex flex-col rounded-xl border border-border-soft bg-bg-soft/50 overflow-hidden">
                     {it.preview && (
@@ -200,14 +201,16 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
                             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isDone ? <Check className="h-4 w-4" /> : null}
                             {isDone ? 'Установлено' : 'Установить'}
                           </button>
-                        ) : (
+                        ) : buyUrl ? (
                           <a
-                            href={it.buyUrl}
+                            href={buyUrl}
                             target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 rounded-lg bg-accent text-white px-3.5 py-2 text-sm font-medium"
                           >
                             Купить <ExternalLink className="h-3.5 w-3.5" />
                           </a>
+                        ) : (
+                          <span className="text-xs text-text-muted">Покупка пока недоступна</span>
                         )}
                       </div>
                     </div>
@@ -219,7 +222,7 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
 
           <p className="mt-5 flex items-center gap-2 text-[11px] text-text-dim leading-relaxed">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-            После оплаты придёт ключ THEDAD-… — нажми «Есть ключ» и вставь его. Программа установится локально, ничего не уходит в облако.
+            Если у вас есть ключ THEDAD-…, нажмите «Есть ключ» и введите его. Программа установится локально.
           </p>
         </div>
       </div>

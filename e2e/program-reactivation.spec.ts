@@ -18,3 +18,13 @@ for (const [eventName, id] of [['thedad:workout-hub', 'home-gym'], ['thedad:prog
     expect(await page.evaluate(() => localStorage.getItem('program.progress.v1'))).toContain('"done":[1,3]');
   });
 }
+
+test('unconfigured purchases do not lead to placeholder payment pages', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
+  await page.goto('/');
+  await expect(page.locator('main')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('thedad:marketplace')));
+  await expect(page.getByText('Покупка пока недоступна').first()).toBeVisible();
+  await expect(page.locator('a[href*="CHANGE_ME"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Есть ключ' })).toBeVisible();
+});

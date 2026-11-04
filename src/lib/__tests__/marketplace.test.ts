@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as ed from '@noble/ed25519';
-import { redeemLicense, isOwned, ownedPackIds } from '../marketplace';
+import { redeemLicense, isOwned, ownedPackIds, purchaseUrl } from '../marketplace';
 
 const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
 const b64url = (u: Uint8Array) => b64(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -81,5 +81,14 @@ describe('лицензии маркетплейса', () => {
     const key = await license(priv, { v: 1, packs: { 'new-program': 'new-key' } });
     await redeemLicense(key, pubB64);
     expect(JSON.parse(localStorage.getItem('marketplace.licenses.v1')!)).toEqual({ 'home-gym': 'existing', 'new-program': 'new-key' });
+  });
+});
+
+describe('ссылки покупки', () => {
+  it.each(['https://boosty.to/CHANGE_ME/purchase/test', 'http://example.org/buy', 'javascript:alert(1)', 'https://user:pass@example.org/'])('отклоняет неподготовленный адрес %s', (url) => {
+    expect(purchaseUrl(url)).toBeNull();
+  });
+  it('принимает настроенный HTTPS-адрес', () => {
+    expect(purchaseUrl('https://shop.test/buy')).toBe('https://shop.test/buy');
   });
 });

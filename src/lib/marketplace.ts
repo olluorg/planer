@@ -155,6 +155,15 @@ export interface Catalog {
   items: CatalogItem[];
 }
 
+/** Do not send users to incomplete or non-HTTPS payment links. */
+export function purchaseUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || /change[_-]?me|placeholder|example\.com/i.test(value)) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
 /** Действия стора, нужные для установки программы (передаёт React-модалка из useStore). */
 export interface ProgramActions {
   batch: (fn: () => void) => void;
