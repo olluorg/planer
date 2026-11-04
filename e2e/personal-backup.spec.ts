@@ -60,6 +60,27 @@ test('invalid personal backup is rejected without changing local data', async ({
   expect(await page.evaluate(() => localStorage.getItem('user.name.v1'))).toBe('Сохранить');
 });
 
+test('personal import does not overwrite data when the database cannot be saved', async ({page}) => {
+  await page.addInitScript(() => { localStorage.setItem('onboarding.done.v1', '1'); localStorage.setItem('user.name.v1', 'До импорта'); });
+  await page.goto('/settings');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Экспорт личных данных' }).click();
+  const contents = await fs.readFile((await (await download).path())!);
+  await page.evaluate(() => {
+    localStorage.setItem('user.name.v1', 'Текущее имя');
+    const original = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (...args) {
+      if (args[1] === 'readwrite') throw new Error('test storage failure');
+      return original.apply(this, args);
+    };
+  });
+  page.once('dialog', dialog => dialog.accept());
+  const input = page.getByText('Копия личных данных', { exact: true }).locator('..').locator('input[type=file]');
+  await input.setInputFiles({ name: 'personal.json', mimeType: 'application/json', buffer: contents });
+  await expect(page.getByText('Не удалось восстановить личные данные', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('user.name.v1'))).toBe('Текущее имя');
+});
+
 test('damaged personal data can still be exported as a raw recovery copy', async ({page}) => {
   await page.addInitScript(() => {
     localStorage.setItem('onboarding.done.v1','1');
