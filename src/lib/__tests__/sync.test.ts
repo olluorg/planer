@@ -61,6 +61,12 @@ async function withGoal(title: string) {
 }
 
 describe('синхронизация', () => {
+  it('использует доступный телефону адрес для QR из расширения и десктопа', async () => {
+    const { syncLinkBase } = await import('../sync');
+    expect(syncLinkBase('chrome-extension://example/index.html#/settings')).toBe('https://thedad.ru/');
+    expect(syncLinkBase('app://planer/settings')).toBe('https://thedad.ru/');
+    expect(syncLinkBase('https://planner.example/settings?x=1')).toBe('https://planner.example/settings');
+  });
   it('сервер получает только шифр — ни названий, ни заголовка SQLite', async () => {
     await withGoal('Секретная цель');
     const sync = await import('../sync');

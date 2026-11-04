@@ -121,12 +121,20 @@ export async function createVault(serverUrl: string): Promise<void> {
 
 /* ===== QR-привязка ===== */
 
+/** Native app and extension origins cannot be opened by a phone camera. */
+export function syncLinkBase(href: string): string {
+  const url = new URL(href);
+  return url.protocol === 'http:' || url.protocol === 'https:'
+    ? `${url.origin}${url.pathname}`
+    : 'https://thedad.ru/';
+}
+
 /** URL для QR: телефон открывает нативной камерой → приложение подхватит #sync=. */
 export function buildSyncLink(): string | null {
   const c = getSync();
   if (!c) return null;
   const payload = toB64Url(JSON.stringify({ s: c.serverUrl, i: c.syncId, t: c.authToken, k: c.encKey }));
-  return `${location.origin}${location.pathname}#sync=${payload}`;
+  return `${syncLinkBase(location.href)}#sync=${payload}`;
 }
 
 /** Если в URL есть #sync=, импортируем конфиг и тянем БД. Вызывается на старте App. */
