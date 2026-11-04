@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { analyzeProgram, recommendWorkout } from '../programAdapt';
 import type { HealthLog } from '../types';
-import type { ProgramPack, WorkoutHub } from '../marketplace';
+import { workoutStreak, type ProgramPack, type WorkoutHub } from '../marketplace';
 import { isoDate } from '../utils';
 
 describe('program progress summary', () => {
@@ -44,4 +44,19 @@ it('keeps a planned rest day even when earlier workouts are missing', () => {
     { sessions: ['strength'] }, { sessions: [] }, { sessions: [] },
   ] } as WorkoutHub;
   expect(recommendWorkout(hub, [])).toMatchObject({ title: 'Сегодня день отдыха' });
+});
+
+it('counts workout days using the local calendar date', () => {
+  const previousTimezone = process.env.TZ;
+  try {
+    process.env.TZ = 'Europe/Moscow';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-04T09:00:00Z'));
+    expect(workoutStreak([
+      { metric: 'workout', date: '2026-11-04', value: 20 },
+      { metric: 'workout', date: '2026-11-03', value: 30 },
+    ])).toBe(2);
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ; else process.env.TZ = previousTimezone;
+  }
 });

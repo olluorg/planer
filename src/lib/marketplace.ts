@@ -12,7 +12,7 @@
  * Ничего не исполняется: расшифрованный пак — это декларативные данные (как шаблоны/плагины),
  * которые проходят через addGoal/addTask/addHabit и валидацию плагинов.
  */
-import { todayISO } from './utils';
+import { isoDate, todayISO } from './utils';
 import type { GoalTpl, HabitTpl, TaskTpl } from './templates';
 import type { TimeBlock } from './types';
 import { installPlugin, validatePlugin, type PluginWidgetDef } from './plugins';
@@ -384,7 +384,7 @@ export const openWorkoutHub = (id: string) =>
 export function workoutStreak(healthLogs: { metric: string; date: string; value: number }[]): number {
   const days = new Set(healthLogs.filter((l) => l.metric === 'workout' && l.value > 0).map((l) => l.date));
   if (days.size === 0) return 0;
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = isoDate;
   const today = new Date(new Date().toDateString());
   // старт стрика: сегодня, если тренировался, иначе вчера (день ещё «не закрыт»)
   const cur = new Date(today);
