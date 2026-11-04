@@ -205,11 +205,13 @@ interface LicensePayload {
   iat?: number;
 }
 
-function ownedMap(): Record<string, string> {
+function ownedMap(strict = false): Record<string, string> {
   try {
     const m = JSON.parse(localStorage.getItem(LICENSE_STORE) || '{}');
-    return m && typeof m === 'object' ? m : {};
+    if (!m || typeof m !== 'object' || Array.isArray(m) || !Object.entries(m).every(([id, key]) => /^[a-z0-9][a-z0-9-]{1,63}$/.test(id) && typeof key === 'string')) throw new Error('invalid');
+    return m;
   } catch {
+    if (strict) throw new Error('Данные лицензий повреждены или недоступны. Они не изменены; сохраните их перед восстановлением и подготовьте исходные ключи активации.');
     return {};
   }
 }
@@ -265,7 +267,7 @@ export async function redeemLicense(raw: string, publicKeyB64: string = MARKETPL
   }
   if (!ok) throw new Error('Неверный ключ — подпись не совпадает');
 
-  const map = ownedMap();
+  const map = ownedMap(true);
   const unlocked: string[] = [];
   for (const [id, key] of Object.entries(payload.packs)) {
     if (typeof key === 'string' && /^[a-z0-9][a-z0-9-]{1,63}$/.test(id)) {

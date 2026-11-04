@@ -66,4 +66,20 @@ describe('лицензии маркетплейса', () => {
     await expect(redeemLicense(key, pubB64)).rejects.toThrow(/нет допустимых паков/);
     expect(ownedPackIds()).toEqual([]);
   });
+
+  it.each(['{broken', '[]', '{"home-gym":42}'])('не перезаписывает повреждённые лицензии при активации', async (stored) => {
+    const { priv, pubB64 } = await keypair();
+    const key = await license(priv, { v: 1, packs: { 'home-gym': 'k' } });
+    localStorage.setItem('marketplace.licenses.v1', stored);
+    await expect(redeemLicense(key, pubB64)).rejects.toThrow(/Данные лицензий повреждены/);
+    expect(localStorage.getItem('marketplace.licenses.v1')).toBe(stored);
+  });
+
+  it('сохраняет ранее активированные лицензии при добавлении новой', async () => {
+    const { priv, pubB64 } = await keypair();
+    localStorage.setItem('marketplace.licenses.v1', '{"home-gym":"existing"}');
+    const key = await license(priv, { v: 1, packs: { 'new-program': 'new-key' } });
+    await redeemLicense(key, pubB64);
+    expect(JSON.parse(localStorage.getItem('marketplace.licenses.v1')!)).toEqual({ 'home-gym': 'existing', 'new-program': 'new-key' });
+  });
 });
