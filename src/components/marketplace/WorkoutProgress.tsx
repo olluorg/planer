@@ -5,15 +5,20 @@ import { ECharts } from '@/components/charts/ECharts';
 import { compressImage } from '@/lib/imageCompress';
 import { workoutMonthStats } from '@/lib/workoutStats';
 import { toast } from '@/lib/toast';
+import { readHubPhotos, type HubPhotos } from '@/lib/hubStorage';
 
-interface Photos { before?: string; after?: string }
+type Photos = HubPhotos;
 
 /** Прогресс и замеры: график веса (healthLogs), статистика тренировок, фото «до/после». */
 export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLog[]; streak: number }> = ({ programId, healthLogs, streak }) => {
   const photosKey = `hub.photos.${programId}`;
   const [photos, setPhotos] = useState<Photos>(() => {
-    try { return JSON.parse(localStorage.getItem(photosKey) || '{}'); } catch { return {}; }
+    try { return readHubPhotos(photosKey); } catch { return {}; }
   });
+  const photosError = useMemo(() => {
+    try { readHubPhotos(photosKey); return ''; }
+    catch (error) { return error instanceof Error ? error.message : 'Не удалось прочитать фото.'; }
+  }, [photosKey, photos]);
   const beforeRef = useRef<HTMLInputElement>(null);
   const afterRef = useRef<HTMLInputElement>(null);
 
@@ -32,15 +37,14 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
     if (!file) return;
     try {
       const url = await compressImage(file, 640, 0.7);
-      const next = { ...photos, [which]: url };
+      const next = { ...readHubPhotos(photosKey), [which]: url };
       localStorage.setItem(photosKey, JSON.stringify(next));
       setPhotos(next);
-    } catch { toast.error('Не удалось сохранить фото', 'Проверьте доступное место в хранилище.'); }
+    } catch (error) { toast.error('Не удалось сохранить фото', error instanceof Error ? error.message : 'Проверьте доступ к хранилищу.'); }
   };
   const clearPhoto = (which: keyof Photos) => {
-    const next = { ...photos }; delete next[which];
-    try { localStorage.setItem(photosKey, JSON.stringify(next)); setPhotos(next); }
-    catch { toast.error('Не удалось удалить фото', 'Проверьте доступ к хранилищу.'); }
+    try { const next = { ...readHubPhotos(photosKey) }; delete next[which]; localStorage.setItem(photosKey, JSON.stringify(next)); setPhotos(next); }
+    catch (error) { toast.error('Не удалось удалить фото', error instanceof Error ? error.message : 'Проверьте доступ к хранилищу.'); }
   };
 
   const chartOption = {
@@ -80,6 +84,7 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
       </div>
 
       {/* Фото до/после */}
+      {photosError && <p role="alert" className="text-sm text-text-muted">{photosError}</p>}
       <div className="grid grid-cols-2 gap-2.5">
         <PhotoSlot label="До" url={photos.before} onPick={() => beforeRef.current?.click()} onClear={() => clearPhoto('before')} />
         <PhotoSlot label="После" url={photos.after} onPick={() => afterRef.current?.click()} onClear={() => clearPhoto('after')} />

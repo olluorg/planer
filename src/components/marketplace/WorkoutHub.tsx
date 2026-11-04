@@ -15,6 +15,8 @@ import { WorkoutCalendar } from './WorkoutCalendar';
 import { WorkoutProgress } from './WorkoutProgress';
 import { recommendWorkout } from '@/lib/programAdapt';
 import { CalendarDays, LineChart, Sparkles } from 'lucide-react';
+import { readHubGoals } from '@/lib/hubStorage';
+import { toast } from '@/lib/toast';
 
 /** Премиум фитнес-хаб — экран занятий спортом на токенах приложения (glass-совместим):
  *  герой, цели-чеклист, стрик, недельное расписание, галерея сессий → гид-плеер тренировки. */
@@ -60,14 +62,20 @@ export const WorkoutHub: React.FC<{ programId: string | null; onClose: () => voi
   const reco = useMemo(() => (hub ? recommendWorkout(hub, healthLogs) : null), [hub, healthLogs]);
   const goalsKey = `hub.goals.${programId}`;
   const checkedGoals: string[] = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem(goalsKey) || '[]'); } catch { return []; }
+    try { return readHubGoals(goalsKey); } catch { return []; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goalsKey, goalsTick]);
+  const goalsError = useMemo(() => {
+    try { readHubGoals(goalsKey); return ''; }
+    catch (error) { return error instanceof Error ? error.message : 'Не удалось прочитать отметки.'; }
+  }, [goalsKey, goalsTick]);
   const toggleGoal = (g: string) => {
-    const set = new Set(checkedGoals);
-    set.has(g) ? set.delete(g) : set.add(g);
-    localStorage.setItem(goalsKey, JSON.stringify([...set]));
-    setGoalsTick((t) => t + 1);
+    try {
+      const set = new Set(readHubGoals(goalsKey));
+      set.has(g) ? set.delete(g) : set.add(g);
+      localStorage.setItem(goalsKey, JSON.stringify([...set]));
+      setGoalsTick((t) => t + 1);
+    } catch (error) { toast.error('Не удалось сохранить отметку', error instanceof Error ? error.message : undefined); }
   };
   const sessionById = (id: string) => hub?.sessions.find((s) => s.id === id);
   const completeSession = (min: number) => activityAction(() => logWorkout(todayISO(), min * 60)) !== undefined;
@@ -133,6 +141,7 @@ export const WorkoutHub: React.FC<{ programId: string | null; onClose: () => voi
             {hub.goals && hub.goals.length > 0 && (
               <section>
                 <SectionTitle icon={<Check className="h-4 w-4" />}>Мои цели</SectionTitle>
+                {goalsError && <p role="alert" className="mb-2 text-sm text-text-muted">{goalsError}</p>}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {hub.goals.map((g) => {
                     const on = checkedGoals.includes(g);
