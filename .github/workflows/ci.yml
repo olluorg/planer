@@ -52,3 +52,46 @@ jobs:
         run: if (-not (Test-Path -LiteralPath 'release/win-unpacked/THEDAD.exe')) { throw 'Packaged executable not found' }
       - name: Test packaged desktop persistence
         run: bunx playwright test e2e/desktop-window.spec.ts --project=laptop --grep "packaged Windows app"
+
+  sync-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: thedad
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: thedad
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U thedad -d thedad"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: npm ci --prefix server
+      - name: Build with sync enabled
+        run: bun run build
+        env:
+          VITE_FEATURE_PLUS: '1'
+          VITE_SYNC_SERVER_URL: http://localhost:8787
+      - name: Start isolated sync server
+        env:
+          DATABASE_URL: postgres://thedad:test-only@localhost:5432/thedad
+          ALLOWED_ORIGINS: http://localhost:4174
+        run: |
+          node server/index.js > "$RUNNER_TEMP/sync-server.log" 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8787/health; then exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/sync-server.log"
+          exit 1
+      - run: bunx playwright install --with-deps chromium
+      - name: Test concurrent sync against PostgreSQL
+        run: bunx playwright test e2e/sync-server.spec.ts --project=laptop --workers=1
+        env:
+          E2E_SYNC_SERVER: http://localhost:8787
