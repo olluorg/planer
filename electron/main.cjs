@@ -115,7 +115,9 @@ function createTray() {
     ]));
     tray.on('click', showWindow);
   } catch (e) {
-    // Нет трея (некоторые окружения Linux) — не повод не запускаться.
+    // Partially configured trays must not be treated as a way to reopen the app.
+    tray?.destroy();
+    tray = null;
     console.error('[tray]', e?.message ?? e);
   }
 }
@@ -147,6 +149,12 @@ function createWindow() {
   // перестанут приходить ровно в тот момент, когда они нужны.
   win.on('close', (e) => {
     if (quitting) return;
+    if (!tray) {
+      // Without a tray, hiding the only window would leave an inaccessible process.
+      quitting = true;
+      app.quit();
+      return;
+    }
     e.preventDefault();
     win.hide();
     // Один раз объясняем, куда делось окно: иначе «закрыл, а процесс висит»
