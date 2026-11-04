@@ -107,6 +107,23 @@ test('правки с двух устройств сливаются без по
   }
 });
 
+test('серверная копия восстанавливается через настройки и переживает перезагрузку', async ({ browser }) => {
+  const page = await device(browser);
+  try {
+    await addGoal(page, 'Цель в серверной копии');
+    await connect(page, `restore-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`, 'Регистрация');
+    await expect(page.getByRole('button', { name: 'Заменить копией с сервера' })).toBeEnabled();
+    page.once('dialog', dialog => void dialog.accept());
+    const reloaded = page.waitForEvent('load');
+    await page.getByRole('button', { name: 'Заменить копией с сервера' }).click();
+    await reloaded;
+    await page.goto('/goals');
+    await expect(page.getByText('Цель в серверной копии').first()).toBeVisible();
+  } finally {
+    await page.context().close();
+  }
+});
+
 test('сервер атомарно отклоняет устаревшую и старую запись', async ({ request }) => {
   const created = await request.post(`${SERVER}/vault`);
   expect(created.ok()).toBeTruthy();
