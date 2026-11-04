@@ -11,7 +11,8 @@ export const PERSONAL_BACKUP_KEYS = [
 const RECOVERY_KEY = 'thedad.personal-backup.recovery.v1';
 const SCHEMA = 'thedad.personal-data/v1';
 type Values = Record<string, string | null>;
-type PersonalBackup = { schema: typeof SCHEMA; exportedAt: string; values: Values; hubs?: Record<string, string> };
+type ProgramData = { installed: string | null; progress: string | null };
+type PersonalBackup = { schema: typeof SCHEMA; exportedAt: string; values: Values; hubs?: Record<string, string>; programs?: ProgramData };
 const HUB_KEY = /^hub\.(photos|goals)\.[a-zA-Z0-9_-]{1,80}$/;
 const JSON_ARRAYS = new Set(['user.categories.v1', 'nutrition.foods.v1']);
 const JSON_OBJECTS = new Set(['nutrition.eaten.v1', 'activity.manual.v1', 'workout.sessions.v1', 'workout.met-seconds.v1']);
@@ -36,7 +37,7 @@ function snapshotHubs(): Record<string, string> {
 }
 
 export function exportPersonalData(): PersonalBackup {
-  return {schema:SCHEMA, exportedAt:new Date().toISOString(), values:snapshot(), hubs:snapshotHubs()};
+  return {schema:SCHEMA, exportedAt:new Date().toISOString(), values:snapshot(), hubs:snapshotHubs(), programs: { installed: localStorage.getItem('program.installed.v1'), progress: localStorage.getItem('program.progress.v1') }};
 }
 
 export function parsePersonalData(raw: unknown): PersonalBackup {
@@ -84,15 +85,35 @@ export function parsePersonalData(raw: unknown): PersonalBackup {
       hubs[key] = value;
     }
   }
-  return {schema:SCHEMA, exportedAt:file.exportedAt, values:values as Values, ...(hubs ? { hubs } : {})};
+  let programs: ProgramData | undefined;
+  if ('programs' in file) {
+    if (!object(file.programs) || Object.keys(file.programs).some(key => !['installed', 'progress'].includes(key)) ||
+        !['installed', 'progress'].every(key => key in (file.programs as Record<string, unknown>) && ((file.programs as Record<string, unknown>)[key] === null || typeof (file.programs as Record<string, unknown>)[key] === 'string'))) throw new Error('Неверные данные программ');
+    programs = file.programs as ProgramData;
+    for (const [key, value] of Object.entries(programs)) {
+      if (value === null) continue;
+      if (value.length > 1_000_000) throw new Error('Данные программ слишком велики');
+      let parsed: unknown;
+      try { parsed = JSON.parse(value); } catch { throw new Error('Неверные данные программ'); }
+      if (key === 'installed') {
+        if (!Array.isArray(parsed) || !parsed.every(item => typeof item === 'string' || (object(item) && typeof item.id === 'string' && (item.title == null || typeof item.title === 'string') && (item.emoji == null || typeof item.emoji === 'string') && (item.kind == null || item.kind === 'program' || item.kind === 'hub')))) throw new Error('Неверный список программ');
+      } else if (!object(parsed) || !Object.values(parsed).every(item => object(item) && typeof item.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.start) && Array.isArray(item.done) && item.done.every(day => Number.isSafeInteger(day) && day > 0))) throw new Error('Неверный прогресс программ');
+    }
+  }
+  return {schema:SCHEMA, exportedAt:file.exportedAt, values:values as Values, ...(hubs ? { hubs } : {}), ...(programs ? { programs } : {})};
 }
 
-function apply(values: Values, hubs?: Record<string, string>) {
+function apply(values: Values, hubs?: Record<string, string>, programs?: ProgramData) {
   for (const key of PERSONAL_BACKUP_KEYS) localStorage.removeItem(key);
   for (const key of PERSONAL_BACKUP_KEYS) if (values[key] !== null) localStorage.setItem(key, values[key]!);
   if (hubs) {
     for (const key of Object.keys(snapshotHubs())) localStorage.removeItem(key);
     for (const [key, value] of Object.entries(hubs)) localStorage.setItem(key, value);
+  }
+  if (programs) {
+    for (const [key, value] of [['program.installed.v1', programs.installed], ['program.progress.v1', programs.progress]] as const) {
+      if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+    }
   }
 }
 
@@ -104,13 +125,13 @@ export async function restorePersonalData(file: PersonalBackup): Promise<void> {
   const before = exportPersonalData();
   await set(RECOVERY_KEY, before);
   try {
-    apply(next.values, next.hubs);
+    apply(next.values, next.hubs, next.programs);
     // The SQLite health values were not restored with this file; do not claim ownership of them.
     localStorage.removeItem(NUTRITION_OWNER_KEY);
     localStorage.removeItem(WORKOUT_OWNER_KEY);
   }
   catch (error) {
-    try { apply(before.values, before.hubs); }
+    try { apply(before.values, before.hubs, before.programs); }
     catch { throw new Error('Не удалось восстановить данные автоматически. Предыдущая копия сохранена для восстановления в настройках.'); }
     throw error;
   }
@@ -129,17 +150,18 @@ export async function restorePersonalRecovery(): Promise<void> {
   if (!object(saved) || saved.schema !== SCHEMA || !object(saved.values) ||
       Object.keys(saved.values).some(key => !PERSONAL_BACKUP_KEYS.includes(key as typeof PERSONAL_BACKUP_KEYS[number])) ||
       PERSONAL_BACKUP_KEYS.some(key => !(key in saved.values) || (saved.values[key] !== null && typeof saved.values[key] !== 'string')) ||
-      (saved.hubs !== undefined && (!object(saved.hubs) || Object.entries(saved.hubs).some(([key, value]) => !HUB_KEY.test(key) || typeof value !== 'string')))) {
+      (saved.hubs !== undefined && (!object(saved.hubs) || Object.entries(saved.hubs).some(([key, value]) => !HUB_KEY.test(key) || typeof value !== 'string'))) ||
+      (saved.programs !== undefined && (!object(saved.programs) || Object.keys(saved.programs).some(key => !['installed', 'progress'].includes(key)) || !['installed', 'progress'].every(key => key in saved.programs! && (saved.programs![key as keyof ProgramData] === null || typeof saved.programs![key as keyof ProgramData] === 'string'))))) {
     throw new Error('Предыдущая копия повреждена');
   }
   const before = exportPersonalData();
   await set(RECOVERY_KEY, before);
   try {
-    apply(saved.values, saved.hubs);
+    apply(saved.values, saved.hubs, saved.programs);
     localStorage.removeItem(NUTRITION_OWNER_KEY);
     localStorage.removeItem(WORKOUT_OWNER_KEY);
   } catch (error) {
-    try { apply(before.values, before.hubs); }
+    try { apply(before.values, before.hubs, before.programs); }
     catch { throw new Error('Не удалось восстановить данные автоматически. Предыдущая копия сохранена для восстановления в настройках.'); }
     // A failed recovery must remain retryable after the current state is restored.
     await set(RECOVERY_KEY, saved);

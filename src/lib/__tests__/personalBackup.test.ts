@@ -26,16 +26,37 @@ describe('personal data backup', () => {
   });
 
   it('preserves program data when importing an older backup without it', async () => {
-    const { hubs: _hubs, ...old } = exportPersonalData();
+    const { hubs: _hubs, programs: _programs, ...old } = exportPersonalData();
     localStorage.setItem('hub.goals.home-gym', '["Оставить"]');
+    localStorage.setItem('program.progress.v1', '{"home-gym":{"start":"2026-11-01","done":[1]}}');
     await restorePersonalData(parsePersonalData(old));
     expect(localStorage.getItem('hub.goals.home-gym')).toBe('["Оставить"]');
+    expect(localStorage.getItem('program.progress.v1')).toContain('2026-11-01');
+  });
+
+  it('restores installed programs and progress without exporting licenses', async () => {
+    const installed = '[{"id":"home-gym","title":"Зал","emoji":"🏋️","kind":"hub"}]';
+    const progress = '{"home-gym":{"start":"2026-11-01","done":[1,3]}}';
+    localStorage.setItem('program.installed.v1', installed);
+    localStorage.setItem('program.progress.v1', progress);
+    localStorage.setItem('marketplace.licenses.v1', 'private-license');
+    const file = parsePersonalData(exportPersonalData());
+    expect(JSON.stringify(file)).not.toContain('private-license');
+    localStorage.removeItem('program.installed.v1');
+    localStorage.setItem('program.progress.v1', '{}');
+    await restorePersonalData(file);
+    expect(localStorage.getItem('program.installed.v1')).toBe(installed);
+    expect(localStorage.getItem('program.progress.v1')).toBe(progress);
+    await restorePersonalRecovery();
+    expect(localStorage.getItem('program.installed.v1')).toBeNull();
+    expect(localStorage.getItem('program.progress.v1')).toBe('{}');
   });
 
   it('rejects non-allowlisted program keys and invalid photo data', () => {
     const file = exportPersonalData();
     expect(() => parsePersonalData({ ...file, hubs: { 'hub.secret.home-gym': 'secret' } })).toThrow();
     expect(() => parsePersonalData({ ...file, hubs: { 'hub.photos.home-gym': '{"before":"https://example.com/image"}' } })).toThrow();
+    expect(() => parsePersonalData({ ...file, programs: { installed: null, progress: '{"a":{"start":"oops","done":[-1]}}' } })).toThrow();
   });
   it('round-trips a diary entry with unknown calories', async () => {
     const original = '{"2026-11-02":[{"key":"soup","title":"Суп","meal":"Обед"}]}';
