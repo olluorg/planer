@@ -76,7 +76,7 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
         </div>
         {weights.length >= 2
           ? <ECharts option={chartOption} height={180} />
-          : <div className="py-10 text-center text-[12px] text-text-dim">Отмечай вес каждый день — здесь появится график динамики.</div>}
+          : <div className="py-10 text-center text-[12px] text-text-dim">Добавьте несколько измерений веса, чтобы увидеть динамику.</div>}
       </div>
 
       {/* Фото до/после */}
@@ -104,10 +104,10 @@ const PhotoSlot: React.FC<{ label: string; url?: string; onPick: () => void; onC
     {url ? (
       <>
         <img src={url} alt={label} className="w-full h-40 object-cover" />
-        <button onClick={onClear} className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
+        <button aria-label={`Удалить фото «${label}»`} onClick={onClear} className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
       </>
     ) : (
-      <button onClick={onPick} className="w-full h-40 flex flex-col items-center justify-center gap-1.5 text-text-dim hover:text-text-muted hover:bg-bg-hover">
+      <button aria-label={`Добавить фото «${label}»`} onClick={onPick} className="w-full h-40 flex flex-col items-center justify-center gap-1.5 text-text-dim hover:text-text-muted hover:bg-bg-hover">
         <ImagePlus className="h-6 w-6" />
         <span className="text-[11px]">Добавить фото</span>
       </button>

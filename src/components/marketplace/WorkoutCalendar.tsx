@@ -9,6 +9,7 @@ const TYPE_COLORS: Record<string, string> = {
 const typeColor = (t: string) => TYPE_COLORS[t.trim().toLowerCase()] ?? '#8b5cf6';
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MONTHS_GENITIVE = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const WEEK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
@@ -89,7 +90,7 @@ export const WorkoutCalendar: React.FC<{
       {selected && (
         <div className="mt-3 rounded-xl border border-border-soft bg-bg-card p-3">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[13px] font-semibold text-text">{selectedCell?.day} {MONTHS[month].toLowerCase()}</span>
+            <span className="text-[13px] font-semibold text-text">{selectedCell?.day} {MONTHS_GENITIVE[month]}</span>
             {selDone && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-500 px-2 py-0.5 text-[10px] font-medium"><Check className="h-3 w-3" /> выполнено</span>}
           </div>
           {selSessions.length === 0 ? (
