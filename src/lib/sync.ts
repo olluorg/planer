@@ -23,6 +23,18 @@ function sameConnection(a: SyncConfig | null, b: SyncConfig | null): boolean {
   return a.serverUrl === b.serverUrl && a.syncId === b.syncId && a.authToken === b.authToken && a.encKey === b.encKey;
 }
 
+// Other tabs can disconnect and reconnect while this tab is awaiting the network.
+// Ignore timestamp-only updates, which are emitted after an ordinary sync.
+if (typeof window !== 'undefined') window.addEventListener('storage', (event) => {
+  if (event.key !== CFG_KEY && event.key !== null) return;
+  if (event.key === null) { connectionGeneration++; return; }
+  try {
+    const before = event.oldValue ? JSON.parse(event.oldValue) as SyncConfig : null;
+    const after = event.newValue ? JSON.parse(event.newValue) as SyncConfig : null;
+    if (!sameConnection(before, after)) connectionGeneration++;
+  } catch { connectionGeneration++; }
+});
+
 export function getSync(): SyncConfig | null {
   try { const raw = localStorage.getItem(CFG_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }

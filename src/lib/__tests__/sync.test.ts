@@ -230,6 +230,28 @@ describe('синхронизация', () => {
     expect([...server.vaults.values()][0].revision).toBe(2);
   });
 
+  it('отменяет старый обмен при переподключении в другой вкладке', async () => {
+    await withGoal('Цель');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    const original = localStorage.getItem('thedad.sync.v1')!;
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => {
+      const response = await server.handler(u, i);
+      if ((!i?.method || i.method === 'GET') && u.includes('/vault/')) { entered(); await gate; }
+      return response;
+    }));
+    const pending = sync.syncNow();
+    await started;
+    window.dispatchEvent(new StorageEvent('storage', { key: 'thedad.sync.v1', oldValue: original, newValue: null }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'thedad.sync.v1', oldValue: null, newValue: original }));
+    release();
+    await expect(pending).rejects.toThrow(/Подключение изменилось/);
+    expect([...server.vaults.values()][0].revision).toBe(1);
+  });
+
   it('не заменяет базу и не возвращает подключение при отключении во время загрузки копии', async () => {
     const db = await withGoal('Исходная');
     const sync = await import('../sync');
