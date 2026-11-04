@@ -16,6 +16,7 @@ import { useTheme, isDarkMode } from '@/lib/theme';
 import { forecastSummary } from '@/lib/forecastSummary';
 import { getChartColors, type ChartColors } from '@/lib/chart-theme';
 import { recentFocusDays, timeByGoal } from '@/lib/analyticsTime';
+import { habitCorrelations } from '@/lib/habitCorrelation';
 
 type Tab = 'overview' | 'focus' | 'tasks' | 'habits' | 'goals';
 
@@ -116,33 +117,7 @@ export const AnalyticsPage = () => {
 
   // habit correlations vs mood and task completion
   const correlations = useMemo(() => {
-    if (habits.length === 0) return [];
-    const today = new Date();
-    const days = Array.from({ length: 60 }, (_, i) => isoDate(addDays(today, -59 + i)));
-
-    const moodByDay = new Map<string, number>();
-    reflections.forEach((r) => { if (r.mood !== null) moodByDay.set(r.date, r.mood); });
-    const taskRatioByDay = new Map<string, number>();
-    days.forEach((d) => {
-      const dt = tasks.filter((t) => t.date === d);
-      taskRatioByDay.set(d, dt.length ? dt.filter((t) => t.status === 'done').length / dt.length : 0);
-    });
-
-    return habits.map((h) => {
-      const habitVec = days.map((d) => habitLogs.some((l) => l.habit_id === h.id && l.date === d) ? 1 : 0);
-      const moodVec: number[] = [];
-      const moodHabit: number[] = [];
-      const taskVec: number[] = [];
-      days.forEach((d, i) => {
-        if (moodByDay.has(d)) { moodHabit.push(habitVec[i]); moodVec.push(moodByDay.get(d)!); }
-        taskVec.push(taskRatioByDay.get(d) ?? 0);
-      });
-      return {
-        title: h.title,
-        rMood: pearson(moodHabit, moodVec),
-        rTasks: pearson(habitVec, taskVec),
-      };
-    });
+    return habitCorrelations(habits, habitLogs, tasks, reflections, new Date());
   }, [habits, habitLogs, tasks, reflections]);
 
   // habits weekly bar
@@ -445,12 +420,12 @@ export const AnalyticsPage = () => {
 
           <Card>
             <CardTitle>Корреляции привычек</CardTitle>
-            <div className="text-caption text-text-muted mb-2">Pearson R за 60 дней</div>
+            <div className="text-caption text-text-muted mb-2">Связь за последние 60 дней после создания привычки. Учитываются дни с оценкой настроения или задачами; связь не доказывает причину.</div>
             <div className="space-y-2 text-small">
               {correlations.length === 0 && <div className="text-small text-text-dim">Нет привычек</div>}
               {correlations.map((c) => (
-                <div key={c.title} className="flex items-center gap-3">
-                  <div className="flex-1 truncate">{c.title}</div>
+                <div key={c.id} className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0"><div className="truncate">{c.title}</div><div className="text-caption text-text-muted">Дней: настроение {c.moodDays} · задачи {c.taskDays}</div></div>
                   <CorrCell label="настр." value={c.rMood} />
                   <CorrCell label="задачи" value={c.rTasks} />
                 </div>
@@ -568,18 +543,6 @@ function consistencyColor(ratio: number): string {
   if (ratio < 0.67) return levels[2];
   if (ratio < 1) return levels[3];
   return levels[4];
-}
-
-function pearson(a: number[], b: number[]): number | null {
-  const n = Math.min(a.length, b.length);
-  if (n < 3) return null;
-  const ma = a.reduce((s, x) => s + x, 0) / n;
-  const mb = b.reduce((s, x) => s + x, 0) / n;
-  let num = 0, da = 0, db = 0;
-  for (let i = 0; i < n; i++) { num += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; }
-  const den = Math.sqrt(da * db);
-  if (!den) return null;
-  return num / den;
 }
 
 function trendChart(series: number[], labels: string[], cc: ChartColors, color = '#6366f1') {
