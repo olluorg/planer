@@ -3,6 +3,8 @@ import { TrendingDown, Flame, Dumbbell, Timer, ImagePlus, X } from 'lucide-react
 import type { HealthLog } from '@/lib/types';
 import { ECharts } from '@/components/charts/ECharts';
 import { compressImage } from '@/lib/imageCompress';
+import { workoutMonthStats } from '@/lib/workoutStats';
+import { toast } from '@/lib/toast';
 
 interface Photos { before?: string; after?: string }
 
@@ -21,12 +23,7 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
   );
 
   const stats = useMemo(() => {
-    const ym = new Date().toISOString().slice(0, 7);
-    const monthW = healthLogs.filter((l) => l.metric === 'workout' && l.value > 0 && l.date.startsWith(ym));
-    return {
-      count: new Set(monthW.map((l) => l.date)).size,
-      minutes: monthW.reduce((s, l) => s + l.value, 0),
-    };
+    return workoutMonthStats(healthLogs, new Date());
   }, [healthLogs]);
 
   const weightDelta = weights.length >= 2 ? weights[weights.length - 1].value - weights[0].value : 0;
@@ -36,14 +33,14 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
     try {
       const url = await compressImage(file, 640, 0.7);
       const next = { ...photos, [which]: url };
-      setPhotos(next);
       localStorage.setItem(photosKey, JSON.stringify(next));
-    } catch { /* не удалось — не критично */ }
+      setPhotos(next);
+    } catch { toast.error('Не удалось сохранить фото', 'Проверьте доступное место в хранилище.'); }
   };
   const clearPhoto = (which: keyof Photos) => {
     const next = { ...photos }; delete next[which];
-    setPhotos(next);
-    localStorage.setItem(photosKey, JSON.stringify(next));
+    try { localStorage.setItem(photosKey, JSON.stringify(next)); setPhotos(next); }
+    catch { toast.error('Не удалось удалить фото', 'Проверьте доступ к хранилищу.'); }
   };
 
   const chartOption = {
@@ -62,7 +59,7 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
     <div className="space-y-4">
       {/* Статистика */}
       <div className="grid grid-cols-3 gap-2.5">
-        <Stat icon={<Dumbbell className="h-4 w-4" />} value={String(stats.count)} label="тренировок в этом месяце" />
+        <Stat icon={<Dumbbell className="h-4 w-4" />} value={String(stats.days)} label="дней с тренировками за месяц" />
         <Stat icon={<Timer className="h-4 w-4" />} value={`${stats.minutes}`} label="минут за месяц" />
         <Stat icon={<Flame className="h-4 w-4" />} value={String(streak)} label="дней стрик" />
       </div>
@@ -72,7 +69,7 @@ export const WorkoutProgress: React.FC<{ programId: string; healthLogs: HealthLo
         <div className="flex items-center justify-between mb-2">
           <span className="text-[13px] font-semibold text-text">Динамика веса</span>
           {weights.length >= 2 && (
-            <span className={`inline-flex items-center gap-1 text-[12px] font-medium ${weightDelta <= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+            <span className="inline-flex items-center gap-1 text-[12px] font-medium text-text-muted">
               <TrendingDown className="h-3.5 w-3.5" /> {weightDelta > 0 ? '+' : ''}{weightDelta.toFixed(1)} кг
             </span>
           )}

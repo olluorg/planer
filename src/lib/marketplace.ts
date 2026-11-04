@@ -320,7 +320,7 @@ export function applyProgram(pack: ProgramPack, actions: ProgramActions): number
   const dayISO = (offset: number): string => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
-    return d.toISOString().slice(0, 10);
+    return isoDate(d);
   };
 
   pack.goals?.forEach((g) => {

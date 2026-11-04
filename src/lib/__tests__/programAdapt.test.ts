@@ -3,6 +3,7 @@ import { analyzeProgram, recommendWorkout } from '../programAdapt';
 import type { HealthLog } from '../types';
 import { workoutStreak, type ProgramPack, type WorkoutHub } from '../marketplace';
 import { isoDate } from '../utils';
+import { workoutMonthStats } from '../workoutStats';
 
 describe('program progress summary', () => {
   const pack = { duration_days: 30, goals: [{ unit: 'кг', target_value: 80 }] } as ProgramPack;
@@ -56,6 +57,23 @@ it('counts workout days using the local calendar date', () => {
       { metric: 'workout', date: '2026-11-04', value: 20 },
       { metric: 'workout', date: '2026-11-03', value: 30 },
     ])).toBe(2);
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ; else process.env.TZ = previousTimezone;
+  }
+});
+
+it('uses the local month and excludes future and zero workout entries', () => {
+  const previousTimezone = process.env.TZ;
+  try {
+    process.env.TZ = 'Europe/Moscow';
+    const now = new Date('2026-10-31T21:30:00Z'); // November 1 locally
+    const records = [
+      { metric: 'workout', date: '2026-10-31', value: 90 },
+      { metric: 'workout', date: '2026-11-01', value: 25 },
+      { metric: 'workout', date: '2026-11-01', value: 0 },
+      { metric: 'workout', date: '2026-11-02', value: 60 },
+    ] as HealthLog[];
+    expect(workoutMonthStats(records, now)).toEqual({ days: 1, minutes: 25 });
   } finally {
     if (previousTimezone === undefined) delete process.env.TZ; else process.env.TZ = previousTimezone;
   }

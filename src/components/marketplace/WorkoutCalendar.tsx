@@ -44,7 +44,8 @@ export const WorkoutCalendar: React.FC<{
   const prev = () => { setSelected(null); if (month === 0) { setYear((y) => y - 1); setMonth(11); } else setMonth((m) => m - 1); };
   const next = () => { setSelected(null); if (month === 11) { setYear((y) => y + 1); setMonth(0); } else setMonth((m) => m + 1); };
 
-  const selSessions = selected ? weekdaySessions((new Date(selected).getDay() + 6) % 7) : [];
+  const selectedCell = cells.find((cell) => cell?.date === selected);
+  const selSessions = selectedCell ? weekdaySessions(selectedCell.mondayIdx) : [];
   const selDone = selected ? completedDays.has(selected) : false;
 
   return (
@@ -52,8 +53,8 @@ export const WorkoutCalendar: React.FC<{
       <div className="flex items-center justify-between mb-3">
         <div className="text-[11px] uppercase tracking-widest font-semibold text-text-muted">{MONTHS[month]} {year}</div>
         <div className="flex gap-1">
-          <button onClick={prev} className="h-7 w-7 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted"><ChevronLeft className="h-4 w-4" /></button>
-          <button onClick={next} className="h-7 w-7 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted"><ChevronRight className="h-4 w-4" /></button>
+          <button aria-label="Предыдущий месяц" onClick={prev} className="h-7 w-7 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted"><ChevronLeft className="h-4 w-4" /></button>
+          <button aria-label="Следующий месяц" onClick={next} className="h-7 w-7 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
 
@@ -88,7 +89,7 @@ export const WorkoutCalendar: React.FC<{
       {selected && (
         <div className="mt-3 rounded-xl border border-border-soft bg-bg-card p-3">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[13px] font-semibold text-text">{new Date(selected).getDate()} {MONTHS[new Date(selected).getMonth()].toLowerCase()}</span>
+            <span className="text-[13px] font-semibold text-text">{selectedCell?.day} {MONTHS[month].toLowerCase()}</span>
             {selDone && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-500 px-2 py-0.5 text-[10px] font-medium"><Check className="h-3 w-3" /> выполнено</span>}
           </div>
           {selSessions.length === 0 ? (
