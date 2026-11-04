@@ -15,7 +15,7 @@
 import { isoDate, todayISO } from './utils';
 import type { GoalTpl, HabitTpl, TaskTpl } from './templates';
 import type { TimeBlock } from './types';
-import { installPlugin, validatePlugin, type PluginWidgetDef } from './plugins';
+import { installPlugin, validatePlugin, PLUGINS_EVENT, type PluginWidgetDef } from './plugins';
 
 /* ==================== Публичный ключ продавца ====================
  * Сгенерировать своей парой: `node scripts/gen-keypair.mjs` → вставить сюда base64
@@ -157,6 +157,7 @@ export interface Catalog {
 
 /** Действия стора, нужные для установки программы (передаёт React-модалка из useStore). */
 export interface ProgramActions {
+  batch: (fn: () => void) => void;
   addGoal: (g: { title: string; type: GoalTpl['type']; start_value: number; target_value: number; unit: string | null; deadline: string | null }) => void;
   addHabit: (h: { title: string; color: string | null; schedule: 'daily' | 'weekly'; target_per_week: number }) => void;
   addTask: (t: { title: string; date: string; time_block: TimeBlock | null; start_time: string | null; priority: number; tags: string | null; estimate_min: number | null }) => void;
@@ -316,6 +317,31 @@ export async function fetchProgram(id: string): Promise<ProgramPack> {
 
 /** Развернуть программу в стор: цели, привычки, задачи (по дням), плагин. */
 export function applyProgram(pack: ProgramPack, actions: ProgramActions): number {
+  if (isInstalled(pack.id)) throw new Error('Программа уже установлена. Откройте её из списка программ.');
+  // SQLite и localStorage не имеют общей транзакции. При синхронной ошибке
+  // откатываем SQLite через batch и возвращаем прежние значения localStorage.
+  const keys = ['plugins.installed.v1', 'program.installed.v1', 'program.progress.v1'];
+  const before = keys.map((key) => [key, localStorage.getItem(key)] as const);
+  try {
+    let count = 0;
+    actions.batch(() => { count = applyProgramContents(pack, actions); });
+    return count;
+  } catch (error) {
+    let restored = true;
+    for (const [key, value] of before) {
+      try {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      } catch { restored = false; }
+    }
+    window.dispatchEvent(new CustomEvent(PROGRAMS_EVENT));
+    window.dispatchEvent(new CustomEvent(PLUGINS_EVENT));
+    if (!restored) throw new Error('Не удалось полностью восстановить данные программы после ошибки. Проверьте резервную копию.');
+    throw error;
+  }
+}
+
+function applyProgramContents(pack: ProgramPack, actions: ProgramActions): number {
   let count = 0;
   const dayISO = (offset: number): string => {
     const d = new Date();

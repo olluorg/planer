@@ -12,7 +12,7 @@ import { toast } from '@/lib/toast';
 /** Витрина премиум-«Программ». Открывается событием thedad:marketplace из WidgetPicker/Шаблонов.
  *  Покупка — на внешней странице (buyUrl) → лиценз-ключ → «Ввести ключ» → установка. */
 export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-  const { addGoal, addHabit, addTask } = useStore();
+  const { addGoal, addHabit, addTask, batch } = useStore();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [installed, setInstalled] = useState<Set<string>>(new Set());
@@ -69,7 +69,7 @@ export const MarketplaceModal: React.FC<{ open: boolean; onClose: () => void }> 
     setInstalling(item.id);
     try {
       const pack = await fetchProgram(item.id);
-      const n = applyProgram(pack, { addGoal, addHabit, addTask });
+      const n = applyProgram(pack, { addGoal, addHabit, addTask, batch });
       setDone((s) => new Set([...s, item.id]));
       setInstalled((s) => new Set([...s, item.id]));
       toast.success(`Программа «${pack.title}» установлена`, `Добавлено элементов: ${n} · открой плеер, чтобы пройти по дням`);
