@@ -46,7 +46,7 @@ test('the published local program displays its documented meals', async ({ page 
     }
     if (day.day < 7) await page.getByRole('button', { name: 'Следующий день' }).click();
   }
-  expect(checked).toBe(9);
+  expect(checked).toBe(12);
   await page.getByRole('button', { name: 'Следующий день' }).click();
   await expect(page.getByText('Для этого дня материалы пока не добавлены.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Отметить день выполненным' })).toBeDisabled();
