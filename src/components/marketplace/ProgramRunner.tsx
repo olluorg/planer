@@ -11,7 +11,7 @@ import {
 import { analyzeProgram, type AdaptiveInsight } from '@/lib/programAdapt';
 import { useStore } from '@/lib/store';
 import { toast } from '@/lib/toast';
-import { isEaten, toggleEaten, readCalories, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
+import { getEaten, toggleEaten, readCalories, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
 import { nutritionAction } from '@/lib/nutritionAction';
 import { isoDate } from '@/lib/utils';
 
@@ -176,7 +176,7 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
               {dayData?.meals && dayData.meals.length > 0 && (
                 <Section icon={<UtensilsCrossed className="h-4 w-4" />} title="Идеи блюд">
                   <div className="space-y-2.5">
-                    {dayData.meals.map((m, i) => <MealCard key={`${day}-${i}`} meal={m} />)}
+                    {dayData.meals.map((m, i) => <MealCard key={`${day}-${i}`} meal={m} programId={programId} day={day} />)}
                   </div>
                 </Section>
               )}
@@ -268,7 +268,7 @@ const VideoButton: React.FC<{ id: string; label?: string; compact?: boolean }> =
   );
 };
 
-const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({ meal }) => {
+const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal; programId: string; day: number }> = ({ meal, programId, day }) => {
   const [open, setOpen] = useState(false);
   const [, setNutritionVersion] = useState(0);
   useEffect(() => {
@@ -277,8 +277,18 @@ const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({
     return () => window.removeEventListener(NUTRITION_EVENT, sync);
   }, []);
   const today = isoDate(new Date());
-  const eatKey = `${meal.meal}¦${meal.title}`;
-  const eaten = isEaten(today, eatKey);
+  const legacyKey = `${meal.meal}¦${meal.title}`;
+  const separateKey = `program:${programId}:${day}:${encodeURIComponent(legacyKey)}`;
+  const entries = getEaten(today);
+  const legacy = entries.find((item) => item.key === legacyKey);
+  const sameNutrition = legacy && (['kcal', 'protein', 'fat', 'carbs'] as const).every((key) => {
+    const stored = key === 'kcal' ? readCalories(legacy[key]) : readMacros(legacy)[key];
+    const current = key === 'kcal' ? readCalories(meal[key]) : readMacros(meal)[key];
+    return stored === current;
+  });
+  const collision = Boolean(legacy && !sameNutrition);
+  const eatKey = entries.some((item) => item.key === separateKey) || collision ? separateKey : legacyKey;
+  const eaten = entries.some((item) => item.key === eatKey);
   const photo = safePhoto(meal.photo);
   const vid = youtubeId(meal.video);
   const macros = [meal.protein, meal.fat, meal.carbs];
@@ -301,6 +311,7 @@ const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({
         <div className="px-2.5 pb-3 pt-0.5 space-y-2">
           {meal.recipe && <p className="text-[12px] text-text-muted leading-relaxed whitespace-pre-line">{meal.recipe}</p>}
           {vid && <VideoButton id={vid} label="Видео-рецепт" />}
+          {collision && <p className="text-[12px] text-text-muted">В дневнике уже есть блюдо с таким названием и другим КБЖУ. Эта запись будет отдельной.</p>}
           <button
             type="button"
             aria-pressed={eaten}

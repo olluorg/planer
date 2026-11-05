@@ -40,6 +40,27 @@ test('meal cards explain when nutritional values are missing', async ({ page }) 
   await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
   let entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
   expect(entries).toContainEqual(expect.objectContaining({ key: 'Завтрак¦Каша', kcal: 344, protein: 9.2, fat: 10.1, carbs: 58.1 }));
+  await page.evaluate(() => {
+    const store = JSON.parse(localStorage.getItem('nutrition.eaten.v1')!);
+    const day = Object.values(store)[0] as Array<{ kcal: number }>;
+    day[0].kcal = 500;
+    localStorage.setItem('nutrition.eaten.v1', JSON.stringify(store));
+    window.dispatchEvent(new CustomEvent('thedad:nutrition-changed'));
+  });
+  await expect(page.getByText(/другим КБЖУ/)).toBeVisible();
+  await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
+  entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
+  expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'Завтрак¦Каша', kcal: 500 }), expect.objectContaining({ kcal: 344, title: 'Каша' })]));
+  await page.getByRole('button', { name: 'Снять отметку за сегодня' }).click();
+  entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
+  expect(entries).toEqual([expect.objectContaining({ key: 'Завтрак¦Каша', kcal: 500 })]);
+  await page.evaluate(() => {
+    const store = JSON.parse(localStorage.getItem('nutrition.eaten.v1')!);
+    const day = Object.values(store)[0] as Array<{ kcal: number }>;
+    day[0].kcal = 344;
+    localStorage.setItem('nutrition.eaten.v1', JSON.stringify(store));
+    window.dispatchEvent(new CustomEvent('thedad:nutrition-changed'));
+  });
   await page.getByRole('button', { name: /Пример блюда/ }).click();
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
