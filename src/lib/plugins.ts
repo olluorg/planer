@@ -248,26 +248,33 @@ function save(list: PluginWidgetDef[]) {
 export function installPlugin(raw: unknown): PluginWidgetDef {
   const res = validatePlugin(raw);
   if (!res.ok) throw new Error(res.errors.join('; '));
-  const list = readPluginsForWrite().filter((p) => p.id !== res.plugin.id);
-  save([...list, res.plugin]);
-  return res.plugin;
+  const plugin = updatedLegacyWeightLossWidget(res.plugin) ?? res.plugin;
+  const list = readPluginsForWrite().filter((p) => p.id !== plugin.id);
+  save([...list, plugin]);
+  return plugin;
 }
 
 export function removePlugin(id: string) {
   save(readPluginsForWrite().filter((p) => p.id !== id));
 }
 
-/** Обновляем только неизменённую старую поставку, не пользовательский виджет. */
-export function migrateLegacyWeightLossWidget(): boolean {
+function updatedLegacyWeightLossWidget(candidate: PluginWidgetDef): PluginWidgetDef | null {
   const legacy = validatePlugin(legacyWeightLossWidget);
-  if (!legacy.ok) return false;
-  const list = readPluginsForWrite();
-  const index = list.findIndex((item) => item.id === legacy.plugin.id);
-  if (index < 0 || JSON.stringify(list[index]) !== JSON.stringify(legacy.plugin)) return false;
+  if (!legacy.ok || JSON.stringify(candidate) !== JSON.stringify(legacy.plugin)) return null;
   const replacement = structuredClone(legacy.plugin);
   replacement.name = 'Идеи блюд на неделю';
   for (const row of replacement.source.static ?? []) delete row.kcal;
   replacement.render.badge = '{{meal}}';
+  return replacement;
+}
+
+/** Обновляем только неизменённую старую поставку, не пользовательский виджет. */
+export function migrateLegacyWeightLossWidget(): boolean {
+  const list = readPluginsForWrite();
+  const index = list.findIndex((item) => item.id === legacyWeightLossWidget.id);
+  if (index < 0) return false;
+  const replacement = updatedLegacyWeightLossWidget(list[index]);
+  if (!replacement) return false;
   list[index] = replacement;
   save(list);
   return true;
