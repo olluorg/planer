@@ -191,7 +191,7 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
               {!dayData && (
                 <div className="py-12 text-center text-sm text-text-dim flex flex-col items-center gap-2">
                   <Sparkles className="h-6 w-6 text-text-dim" />
-                  Свободный день — восстановление. Держи привычки и отдохни.
+                  Для этого дня материалы пока не добавлены.
                 </div>
               )}
             </>
@@ -202,9 +202,10 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
         <div className="shrink-0 border-t border-border-soft p-4">
           <button
             onClick={markDone}
+            disabled={loading || !!error || !pack || (!dayData && !isDayDone)}
             className={`w-full rounded-xl px-4 py-3 text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors ${
               isDayDone ? 'bg-green-500/15 text-green-500' : 'bg-accent text-white hover:opacity-90'
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Check className="h-4 w-4" /> {isDayDone ? 'День пройден' : 'Отметить день выполненным'}
           </button>
@@ -275,7 +276,7 @@ const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({
           {photo ? <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" /> : '🍽️'}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-text-dim">{meal.meal}{meal.kcal ? ` · ${meal.kcal} ккал` : ''}</div>
+          <div className="text-[10px] uppercase tracking-wider text-text-dim">{meal.meal}{meal.kcal ? ` · ≈ ${meal.kcal} ккал` : ''}</div>
           <div className="text-[13px] font-medium text-text truncate">{meal.title}</div>
         </div>
         {(meal.recipe || vid) && <ChevronRight className={`h-4 w-4 text-text-dim shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />}
