@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
-test('the published local program displays its documented meal', async ({ page }) => {
+test('the published local program displays its documented meals', async ({ page }) => {
   test.skip(!existsSync('secrets/pack-keys.json'), 'Requires the local program key; not part of CI');
   const key = JSON.parse(readFileSync('secrets/pack-keys.json', 'utf8'))['weight-loss-8w'];
   test.skip(typeof key !== 'string', 'Local key for this program is unavailable');
@@ -14,14 +14,27 @@ test('the published local program displays its documented meal', async ({ page }
   await page.goto('/');
   await expect(page.locator('main')).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('thedad:program-open', { detail: { id: 'weight-loss-8w' } })));
-  const meal = page.getByRole('button', { name: /Овсянка с бананом и орехами/ });
-  await expect(meal).toBeVisible();
-  await expect(meal).toContainText('344 ккал');
-  await expect(meal).toContainText('Б 9.2 · Ж 10.1 · У 58.1 г');
-  const image = meal.locator('img');
-  await expect(image).toHaveAttribute('src', '/food/studio/oatmeal-banana.webp');
-  await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
-  await meal.click();
-  await expect(page.getByText(/овсяные хлопья 50 г/)).toBeVisible();
-  await expect(page.getByText(/USDA FoodData Central/)).toBeVisible();
+  const pack = JSON.parse(readFileSync('content/programs/weight-loss-8w.json', 'utf8')) as {
+    days: Array<{ day: number; title: string; meals?: Array<{ title: string; kcal?: number; protein: number; fat: number; carbs: number; photo: string }> }>;
+  };
+  let checked = 0;
+  for (const day of pack.days.slice(0, 7)) {
+    await expect(page.getByText(day.title, { exact: true })).toBeVisible();
+    for (const entry of day.meals ?? []) {
+      if (entry.kcal === undefined) continue;
+      const meal = page.getByRole('button', { name: entry.title });
+      await expect(meal).toBeVisible();
+      await expect(meal).toContainText(`${entry.kcal} ккал`);
+      await expect(meal).toContainText(`Б ${entry.protein} · Ж ${entry.fat} · У ${entry.carbs} г`);
+      const image = meal.locator('img');
+      await expect(image).toHaveAttribute('src', entry.photo);
+      await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+      await meal.click();
+      await expect(page.getByText(/USDA FoodData Central/)).toBeVisible();
+      await meal.click();
+      checked++;
+    }
+    if (day.day < 7) await page.getByRole('button', { name: 'Следующий день' }).click();
+  }
+  expect(checked).toBe(8);
 });

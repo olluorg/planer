@@ -112,14 +112,14 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
           </div>
           {/* Навигация по дням */}
           <div className="flex items-center gap-2 px-5 py-2.5">
-            <button onClick={() => setDay((d) => Math.max(1, d - 1))} disabled={day <= 1} className="h-8 w-8 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted disabled:opacity-40">
+            <button aria-label="Предыдущий день" onClick={() => setDay((d) => Math.max(1, d - 1))} disabled={day <= 1} className="h-8 w-8 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted disabled:opacity-40">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="flex-1 text-center">
               <div className="text-sm font-semibold text-text">{dayData?.title ?? `День ${day}`}</div>
               {day === today && <div className="text-[10px] uppercase tracking-wider text-accent">сегодня</div>}
             </div>
-            <button onClick={() => setDay((d) => Math.min(total, d + 1))} disabled={day >= total} className="h-8 w-8 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted disabled:opacity-40">
+            <button aria-label="Следующий день" onClick={() => setDay((d) => Math.min(total, d + 1))} disabled={day >= total} className="h-8 w-8 rounded-lg bg-bg-soft hover:bg-bg-hover flex items-center justify-center text-text-muted disabled:opacity-40">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
