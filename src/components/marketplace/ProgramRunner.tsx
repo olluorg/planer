@@ -83,7 +83,7 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
   void doneTick; // прогресс перечитывается из localStorage при ре-рендере
 
   return createPortal(
-    <div className="fixed inset-0 z-[205] flex items-start justify-center p-0 sm:p-6" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[205] flex items-start justify-center p-0 sm:p-6" role="dialog" aria-modal="true" aria-label={pack?.title ?? 'Программа'}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="modal-surface relative z-10 w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[92vh] sm:rounded-2xl bg-bg-card border-0 sm:border border-border shadow-2xl overflow-hidden flex flex-col animate-[slide-up_200ms_ease-out]">
         {/* Шапка + прогресс */}
@@ -173,7 +173,7 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
               {dayData?.meals && dayData.meals.length > 0 && (
                 <Section icon={<UtensilsCrossed className="h-4 w-4" />} title="Идеи блюд">
                   <div className="space-y-2.5">
-                    {dayData.meals.map((m, i) => <MealCard key={i} meal={m} />)}
+                    {dayData.meals.map((m, i) => <MealCard key={`${day}-${i}`} meal={m} />)}
                   </div>
                 </Section>
               )}
@@ -271,16 +271,18 @@ const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({
   const vid = youtubeId(meal.video);
   const macros = [meal.protein, meal.fat, meal.carbs];
   const hasMacros = macros.every((value) => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  const hasCalories = typeof meal.kcal === 'number' && Number.isFinite(meal.kcal) && meal.kcal >= 0;
+  const hasDetails = Boolean(meal.recipe || vid);
   return (
     <div className="rounded-xl border border-border-soft bg-bg-soft/60 overflow-hidden">
-      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-3 w-full p-2.5 text-left">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={hasDetails ? open : undefined} disabled={!hasDetails} className="flex items-center gap-3 w-full p-2.5 text-left">
         <div className="h-12 w-12 rounded-lg bg-bg-card border border-border-soft overflow-hidden shrink-0 flex items-center justify-center text-2xl">
           {photo ? <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" /> : '🍽️'}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-text-dim">{meal.meal}{meal.kcal ? ` · ≈ ${meal.kcal} ккал` : ''}</div>
+          <div className="text-[10px] uppercase tracking-wider text-text-dim">{meal.meal}{hasCalories ? ` · ≈ ${meal.kcal} ккал` : ''}</div>
           <div className="text-[13px] font-medium text-text truncate">{meal.title}</div>
-          <div className="text-[11px] text-text-muted">{hasMacros ? `Б ${meal.protein} · Ж ${meal.fat} · У ${meal.carbs} г` : meal.kcal ? 'БЖУ не указаны' : 'КБЖУ не рассчитаны'}</div>
+          <div className="text-[11px] text-text-muted">{hasMacros ? `Б ${meal.protein} · Ж ${meal.fat} · У ${meal.carbs} г` : hasCalories ? 'БЖУ не указаны' : 'КБЖУ не рассчитаны'}</div>
         </div>
         {(meal.recipe || vid) && <ChevronRight className={`h-4 w-4 text-text-dim shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />}
       </button>

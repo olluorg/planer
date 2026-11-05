@@ -14,6 +14,14 @@ test('the published local program displays its documented meals', async ({ page 
   await page.goto('/');
   await expect(page.locator('main')).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('thedad:program-open', { detail: { id: 'weight-loss-8w' } })));
+  const firstBreakfast = page.getByRole('button', { name: /Овсянка с бананом и орехами/ });
+  await expect(firstBreakfast).toHaveAttribute('aria-expanded', 'false');
+  await firstBreakfast.click();
+  await expect(firstBreakfast).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: 'Следующий день' }).click();
+  await expect(page.getByRole('button', { name: /Омлет со шпинатом и томатами/ })).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('button', { name: 'Предыдущий день' }).click();
+  await expect(firstBreakfast).toHaveAttribute('aria-expanded', 'false');
   const pack = JSON.parse(readFileSync('content/programs/weight-loss-8w.json', 'utf8')) as {
     days: Array<{ day: number; title: string; meals?: Array<{ title: string; kcal?: number; protein: number; fat: number; carbs: number; photo: string }> }>;
   };
@@ -37,4 +45,7 @@ test('the published local program displays its documented meals', async ({ page 
     if (day.day < 7) await page.getByRole('button', { name: 'Следующий день' }).click();
   }
   expect(checked).toBe(8);
+  await page.getByRole('button', { name: 'Следующий день' }).click();
+  await expect(page.getByText('Для этого дня материалы пока не добавлены.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Отметить день выполненным' })).toBeDisabled();
 });
