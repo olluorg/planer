@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { createReminderScheduler } = require('./reminder-scheduler.cjs');
 const { closeWindow } = require('./window-close.cjs');
+const { youtubeEmbedHeaders } = require('./youtube-referrer.cjs');
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIR = path.join(__dirname, '..', 'dist');
@@ -242,6 +243,13 @@ function isAppUrl(url) {
 const ALLOWED_PERMISSIONS = new Set(['notifications', 'geolocation', 'clipboard-sanitized-write']);
 
 app.whenReady().then(() => {
+  // YouTube требует идентификацию встроенного плеера и не принимает app:// как Referer.
+  // Указываем зарегистрированный appId только для iframe своего окна и только на embed-адресах.
+  if (!DEV_URL) {
+    session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (details, callback) => {
+      callback({ requestHeaders: youtubeEmbedHeaders(details, mainWindow?.webContents.id) });
+    });
+  }
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
     cb(ALLOWED_PERMISSIONS.has(permission) && isAppUrl(wc.getURL()));
   });

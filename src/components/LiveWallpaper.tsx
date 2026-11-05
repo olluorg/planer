@@ -29,6 +29,7 @@ export const YouTubeBg: React.FC<{ id: string; className?: string; onPlaying?: (
   useEffect(() => {
     if (!waitForPlayback) return;
     let playing = false;
+    let interval: number | undefined;
     const listen = () => frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'background' }), 'https://www.youtube-nocookie.com');
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== 'https://www.youtube-nocookie.com' || event.source !== frame.current?.contentWindow) return;
@@ -36,15 +37,16 @@ export const YouTubeBg: React.FC<{ id: string; className?: string; onPlaying?: (
       try { data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return; }
       if (!data || typeof data !== 'object') return;
       if (data.event === 'onReady') {
+        window.clearInterval(interval);
         for (const eventName of ['onStateChange', 'onError']) frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: [eventName] }), 'https://www.youtube-nocookie.com');
       }
       const state = data.event === 'onStateChange' ? data.info : data.event === 'infoDelivery' && data.info && typeof data.info === 'object' ? (data.info as { playerState?: number }).playerState : undefined;
       if (state === 1) { playing = true; callbacks.current.onPlaying?.(); }
-      if (data.event === 'onError') { playing = false; callbacks.current.onUnavailable?.(); }
+      if (data.event === 'onError' || data.event === 'onAutoplayBlocked') { playing = false; window.clearInterval(interval); callbacks.current.onUnavailable?.(); }
     };
     window.addEventListener('message', onMessage);
-    const interval = window.setInterval(listen, 500);
-    const timeout = window.setTimeout(() => { if (!playing) callbacks.current.onUnavailable?.(); }, 15000);
+    interval = window.setInterval(listen, 500);
+    const timeout = window.setTimeout(() => { window.clearInterval(interval); if (!playing) callbacks.current.onUnavailable?.(); }, 15000);
     return () => { window.removeEventListener('message', onMessage); window.clearInterval(interval); window.clearTimeout(timeout); };
   }, [id, waitForPlayback]);
   const src = `https://www.youtube-nocookie.com/embed/${id}`
