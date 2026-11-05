@@ -11,6 +11,9 @@ import {
 import { analyzeProgram, type AdaptiveInsight } from '@/lib/programAdapt';
 import { useStore } from '@/lib/store';
 import { toast } from '@/lib/toast';
+import { isEaten, toggleEaten, readCalories, readMacros, NUTRITION_EVENT } from '@/lib/nutrition';
+import { nutritionAction } from '@/lib/nutritionAction';
+import { isoDate } from '@/lib/utils';
 
 /** Программа-плеер — направляемый режим «День X из N»: урок, тренировка (видео-демо),
  *  питание (фото+рецепт), акцент на привычках. Ядро премиум-опыта. */
@@ -267,15 +270,23 @@ const VideoButton: React.FC<{ id: string; label?: string; compact?: boolean }> =
 
 const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({ meal }) => {
   const [open, setOpen] = useState(false);
+  const [, setNutritionVersion] = useState(0);
+  useEffect(() => {
+    const sync = () => setNutritionVersion((v) => v + 1);
+    window.addEventListener(NUTRITION_EVENT, sync);
+    return () => window.removeEventListener(NUTRITION_EVENT, sync);
+  }, []);
+  const today = isoDate(new Date());
+  const eatKey = `${meal.meal}¦${meal.title}`;
+  const eaten = isEaten(today, eatKey);
   const photo = safePhoto(meal.photo);
   const vid = youtubeId(meal.video);
   const macros = [meal.protein, meal.fat, meal.carbs];
   const hasMacros = macros.every((value) => typeof value === 'number' && Number.isFinite(value) && value >= 0);
   const hasCalories = typeof meal.kcal === 'number' && Number.isFinite(meal.kcal) && meal.kcal >= 0;
-  const hasDetails = Boolean(meal.recipe || vid);
   return (
     <div className="rounded-xl border border-border-soft bg-bg-soft/60 overflow-hidden">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={hasDetails ? open : undefined} disabled={!hasDetails} className="flex items-center gap-3 w-full p-2.5 text-left">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex items-center gap-3 w-full p-2.5 text-left">
         <div className="h-12 w-12 rounded-lg bg-bg-card border border-border-soft overflow-hidden shrink-0 flex items-center justify-center text-2xl">
           {photo ? <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" /> : '🍽️'}
         </div>
@@ -284,12 +295,20 @@ const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({
           <div className="text-[13px] font-medium text-text truncate">{meal.title}</div>
           <div className="text-[11px] text-text-muted">{hasMacros ? `Б ${meal.protein} · Ж ${meal.fat} · У ${meal.carbs} г` : hasCalories ? 'БЖУ не указаны' : 'КБЖУ не рассчитаны'}</div>
         </div>
-        {(meal.recipe || vid) && <ChevronRight className={`h-4 w-4 text-text-dim shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />}
+        <ChevronRight className={`h-4 w-4 text-text-dim shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
-      {open && (meal.recipe || vid) && (
+      {open && (
         <div className="px-2.5 pb-3 pt-0.5 space-y-2">
           {meal.recipe && <p className="text-[12px] text-text-muted leading-relaxed whitespace-pre-line">{meal.recipe}</p>}
           {vid && <VideoButton id={vid} label="Видео-рецепт" />}
+          <button
+            type="button"
+            aria-pressed={eaten}
+            onClick={() => nutritionAction(() => toggleEaten(today, { key: eatKey, title: meal.title, meal: meal.meal, kcal: readCalories(meal.kcal), ...readMacros(meal) }))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-xs font-medium text-text hover:bg-bg-hover"
+          >
+            {eaten ? 'Снять отметку за сегодня' : 'Отметить съеденным сегодня'}
+          </button>
         </div>
       )}
     </div>

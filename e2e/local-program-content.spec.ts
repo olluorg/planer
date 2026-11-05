@@ -18,6 +18,16 @@ test('the published local program displays its documented meals', async ({ page 
   await expect(firstBreakfast).toHaveAttribute('aria-expanded', 'false');
   await firstBreakfast.click();
   await expect(firstBreakfast).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
+  await expect(page.getByRole('button', { name: 'Снять отметку за сегодня' })).toHaveAttribute('aria-pressed', 'true');
+  const entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
+  expect(entries).toContainEqual(expect.objectContaining({ key: 'Завтрак¦Овсянка с бананом и орехами', kcal: 344, protein: 9.2, fat: 10.1, carbs: 58.1 }));
+  await page.reload();
+  await expect(page.locator('main')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('thedad:program-open', { detail: { id: 'weight-loss-8w' } })));
+  await firstBreakfast.click();
+  await page.getByRole('button', { name: 'Снять отметку за сегодня' }).click();
+  await expect(page.getByRole('button', { name: 'Отметить съеденным сегодня' })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Следующий день' }).click();
   await expect(page.getByRole('button', { name: /Омлет со шпинатом и томатами/ })).toHaveAttribute('aria-expanded', 'false');
   await page.getByRole('button', { name: 'Предыдущий день' }).click();

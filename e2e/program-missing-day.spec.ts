@@ -22,7 +22,7 @@ test('a day without content is not presented as a completed rest day', async ({ 
 test('meal cards explain when nutritional values are missing', async ({ page }) => {
   const key = randomBytes(32), iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const pack = { schema: 'thedad.program/v1', id: 'meal-program', title: 'Программа', emoji: '🎯', duration_days: 1, days: [{ day: 1, meals: [{ meal: 'Обед', title: 'Пример блюда', recipe: 'Рецепт' }, { meal: 'Завтрак', title: 'Каша', kcal: 344, protein: 9.2, fat: 10.1, carbs: 58.1 }] }] };
+  const pack = { schema: 'thedad.program/v1', id: 'meal-program', title: 'Программа', emoji: '🎯', duration_days: 1, days: [{ day: 1, meals: [{ meal: 'Обед', title: 'Пример блюда', recipe: 'Рецепт' }, { meal: 'Завтрак', title: 'Каша', recipe: 'Рецепт каши', kcal: 344, protein: 9.2, fat: 10.1, carbs: 58.1 }] }] };
   const ct = Buffer.concat([cipher.update(JSON.stringify(pack)), cipher.final(), cipher.getAuthTag()]);
   await page.addInitScript((key64) => {
     localStorage.setItem('onboarding.done.v1', '1');
@@ -35,4 +35,12 @@ test('meal cards explain when nutritional values are missing', async ({ page }) 
   await expect(page.getByText('КБЖУ не рассчитаны')).toBeVisible();
   await expect(page.getByText('Пример блюда')).toBeVisible();
   await expect(page.getByText('Б 9.2 · Ж 10.1 · У 58.1 г')).toBeVisible();
+  await page.getByRole('button', { name: /Каша/ }).click();
+  await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
+  let entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
+  expect(entries).toContainEqual(expect.objectContaining({ key: 'Завтрак¦Каша', kcal: 344, protein: 9.2, fat: 10.1, carbs: 58.1 }));
+  await page.getByRole('button', { name: /Пример блюда/ }).click();
+  await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
+  entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
+  expect(entries).toContainEqual({ key: 'Обед¦Пример блюда', title: 'Пример блюда', meal: 'Обед' });
 });
