@@ -5,6 +5,7 @@
  * eval/выражений — только имена полей и значения из белых списков.
  */
 import { isoDate } from './utils';
+import legacyWeightLossWidget from './legacyWeightLossWidget.json';
 
 /* ==================== Формат и белые списки ==================== */
 
@@ -256,6 +257,22 @@ export function removePlugin(id: string) {
   save(readPluginsForWrite().filter((p) => p.id !== id));
 }
 
+/** Обновляем только неизменённую старую поставку, не пользовательский виджет. */
+export function migrateLegacyWeightLossWidget(): boolean {
+  const legacy = validatePlugin(legacyWeightLossWidget);
+  if (!legacy.ok) return false;
+  const list = readPluginsForWrite();
+  const index = list.findIndex((item) => item.id === legacy.plugin.id);
+  if (index < 0 || JSON.stringify(list[index]) !== JSON.stringify(legacy.plugin)) return false;
+  const replacement = structuredClone(legacy.plugin);
+  replacement.name = 'Идеи блюд на неделю';
+  for (const row of replacement.source.static ?? []) delete row.kcal;
+  replacement.render.badge = '{{meal}}';
+  list[index] = replacement;
+  save(list);
+  return true;
+}
+
 /** Предустановленные плагины: ставятся один раз при первом запуске из статики приложения
  *  (same-origin, не сеть). Флаг не даёт переустановить то, что пользователь удалил сам. */
 // v4: простые дешёвые рецепты по шагам + галерея/видео (страница рецепта)
@@ -278,6 +295,7 @@ export async function restoreDefaultNutrition(): Promise<boolean> {
 
 export async function ensureDefaultPlugins(): Promise<void> {
   try {
+    migrateLegacyWeightLossWidget();
     if (localStorage.getItem(DEFAULTS_KEY) === '1') return;
     if (!isPluginStorageReadable()) return;
     let complete = true;
