@@ -1,5 +1,6 @@
 import { createCipheriv, randomBytes } from 'node:crypto';
 import { test, expect } from '@playwright/test';
+import { DEFAULT_LAYOUT } from '../src/lib/dashboardPresets';
 
 test('a day without content is not presented as a completed rest day', async ({ page }) => {
   const key = randomBytes(32), iv = randomBytes(12);
@@ -40,7 +41,32 @@ test('meal cards explain when nutritional values are missing', async ({ page }) 
   let entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
   expect(entries).toContainEqual(expect.objectContaining({ key: 'Завтрак¦Каша', kcal: 344, protein: 9.2, fat: 10.1, carbs: 58.1 }));
   await page.getByRole('button', { name: /Пример блюда/ }).click();
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (key === 'nutrition.eaten.v1') throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
+  await expect(page.getByText('Изменения питания не сохранены', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Отметить съеденным сегодня' })).toHaveAttribute('aria-pressed', 'false');
+  entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
+  expect(entries).toHaveLength(1);
+  await page.reload();
+  await expect(page.locator('main')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('thedad:program-open', { detail: { id: 'meal-program' } })));
+  await page.getByRole('button', { name: /Пример блюда/ }).click();
   await page.getByRole('button', { name: 'Отметить съеденным сегодня' }).click();
   entries = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('nutrition.eaten.v1')!)).flat());
   expect(entries).toContainEqual({ key: 'Обед¦Пример блюда', title: 'Пример блюда', meal: 'Обед' });
+  await page.getByRole('button', { name: 'Снять отметку за сегодня' }).last().click();
+  await page.evaluate((ids) => {
+    localStorage.setItem('dashboard.screens.v1', JSON.stringify([{ id: 'calories-test', name: 'Калории', hidden: ids.filter((id: string) => id !== 'calories'), layout: [{ i: 'calories', x: 0, y: 0, w: 6, h: 8 }] }]));
+    localStorage.setItem('dashboard.activeScreen.v1', 'calories-test');
+  }, DEFAULT_LAYOUT.map(l => l.i));
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /Загрузить примеры/ }).click();
+  await page.goto('/');
+  await expect(page.getByText('344', { exact: true })).toBeVisible();
 });
