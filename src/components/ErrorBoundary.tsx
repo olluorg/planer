@@ -1,17 +1,17 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { recordCrash, buildCrashReport } from '@/lib/crashlog';
-import { DB_KEY } from '@/lib/db';
+import { DB_KEY, exportOpenDatabase } from '@/lib/db';
 import { get } from 'idb-keyval';
 
 interface Props { children: ReactNode }
-interface State { error: Error | null }
+interface State { error: Error | null; backupError: boolean }
 
 /** Ловит ошибки рендера. Без неё любое исключение в дереве даёт белый экран,
  *  из которого пользователь не может даже забрать свои данные. */
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, backupError: false };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
@@ -20,8 +20,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private downloadBackup = async () => {
-    const blob = await get<Uint8Array>(DB_KEY);
-    if (!blob) return;
+    let blob: Uint8Array | null | undefined;
+    try { blob = exportOpenDatabase(); } catch { /* try persisted copy */ }
+    try { if (!blob) blob = await get<Uint8Array>(DB_KEY); } catch { /* report below */ }
+    if (!blob) { this.setState({ backupError: true }); return; }
+    this.setState({ backupError: false });
     const url = URL.createObjectURL(new Blob([blob.buffer as ArrayBuffer], { type: 'application/octet-stream' }));
     const a = document.createElement('a');
     a.href = url;
@@ -41,9 +44,10 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="max-w-lg w-full space-y-4">
           <div className="text-2xl font-semibold">Что-то сломалось</div>
           <div className="text-sm text-text-muted">
-            Ваши данные на месте — они хранятся отдельно от интерфейса. Скачайте резервную копию
-            и пришлите отчёт, если ошибка повторяется.
+            Интерфейс остановился из-за ошибки. Скачайте доступную копию базы перед перезагрузкой;
+            если ошибка повторяется, сохраните отчёт.
           </div>
+          {this.state.backupError && <p role="alert">Не удалось прочитать базу для скачивания.</p>}
           <pre className="text-xs bg-surface rounded-xl p-3 overflow-x-auto whitespace-pre-wrap">
             {this.state.error.message}
           </pre>

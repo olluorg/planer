@@ -63,6 +63,18 @@ describe('база данных', () => {
     expect(db.query<{ title: string }>('SELECT title FROM goals')[0].title).toBe('Цель');
   });
 
+  it('копия открытой базы содержит ещё не записанные изменения', async () => {
+    const db = await env.db();
+    await db.getDB();
+    db.exec("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('unsaved', 'В памяти', 'x', 'x')");
+    const bytes = db.exportOpenDatabase();
+    expect(bytes).not.toBeNull();
+    const SQL = await (await import('sql.js')).default();
+    const copy = new SQL.Database(bytes!);
+    try { expect(copy.exec("SELECT id FROM goals WHERE id = 'unsaved'")[0].values).toEqual([['unsaved']]); }
+    finally { copy.close(); }
+  });
+
   it('сообщает об ожидающей записи до подтверждения IndexedDB', async () => {
     const db = await env.db();
     await db.getDB();

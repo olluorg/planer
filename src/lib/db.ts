@@ -34,6 +34,8 @@ export const CROSS_TAB_MERGED_EVENT = 'thedad-cross-tab-merged';
 export function hasPersistFailure() { return persistFailed; }
 export function hasCrossTabConflict() { return crossTabConflict; }
 export function hasPendingPersist() { return savedRevision < changeRevision && !persistFailed; }
+/** Копия открытой базы для экрана ошибки, включая ещё не записанные правки. */
+export function exportOpenDatabase(): Uint8Array | null { return db ? db.export() : null; }
 
 function sameBytes(a: Uint8Array | undefined, b: Uint8Array | undefined) {
   if (!a || !b) return !a && !b;
