@@ -4,12 +4,12 @@ import { DB_KEY, exportOpenDatabase } from '@/lib/db';
 import { get } from 'idb-keyval';
 
 interface Props { children: ReactNode }
-interface State { error: Error | null; backupError: boolean }
+interface State { error: Error | null; backupError: boolean; backupFromDisk: boolean }
 
 /** Ловит ошибки рендера. Без неё любое исключение в дереве даёт белый экран,
  *  из которого пользователь не может даже забрать свои данные. */
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, backupError: false };
+  state: State = { error: null, backupError: false, backupFromDisk: false };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
@@ -22,15 +22,18 @@ export class ErrorBoundary extends Component<Props, State> {
   private downloadBackup = async () => {
     let blob: Uint8Array | null | undefined;
     try { blob = exportOpenDatabase(); } catch { /* try persisted copy */ }
-    try { if (!blob) blob = await get<Uint8Array>(DB_KEY); } catch { /* report below */ }
-    if (!blob) { this.setState({ backupError: true }); return; }
-    this.setState({ backupError: false });
-    const url = URL.createObjectURL(new Blob([blob.buffer as ArrayBuffer], { type: 'application/octet-stream' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `thedad-backup-${new Date().toISOString().slice(0, 10)}.sqlite`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const backupFromDisk = !blob;
+    try {
+      if (!blob) blob = await get<Uint8Array>(DB_KEY);
+      if (!blob) throw new Error('Database unavailable');
+      const url = URL.createObjectURL(new Blob([new Uint8Array(blob)], { type: 'application/octet-stream' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `thedad-backup-${new Date().toISOString().slice(0, 10)}.sqlite`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      this.setState({ backupError: false, backupFromDisk });
+    } catch { this.setState({ backupError: true, backupFromDisk: false }); }
   };
 
   private copyReport = async () => {
@@ -48,6 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
             если ошибка повторяется, сохраните отчёт.
           </div>
           {this.state.backupError && <p role="alert">Не удалось прочитать базу для скачивания.</p>}
+          {this.state.backupFromDisk && <p role="status">Скачана последняя сохранённая копия; недавние несохранённые изменения могут отсутствовать.</p>}
           <pre className="text-xs bg-surface rounded-xl p-3 overflow-x-auto whitespace-pre-wrap">
             {this.state.error.message}
           </pre>
