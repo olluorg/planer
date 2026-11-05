@@ -34,9 +34,11 @@ test('the published local program displays its documented meals', async ({ page 
       await expect(meal).toBeVisible();
       await expect(meal).toContainText(`${entry.kcal} ккал`);
       await expect(meal).toContainText(`Б ${entry.protein} · Ж ${entry.fat} · У ${entry.carbs} г`);
-      const image = meal.locator('img');
-      await expect(image).toHaveAttribute('src', entry.photo);
-      await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+      if (entry.photo) {
+        const image = meal.locator('img');
+        await expect(image).toHaveAttribute('src', entry.photo);
+        await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+      }
       await meal.click();
       await expect(page.getByText(/USDA FoodData Central/)).toBeVisible();
       await meal.click();
@@ -44,7 +46,7 @@ test('the published local program displays its documented meals', async ({ page 
     }
     if (day.day < 7) await page.getByRole('button', { name: 'Следующий день' }).click();
   }
-  expect(checked).toBe(8);
+  expect(checked).toBe(9);
   await page.getByRole('button', { name: 'Следующий день' }).click();
   await expect(page.getByText('Для этого дня материалы пока не добавлены.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Отметить день выполненным' })).toBeDisabled();
