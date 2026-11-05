@@ -7,7 +7,7 @@ import { parseImportFile, applyImport, SOURCE_LABEL, type ImportResult } from '@
 import { useStore } from '@/lib/store';
 import { toast } from '@/lib/toast';
 import { todayISO } from '@/lib/utils';
-import { persist, saveBackup, DB_KEY } from '@/lib/db';
+import { persistBeforeReload, saveBackup, DB_KEY } from '@/lib/db';
 import { get } from 'idb-keyval';
 
 /** Переезд из Todoist, TickTick и Google Tasks: файл → превью → импорт.
@@ -16,6 +16,7 @@ import { get } from 'idb-keyval';
 export function ImportFromServices() {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [includeDone, setIncludeDone] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const pick = async (file: File) => {
     try {
@@ -27,18 +28,28 @@ export function ImportFromServices() {
   };
 
   const run = async () => {
-    if (!result) return;
-    // Снимок до импорта: сотни чужих задач не должны быть необратимы.
-    await persist();
-    const before = await get<Uint8Array>(DB_KEY);
-    if (before) await saveBackup(before, 'pre-import');
-    const s = useStore.getState();
-    let n = 0;
-    s.batch(() => {
-      n = applyImport(result.tasks, { includeCompleted: includeDone, today: todayISO() }, (t) => s.addTask(t));
-    });
-    toast.success(`Импортировано задач: ${n}`, `Из ${SOURCE_LABEL[result.source]}`);
-    setResult(null);
+    if (!result || busy) return;
+    setBusy(true);
+    let applied = false;
+    try {
+      await persistBeforeReload();
+      const before = await get<Uint8Array>(DB_KEY);
+      if (!before || !await saveBackup(before, 'pre-import')) throw new Error('Не удалось создать снимок базы. Импорт отменён.');
+      const s = useStore.getState();
+      let n = 0;
+      s.batch(() => {
+        n = applyImport(result.tasks, { includeCompleted: includeDone, today: todayISO() }, (t) => s.addTask(t));
+      });
+      applied = true;
+      await persistBeforeReload();
+      toast.success(`Импортировано задач: ${n}`, `Из ${SOURCE_LABEL[result.source]}`);
+      setResult(null);
+    } catch (error) {
+      if (applied) {
+        setResult(null);
+        toast.error('Задачи импортированы в память, но не сохранены', 'Повторите сохранение или скачайте копию базы перед закрытием приложения.');
+      } else toast.error('Не удалось импортировать задачи', String((error as Error)?.message ?? error));
+    } finally { setBusy(false); }
   };
 
   const active = result?.tasks.filter((t) => !t.done).length ?? 0;
@@ -63,7 +74,7 @@ export function ImportFromServices() {
         </Button>
       </label>
 
-      <Dialog open={!!result} onOpenChange={(v) => !v && setResult(null)}>
+      <Dialog open={!!result} onOpenChange={(v) => !v && !busy && setResult(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Импорт из {result ? SOURCE_LABEL[result.source] : ''}</DialogTitle>
@@ -96,8 +107,8 @@ export function ImportFromServices() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setResult(null)}>Отмена</Button>
-            <Button disabled={count === 0} onClick={() => void run()}>Импортировать {count}</Button>
+            <Button variant="ghost" disabled={busy} onClick={() => setResult(null)}>Отмена</Button>
+            <Button disabled={count === 0 || busy} onClick={() => void run()}>{busy ? 'Импортируем…' : `Импортировать ${count}`}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
