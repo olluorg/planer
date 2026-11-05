@@ -35,7 +35,7 @@ export const AppLiveWallpaper: React.FC<{ suspended?: boolean }> = ({ suspended 
 
   // Прячем статичные обои, пока активны живые
   useEffect(() => {
-    document.documentElement.classList.toggle('live-wp', active && (wp?.kind === 'youtube' || videoReady));
+    document.documentElement.classList.toggle('live-wp', active && videoReady);
     return () => document.documentElement.classList.remove('live-wp');
   }, [active, wp, videoReady]);
 
@@ -55,10 +55,10 @@ export const AppLiveWallpaper: React.FC<{ suspended?: boolean }> = ({ suspended 
 
   return createPortal(
     <div className="fixed inset-0 -z-[1] pointer-events-none">
-      {wp.kind === 'youtube' && <YouTubeBg id={wp.ref} />}
+      {wp.kind === 'youtube' && <YouTubeBg id={wp.ref} waitForPlayback className={videoReady ? '' : 'opacity-0'} onPlaying={() => setVideoReady(true)} onUnavailable={() => setVideoReady(false)} />}
       {wp.kind === 'video' && videoUrl && <VideoBg src={videoUrl} onReady={() => setVideoReady(true)} onError={() => setVideoReady(false)} />}
       {/* затемнение для читаемости панелей */}
-      {(wp.kind === 'youtube' || videoReady) && <div className="absolute inset-0 bg-black/60" />}
+      {videoReady && <div className="absolute inset-0 bg-black/60" />}
     </div>,
     document.body,
   );

@@ -32,6 +32,28 @@ test('keeps a user-selected YouTube background', async ({ page }) => {
   await expect(page.locator('iframe[title="Живой фон"]')).toHaveCount(1);
 });
 
+test('YouTube background keeps the still image until playback and restores it on error', async ({ page }) => {
+  await page.route('https://www.youtube-nocookie.com/embed/**', route => route.fulfill({
+    contentType: 'text/html',
+    body: '<!doctype html><script>window.reportPlaying = () => parent.postMessage(JSON.stringify({event:"infoDelivery",info:{playerState:1}}), "*"); window.reportError = () => parent.postMessage(JSON.stringify({event:"onError",info:150}), "*");</script>',
+  }));
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'glass');
+    localStorage.setItem('onboarding.done.v1', '1');
+    localStorage.setItem('app.livewallpaper.v1', JSON.stringify({ kind: 'youtube', ref: 'abcdefghijk' }));
+  });
+  await page.goto('/');
+  const iframe = page.locator('iframe[title="Живой фон"]');
+  await expect(iframe).toHaveCount(1);
+  await expect(page.locator('html')).not.toHaveClass(/live-wp/);
+  const frame = await iframe.contentFrame();
+  await frame.locator('body').evaluate(() => (window as any).reportPlaying());
+  await expect(page.locator('html')).toHaveClass(/live-wp/);
+  await frame.locator('body').evaluate(() => (window as any).reportError());
+  await expect(page.locator('html')).not.toHaveClass(/live-wp/);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('app.livewallpaper.v1')!).kind)).toBe('youtube');
+});
+
 test('switching from YouTube to a still wallpaper persists after reload', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('theme', 'glass');
