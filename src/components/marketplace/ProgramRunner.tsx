@@ -278,6 +278,7 @@ const MealCard: React.FC<{ meal: import('@/lib/marketplace').ProgramMeal }> = ({
         <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-wider text-text-dim">{meal.meal}{meal.kcal ? ` · ≈ ${meal.kcal} ккал` : ''}</div>
           <div className="text-[13px] font-medium text-text truncate">{meal.title}</div>
+          <div className="text-[11px] text-text-muted">{meal.kcal ? 'БЖУ не указаны' : 'КБЖУ не рассчитаны'}</div>
         </div>
         {(meal.recipe || vid) && <ChevronRight className={`h-4 w-4 text-text-dim shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />}
       </button>
