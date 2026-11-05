@@ -36,6 +36,9 @@ export interface ProgramMeal {
   meal: string;          // «Завтрак»
   title: string;
   kcal?: number;
+  protein?: number;
+  fat?: number;
+  carbs?: number;
   photo?: string;        // data:… или /marketplace/…
   recipe?: string;       // пошаговый рецепт
   video?: string;        // YouTube (id или ссылка)
