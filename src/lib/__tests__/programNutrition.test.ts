@@ -6,6 +6,7 @@ import { DINING_COLLECTION } from '../diningCollection';
 it('only uses documented meal nutrition and omits uncalculated widget values', () => {
   const program = JSON.parse(readFileSync('content/programs/weight-loss-8w.json', 'utf8'));
   expect(program.days.flatMap((day: any) => day.meals ?? []).length).toBeGreaterThan(0);
+  expect(program.days.flatMap((day: any) => day.meals ?? []).filter((meal: any) => typeof meal.kcal === 'number')).toHaveLength(8);
   for (const day of program.days) for (const meal of day.meals ?? []) {
     if (!('kcal' in meal)) continue;
     const source = DINING_COLLECTION.find(dish => dish.title === meal.title);
