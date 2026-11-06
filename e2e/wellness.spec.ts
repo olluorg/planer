@@ -509,8 +509,8 @@ test('new recipe can be previewed, added and preserved without overwriting the e
   await planner.getByLabel('Подобрать под свой день').selectOption('quick');
   await expect(planner.getByRole('button', { name: /^Выбрать блюдо:/ })).toHaveCount(3);
   await planner.getByLabel('Подобрать под свой день').selectOption('all');
-  await planner.getByRole('button', { name: 'Новая коллекция · 8 блюд' }).click();
-  await expect(planner.getByRole('button', { name: /^Выбрать блюдо:/ })).toHaveCount(8);
+  await planner.getByRole('button', { name: 'Новая коллекция · 9 блюд' }).click();
+  await expect(planner.getByRole('button', { name: /^Выбрать блюдо:/ })).toHaveCount(9);
   await planner.getByRole('button', { name: 'Рецепт: Овсянка с бананом и орехами', exact: true }).click();
   const recipe = page.getByRole('dialog', { name: 'Овсянка с бананом и орехами', exact: true });
   const img = recipe.getByRole('img', { name: 'Овсянка с бананом и орехами', exact: true });
@@ -527,15 +527,34 @@ test('new recipe can be previewed, added and preserved without overwriting the e
   expect(saved.find((r: any) => r.day === 1 && r.title === 'Овсянка с бананом и орехами')).toEqual(expect.objectContaining({kcal:344, protein:9.2, fat:10.1, carbs:58.1}));
   expect(saved.some((r: any) => r.day === 1 && r.title === 'Овсянка с бананом')).toBe(true);
   await page.getByTitle('Открыть конструктор рациона').click();
-  await planner.getByRole('button', { name: 'Новая коллекция · 8 блюд' }).click();
-  await expect(planner.getByRole('button', { name: /^Выбрать блюдо:/ })).toHaveCount(8);
+  await planner.getByRole('button', { name: 'Новая коллекция · 9 блюд' }).click();
+  await expect(planner.getByRole('button', { name: /^Выбрать блюдо:/ })).toHaveCount(9);
+});
+
+test('shakshuka recipe keeps its calculated nutrition when added to the plan', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTitle('Открыть конструктор рациона').click();
+  const planner = page.getByRole('dialog', { name: 'Конструктор рациона' });
+  await planner.getByRole('button', { name: 'Новая коллекция · 9 блюд' }).click();
+  await planner.getByRole('button', { name: 'Рецепт: Шакшука с перцем' }).click();
+  const recipe = page.getByRole('dialog', { name: 'Шакшука с перцем' });
+  const photo = recipe.getByRole('img', { name: 'Шакшука с перцем' });
+  await expect.poll(() => photo.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+  await expect(recipe.getByText(/красный сладкий перец 100 г/)).toBeVisible();
+  await recipe.getByRole('button', { name: 'Закрыть (Esc)' }).click();
+  await planner.getByRole('button', { name: 'Выбрать блюдо: Шакшука с перцем' }).click();
+  await planner.locator('tbody tr').first().locator('td').nth(1).click();
+  await planner.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await page.reload();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('plugins.installed.v1')!).find((p: {id:string}) => p.id === 'nutrition-month').source.static);
+  expect(saved).toContainEqual(expect.objectContaining({ day: 1, title: 'Шакшука с перцем', kcal: 269, protein: 15.9, fat: 15.3, carbs: 19.2 }));
 });
 
 test('a missing recipe photo does not leave a broken image or hide the recipe', async ({ page }) => {
   await page.route('**/food/studio/salmon-asparagus.webp', (route) => route.fulfill({ status: 404, body: '' }));
   await page.goto('/');
   await page.getByTitle('Открыть конструктор рациона').click();
-  await page.getByRole('button', { name: 'Новая коллекция · 8 блюд' }).click();
+  await page.getByRole('button', { name: 'Новая коллекция · 9 блюд' }).click();
   await page.getByRole('button', { name: 'Рецепт: Лосось со спаржей', exact: true }).click();
   const recipe = page.getByRole('dialog', { name: 'Лосось со спаржей', exact: true });
   await expect(recipe.getByText('Фото не добавлено', { exact: true })).toBeVisible();
@@ -547,7 +566,7 @@ test('protein meal adds its nutrition to the saved plan', async ({ page }) => {
   await page.goto('/');
   await page.getByTitle('Открыть конструктор рациона').click();
   const planner = page.getByRole('dialog', {name:'Конструктор рациона', exact:true});
-  await planner.getByRole('button', {name:'Новая коллекция · 8 блюд'}).click();
+  await planner.getByRole('button', {name:'Новая коллекция · 9 блюд'}).click();
   await planner.getByRole('button', {name:'Рецепт: Индейка с картофелем и брокколи', exact:true}).click();
   const recipe = page.getByRole('dialog', {name:'Индейка с картофелем и брокколи'});
   const photo = recipe.getByRole('img', {name:'Индейка с картофелем и брокколи'});
@@ -592,7 +611,7 @@ test('saved meal plan can be exported and restored separately', async ({ page })
   await page.goto('/');
   await page.getByTitle('Открыть конструктор рациона').click();
   const planner = page.getByRole('dialog', {name:'Конструктор рациона', exact:true});
-  await planner.getByRole('button', {name:'Новая коллекция · 8 блюд'}).click();
+  await planner.getByRole('button', {name:'Новая коллекция · 9 блюд'}).click();
   await planner.getByRole('button', {name:'Выбрать блюдо: Чечевичный суп с овощами'}).click();
   await planner.locator('tbody tr').first().locator('td').nth(1).click();
   await planner.getByRole('button', {name:'Сохранить', exact:true}).click();
