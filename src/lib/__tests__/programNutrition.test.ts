@@ -14,7 +14,7 @@ it('only uses documented meal nutrition and omits uncalculated widget values', (
     'Рис с индейкой и овощами': { kcal: 532, protein: 42, fat: 8, carbs: 70.5 },
   };
   const sources = readFileSync('docs/NUTRITION_SOURCES.md', 'utf8');
-  expect(program.days.flatMap((day: any) => day.meals ?? []).filter((meal: any) => typeof meal.kcal === 'number')).toHaveLength(12);
+  expect(program.days.flatMap((day: any) => day.meals ?? []).filter((meal: any) => typeof meal.kcal === 'number')).toHaveLength(33);
   for (const day of program.days) for (const meal of day.meals ?? []) {
     if (!('kcal' in meal)) continue;
     const source = DINING_COLLECTION.find(dish => dish.title === meal.title) ?? programOnly[meal.title];

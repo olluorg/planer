@@ -33,12 +33,16 @@ test('the published local program displays its documented meals', async ({ page 
   await page.getByRole('button', { name: 'Предыдущий день' }).click();
   await expect(firstBreakfast).toHaveAttribute('aria-expanded', 'false');
   const pack = JSON.parse(readFileSync('content/programs/weight-loss-8w.json', 'utf8')) as {
-    days: Array<{ day: number; title: string; meals?: Array<{ title: string; kcal?: number; protein: number; fat: number; carbs: number; photo: string }> }>;
+    days: Array<{ day: number; title: string; workout?: { title: string; exercises?: Array<{ name: string }> }; meals?: Array<{ title: string; kcal?: number; protein: number; fat: number; carbs: number; photo: string }> }>;
   };
   let checked = 0;
-  for (const day of pack.days.slice(0, 7)) {
+  for (const day of pack.days.slice(0, 14)) {
     await expect(page.getByText(day.title, { exact: true })).toBeVisible();
     await expect(page.getByText(/не полный рацион или индивидуальная норма на день/)).toBeVisible();
+    if (day.workout) {
+      await expect(page.getByText(day.workout.title, { exact: true })).toBeVisible();
+      for (const exercise of day.workout.exercises ?? []) await expect(page.getByText(exercise.name, { exact: true })).toBeVisible();
+    }
     for (const entry of day.meals ?? []) {
       if (entry.kcal === undefined) continue;
       const meal = page.getByRole('button', { name: entry.title });
@@ -55,9 +59,9 @@ test('the published local program displays its documented meals', async ({ page 
       await meal.click();
       checked++;
     }
-    if (day.day < 7) await page.getByRole('button', { name: 'Следующий день' }).click();
+    if (day.day < 14) await page.getByRole('button', { name: 'Следующий день' }).click();
   }
-  expect(checked).toBe(12);
+  expect(checked).toBe(33);
   await page.getByRole('button', { name: 'Следующий день' }).click();
   await expect(page.getByText('Для этого дня материалы пока не добавлены.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Отметить день выполненным' })).toBeDisabled();
