@@ -7,6 +7,8 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import pg from 'pg';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import authValidation from './auth-validation.cjs';
+const { AUTH_BODY_LIMIT, readCredentials } = authValidation;
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL || 'postgres://thedad:thedad@localhost:5432/thedad' });
@@ -36,8 +38,6 @@ async function initDb() {
 
 const token = () => randomBytes(32).toString('base64url');
 const hashPw = (pw, salt) => scryptSync(pw, salt, 64).toString('hex');
-/** Регистр и пробелы не должны плодить разные аккаунты на один адрес. */
-const normEmail = (e) => (typeof e === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.trim()) ? e.trim().toLowerCase() : null);
 const safeEq = (a, b) => { const ab = Buffer.from(a), bb = Buffer.from(b); return ab.length === bb.length && timingSafeEqual(ab, bb); };
 
 const app = Fastify({ bodyLimit: 60 * 1024 * 1024, trustProxy: true }); // до 60МБ на блоб БД
@@ -58,7 +58,7 @@ await app.register(rateLimit, {
 });
 
 /** Лимит для конкретного маршрута. */
-const limit = (max, timeWindow) => ({ config: { rateLimit: { max, timeWindow } } });
+const limit = (max, timeWindow, bodyLimit) => ({ ...(bodyLimit ? { bodyLimit } : {}), config: { rateLimit: { max, timeWindow } } });
 
 // bearer authToken → vault
 async function auth(req, reply) {
@@ -90,11 +90,11 @@ app.post('/vault', limit(5, '1 hour'), async () => {
 });
 
 // Регистрация по email+паролю. salt приходит с клиента (для вывода encKey), сервер его лишь хранит.
-app.post('/register', limit(5, '1 hour'), async (req, reply) => {
-  const { password, salt } = req.body || {};
-  const email = normEmail(req.body?.email);
-  if (!email || !password || !salt) return reply.code(400).send({ error: 'email, password, salt required' });
-  if (String(password).length < 8) return reply.code(400).send({ error: 'пароль короче 8 символов' });
+app.post('/register', limit(5, '1 hour', AUTH_BODY_LIMIT), async (req, reply) => {
+  const credentials = readCredentials(req.body, true);
+  if (!credentials) return reply.code(400).send({ error: 'email, password, salt required' });
+  const { email, password, salt } = credentials;
+  if (password.length < 8) return reply.code(400).send({ error: 'пароль короче 8 символов' });
   const exists = await pool.query('SELECT 1 FROM vaults WHERE LOWER(email) = $1', [email]);
   if (exists.rows[0]) return reply.code(409).send({ error: 'email занят' });
   const id = randomUUID();
@@ -104,10 +104,10 @@ app.post('/register', limit(5, '1 hour'), async (req, reply) => {
   return { syncId: id, authToken, salt };
 });
 
-app.post('/login', limit(10, '15 minutes'), async (req, reply) => {
-  const { password } = req.body || {};
-  const email = normEmail(req.body?.email);
-  if (!email || !password) return reply.code(400).send({ error: 'email, password required' });
+app.post('/login', limit(10, '15 minutes', AUTH_BODY_LIMIT), async (req, reply) => {
+  const credentials = readCredentials(req.body);
+  if (!credentials) return reply.code(400).send({ error: 'email, password required' });
+  const { email, password } = credentials;
   const { rows } = await pool.query('SELECT * FROM vaults WHERE LOWER(email) = $1', [email]);
   const v = rows[0];
   if (!v || !v.pass_hash || !safeEq(v.pass_hash, hashPw(password, v.salt))) return reply.code(401).send({ error: 'неверный email или пароль' });

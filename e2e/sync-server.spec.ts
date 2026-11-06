@@ -132,6 +132,14 @@ test('сервер атомарно отклоняет устаревшую и �
   expect(['first', 'second']).toContain(result.ciphertext);
 });
 
+test('сервер отклоняет некорректные и слишком большие данные входа', async ({ request }) => {
+  const invalid = await request.post(`${SERVER}/login`, { data: { email: 'test@example.com', password: { value: 'password' } } });
+  expect(invalid.status()).toBe(400);
+  const oversized = await request.post(`${SERVER}/login`, { data: { email: 'test@example.com', password: 'x'.repeat(20_000) } });
+  expect(oversized.status()).toBe(413);
+  expect((await request.get(`${SERVER}/health`)).ok()).toBe(true);
+});
+
 test('registration with failed initial sync stays available for retry', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('onboarding.done.v1', '1'));
   await page.route('**/register', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ syncId: 'retry-vault', authToken: 'retry-token' }) }));
