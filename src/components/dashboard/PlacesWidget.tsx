@@ -20,7 +20,7 @@ export const PlacesWidget: React.FC<{preview?: boolean}> = ({preview = false}) =
   const mappedIds = useMemo(() => new Set(mapped.map(t => t.id)), [mapped]);
   useEffect(() => {
     if (!enabled || !host.current || !mapped.length || preview) return;
-    let disposed = false; let map: LeafletMap | null = null;
+    let disposed = false; let map: LeafletMap | null = null; let resizeObserver: ResizeObserver | null = null;
     setMapError(false);
     void import('leaflet').then(L => {
       if (disposed || !host.current) return;
@@ -46,9 +46,11 @@ export const PlacesWidget: React.FC<{preview?: boolean}> = ({preview = false}) =
         target.marker.openPopup();
         pendingPlace.current = null;
       }
+      resizeObserver = new ResizeObserver(() => { if (!disposed) map?.invalidateSize({ pan: false }); });
+      resizeObserver.observe(host.current);
       requestAnimationFrame(() => { if (!disposed) map?.invalidateSize(); });
     }).catch(() => setMapError(true));
-    return () => {disposed = true; map?.remove(); mapRef.current = null; markersRef.current.clear();};
+    return () => {disposed = true; resizeObserver?.disconnect(); map?.remove(); mapRef.current = null; markersRef.current.clear();};
   }, [enabled, mapped, preview]);
   return <section className="h-full rounded-xl bg-bg-card border border-border p-4 flex flex-col overflow-auto" aria-label="Места задач">
     <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-accent"/><h3 className="font-semibold text-text">Места задач</h3></div>
@@ -61,7 +63,7 @@ export const PlacesWidget: React.FC<{preview?: boolean}> = ({preview = false}) =
       </ul>
       {mapped.length > 0 && !enabled && !preview && <button type="button" onClick={() => setEnabled(true)} className="mt-3 text-left text-sm text-accent">Показать карту</button>}
       {mapped.length > 0 && !enabled && <p className="mt-1 text-xs text-text-muted">При открытии OpenStreetMap получит запросы на область карты и IP-адрес устройства. Названия задач не отправляются.</p>}
-      {enabled && mapped.length > 0 && !preview && <><div ref={host} className="mt-3 min-h-[200px] w-full rounded-lg" aria-label="Карта мест" />{mapError && <p role="status" className="text-xs text-text-muted mt-2">Карту не удалось загрузить. Список мест доступен без сети.</p>}</>}
+      {enabled && mapped.length > 0 && !preview && <><div ref={host} className="mt-3 min-h-[200px] w-full flex-1 rounded-lg" aria-label="Карта мест" />{mapError && <p role="status" className="text-xs text-text-muted mt-2">Карту не удалось загрузить. Список мест доступен без сети.</p>}</>}
     </>}
     <button type="button" className="mt-auto pt-3 text-left text-xs text-text-muted hover:text-accent" onClick={() => nav('/tasks')}>Управлять местами в задачах</button>
   </section>;
