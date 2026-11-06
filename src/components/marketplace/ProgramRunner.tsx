@@ -175,6 +175,7 @@ export const ProgramRunner: React.FC<{ programId: string | null; onClose: () => 
 
               {dayData?.meals && dayData.meals.length > 0 && (
                 <Section icon={<UtensilsCrossed className="h-4 w-4" />} title="Идеи блюд">
+                  {pack?.meals_note && <p className="mb-3 text-[12px] leading-relaxed text-text-muted">{pack.meals_note}</p>}
                   <div className="space-y-2.5">
                     {dayData.meals.map((m, i) => <MealCard key={`${day}-${i}`} meal={m} programId={programId} day={day} />)}
                   </div>

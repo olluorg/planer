@@ -105,6 +105,8 @@ export interface ProgramPack {
   emoji: string;
   /** Длительность курса в днях (для «День X из N»). По умолчанию — макс. day в days[]. */
   duration_days?: number;
+  /** Контекст для примеров блюд, если они не составляют полный рацион. */
+  meals_note?: string;
   goals?: GoalTpl[];
   habits?: HabitTpl[];
   tasks?: ProgramTask[];

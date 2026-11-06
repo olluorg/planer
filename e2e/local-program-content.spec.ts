@@ -38,6 +38,7 @@ test('the published local program displays its documented meals', async ({ page 
   let checked = 0;
   for (const day of pack.days.slice(0, 7)) {
     await expect(page.getByText(day.title, { exact: true })).toBeVisible();
+    await expect(page.getByText(/не полный рацион или индивидуальная норма на день/)).toBeVisible();
     for (const entry of day.meals ?? []) {
       if (entry.kcal === undefined) continue;
       const meal = page.getByRole('button', { name: entry.title });

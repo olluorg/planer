@@ -5,6 +5,7 @@ import { DINING_COLLECTION } from '../diningCollection';
 
 it('only uses documented meal nutrition and omits uncalculated widget values', () => {
   const program = JSON.parse(readFileSync('content/programs/weight-loss-8w.json', 'utf8'));
+  expect(program.meals_note).toContain('не полный рацион');
   expect(program.days.flatMap((day: any) => day.meals ?? []).length).toBeGreaterThan(0);
   const programOnly: Record<string, { kcal: number; protein: number; fat: number; carbs: number }> = {
     'Овсянка с яблоком и корицей': { kcal: 252, protein: 6.9, fat: 3.5, carbs: 50.4 },
