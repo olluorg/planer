@@ -6,6 +6,7 @@ import { isoDate } from '@/lib/utils';
 import { fmtSec } from '@/lib/pomodoroState';
 import { logWorkout, WORKOUT_TYPE_MET } from '@/lib/activity';
 import { activityAction } from '@/lib/activityAction';
+import { balanceWorkoutSides } from '@/lib/workoutPlan';
 
 /* ==================== База упражнений ====================
  * Студийные изображения лежат в public/workout/studio. Часть упражнений
@@ -71,11 +72,11 @@ const CALISTHENICS = [
   { name: 'Обратные отжимания от стула', hint: 'Локти назад, опускайся до угла 90°' },
   { name: 'Болгарские выпады', hint: 'Задняя нога на диване, вес на передней' },
   { name: 'Планка', hint: 'Держи прямую линию от пяток до макушки' },
-  { name: 'Боковая планка слева', hint: 'Локоть под плечом, таз вверх' },
-  { name: 'Боковая планка справа', hint: 'Не проваливай бедро' },
+  { name: 'Боковая планка слева', hint: 'Опора на левом предплечье, локоть под плечом; не проваливай таз.' },
+  { name: 'Боковая планка справа', hint: 'Опора на правом предплечье, локоть под плечом; не проваливай таз.' },
   { name: 'Приседания с прыжком', hint: 'Взрывной вверх, мягкое приземление' },
   { name: 'Скалолаз', hint: 'Быстро подтягивай колени к груди' },
-  { name: 'Ягодичный мостик на одной ноге', hint: 'Вторая нога вытянута' },
+  { name: 'Ягодичный мостик на одной ноге', hint: 'Вторая нога вытянута. Чередуй ноги или смени сторону в середине упражнения.' },
   { name: 'Супермен', hint: 'Отрывай руки и ноги, держи 2 секунды' },
   { name: 'Подъём ног лёжа', hint: 'Медленно вниз, поясница прижата' },
   { name: 'Стул у стены', hint: 'Бёдра параллельны полу, держим' },
@@ -88,12 +89,12 @@ const YOGA = [
   { name: 'Поза ребёнка', hint: 'Колени врозь, лоб на пол, расслабься' },
   { name: 'Кошка-корова', hint: 'Плавно на вдохе прогиб, на выдохе округление' },
   { name: 'Поза кобры', hint: 'Грудь вверх, плечи от ушей, таз на полу' },
-  { name: 'Поза воина II', hint: 'Переднее колено над стопой, руки в стороны' },
+  { name: 'Поза воина II', hint: 'Переднее колено над стопой, руки в стороны. В середине смени сторону.' },
   { name: 'Наклон вперёд стоя', hint: 'Колени мягкие, отпусти шею и руки' },
   { name: 'Поза дерева (слева)', hint: 'Опора на левой ноге. Стопа у щиколотки или на голени, не на колене.' },
   { name: 'Поза дерева (справа)', hint: 'Опора на правой ноге. Стопа у щиколотки или на голени, не на колене.' },
   { name: 'Скручивание сидя', hint: 'Сядь с вытянутыми ногами, вытяни спину и мягко поверни корпус; затем смени сторону.' },
-  { name: 'Поза голубя', hint: 'Раскрытие бедра, дыши в натяжение' },
+  { name: 'Поза голубя', hint: 'Дыши спокойно, не углубляй положение через боль. В середине смени сторону.' },
   { name: 'Мостик лёжа', hint: 'Таз вверх, лопатки вместе' },
   { name: 'Поза лодки', hint: 'Балансируй на седалищных костях, держи спину вытянутой; колени можно согнуть.' },
   { name: 'Шавасана / дыхание', hint: 'Ляг, расслабься, дыши животом' },
@@ -163,7 +164,7 @@ const ExerciseImage: React.FC<{ ex: Exercise; size: number }> = ({ ex, size }) =
       src={ex.img}
       alt={ex.name}
       className="rounded-2xl object-contain bg-white p-2"
-      style={{ width: size, height: size, transform: ex.name === 'Поза дерева (справа)' ? 'scaleX(-1)' : undefined }}
+      style={{ width: size, height: size, transform: ex.name === 'Поза дерева (справа)' || ex.name === 'Боковая планка слева' ? 'scaleX(-1)' : undefined }}
       onError={() => setFailed(true)}
     />
   );
@@ -195,7 +196,7 @@ export const WorkoutMode: React.FC<Props> = ({ open, onClose }) => {
   const tickRef = useRef<() => void>(() => {});
 
   const exercisesOf = (t: WorkoutType) => WORKOUT_TYPES.find((x) => x.id === t)!.exercises;
-  const makePlan = (t: WorkoutType) => t === 'low-impact' ? [...LOW_IMPACT] : shuffle(exercisesOf(t)).slice(0, EX_COUNT);
+  const makePlan = (t: WorkoutType) => t === 'low-impact' ? [...LOW_IMPACT] : balanceWorkoutSides(shuffle(exercisesOf(t)), EX_COUNT);
 
   // Новый случайный план на каждое открытие
   useEffect(() => {

@@ -299,6 +299,7 @@ test('yoga loads the cat-cow photograph', async ({ page }) => {
   await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
   const warrior = dialog.getByRole('img', {name:'Поза воина II', exact:true});
   await expect(warrior).toHaveAttribute('src', '/workout/studio/warrior-two.webp');
+  await expect(dialog.getByText(/В середине смени сторону/)).toBeVisible();
   await expect.poll(() => warrior.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
   const fold = dialog.getByRole('img', {name:'Наклон вперёд стоя', exact:true});
@@ -313,9 +314,14 @@ test('calisthenics loads the side plank photograph', async ({ page }) => {
   const dialog = page.getByRole('dialog', {name:'Тренировка', exact:true});
   await dialog.getByRole('button', {name:'Калистеника', exact:true}).click();
   await dialog.getByRole('button', {name:'Начать · Калистеника', exact:true}).click();
-  for (let i = 0; i < 6; i++) await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
+  for (let i = 0; i < 5; i++) await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
+  const rightSide = dialog.getByRole('img', {name:'Боковая планка справа', exact:true});
+  await expect(rightSide).toHaveAttribute('src', '/workout/studio/side-plank.webp');
+  await expect(rightSide).toHaveCSS('transform', 'none');
+  await dialog.getByRole('button', {name:'Пропустить упражнение'}).click();
   const image = dialog.getByRole('img', {name:'Боковая планка слева', exact:true});
   await expect(image).toHaveAttribute('src', '/workout/studio/side-plank.webp');
+  await expect(image).toHaveCSS('transform', 'matrix(-1, 0, 0, 1, 0, 0)');
   await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
 });
 
@@ -371,6 +377,7 @@ for (const exercise of [
     const photo = dialog.getByRole('img', {name:exercise.name, exact:true});
     await expect(photo).toHaveAttribute('src', `/workout/studio/${exercise.file}.webp`);
     await expect.poll(() => photo.evaluate((el:HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+    if (['Поза голубя', 'Ягодичный мостик на одной ноге'].includes(exercise.name)) await expect(dialog.getByText(/смени сторону/)).toBeVisible();
     if (exercise.name === 'Поза дерева (справа)') await expect(photo).toHaveCSS('transform', 'matrix(-1, 0, 0, 1, 0, 0)');
   });
 }
