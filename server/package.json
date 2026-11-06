@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "E2E-encrypted blob sync server for THEDAD (Fastify + Postgres)",
+  "description": "Encrypted blob sync server for THEDAD (Fastify + Postgres)",
   "scripts": {
     "start": "node index.js",
     "test": "node --test tests/*.test.mjs"

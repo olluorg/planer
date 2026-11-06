@@ -154,9 +154,11 @@ test('registration with failed initial sync stays available for retry', async ({
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ciphertext: null, revision: 0 }) });
   });
   await page.goto('/settings');
+  await expect(page.getByText(/серверу, который технически может вычислить ключ расшифровки/)).toBeVisible();
   await page.getByPlaceholder('email').fill('retry@example.com');
   await page.getByPlaceholder('пароль').fill('password123');
   await page.getByRole('button', { name: 'Регистрация' }).click();
+  await expect(page.getByText(/серверу, который технически может вычислить ключ расшифровки/)).toBeVisible();
   await expect(page.getByText('Ожидает синхронизации', { exact: false })).toBeVisible();
   await expect(page.getByText(/первая синхронизация не завершена/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Синхронизировать' })).toBeEnabled();

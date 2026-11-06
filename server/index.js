@@ -1,7 +1,6 @@
-// THEDAD sync-сервер: хранит ТОЛЬКО зашифрованные на клиенте блобы БД (E2E).
-// Сервер не видит содержимое и не знает ключ шифрования. Два способа входа:
+// THEDAD sync-сервер хранит зашифрованные на клиенте блобы БД. Два способа входа:
 //  - аноним/QR: создаём vault, клиент держит authToken+encKey (encKey в QR, не на сервере);
-//  - email+пароль: сервер хранит хеш пароля и salt; encKey клиент выводит из пароля (PBKDF2).
+//  - email+пароль: сервер получает пароль и соль и технически может вывести encKey (PBKDF2).
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';

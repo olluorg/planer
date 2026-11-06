@@ -50,6 +50,7 @@ export const SyncSettings: React.FC = () => {
         </div>
 
         {!cfg.lastSync && <div className="text-xs text-warning" role="status">Подключение создано, но первая синхронизация не завершена. Повторите синхронизацию.</div>}
+        {cfg.email && <p className="text-xs text-text-muted">При входе по email пароль передаётся серверу, который технически может вычислить ключ расшифровки. Используйте HTTPS и сервер, которому доверяете.</p>}
 
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" disabled={busy} onClick={() => run(async () => {
@@ -81,7 +82,7 @@ export const SyncSettings: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="text-sm text-text-muted">
-        Синхронизируй данные между устройствами. Всё шифруется на твоём устройстве — сервер видит только зашифрованный блоб.
+        Данные шифруются на устройстве перед отправкой на сервер.
       </div>
       <div>
         <div className="text-[11px] text-text-muted mb-1">Адрес сервера</div>
@@ -90,6 +91,7 @@ export const SyncSettings: React.FC = () => {
 
       <div className="rounded-xl border border-border p-4 space-y-2">
         <div className="text-sm font-medium">Вход по email</div>
+        <p className="text-xs text-text-muted">При входе пароль передаётся серверу, который технически может вычислить ключ расшифровки. Используйте HTTPS и сервер, которому доверяете.</p>
         <Input type="email" placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input type="password" placeholder="пароль" value={password} onChange={(e) => setPassword(e.target.value)} />
         <div className="flex gap-2">

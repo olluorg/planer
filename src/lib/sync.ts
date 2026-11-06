@@ -1,5 +1,6 @@
-// Клиент E2E-синхронизации. Дамп SQLite шифруется НА КЛИЕНТЕ (AES-GCM) и
-// заливается на sync-сервер как непрозрачный блоб. Сервер не знает ключ.
+// Клиент синхронизации. Дамп SQLite шифруется на клиенте (AES-GCM) и
+// заливается на сервер. При email-входе сервер получает пароль и соль и
+// технически может вывести ключ; в режиме без аккаунта ключ ему не отправляется.
 // encKey: из пароля (PBKDF2) для email-входа, либо случайный для QR-привязки.
 import { get } from 'idb-keyval';
 import { DB_KEY, persistBeforeReload, replaceDatabase, mergeIncoming } from './db';
@@ -70,7 +71,7 @@ const fromB64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const toB64Url = (s: string) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const fromB64Url = (s: string) => atob(s.replace(/-/g, '+').replace(/_/g, '/'));
 
-/** Детерминированный encKey из пароля и соли (PBKDF2) — сервер его не получает. */
+/** Детерминированный encKey из пароля и соли. Сервер получает пароль при email-входе. */
 async function deriveEncKey(password: string, saltB64: string): Promise<string> {
   const enc = new TextEncoder();
   const salt = fromB64(saltB64);
