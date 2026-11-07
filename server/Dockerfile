@@ -3,7 +3,7 @@ WORKDIR /app
 # npm ci по lockfile — одинаковые версии зависимостей в каждой сборке.
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-COPY index.js auth-validation.cjs ./
+COPY index.js auth-validation.cjs opaque-challenges.cjs ./
 # Не от root: при уязвимости в зависимостях у атакующего не будет прав в контейнере.
 USER node
 EXPOSE 8787

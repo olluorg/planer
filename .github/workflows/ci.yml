@@ -88,6 +88,8 @@ jobs:
       - run: npm ci --prefix server
       - name: Test sync server request validation
         run: npm test --prefix server
+        env:
+          OPAQUE_TEST_DATABASE_URL: postgres://thedad:test-only@localhost:5432/thedad
       - name: Build sync server image
         run: docker build -t thedad-sync-ci ./server
       - name: Build with sync enabled
