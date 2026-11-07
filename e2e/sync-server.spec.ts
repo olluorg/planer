@@ -169,6 +169,17 @@ test('registration with failed initial sync stays available for retry', async ({
   await expect(page.getByText('Подключено · retry@example.com')).toBeVisible();
   await expect(page.getByText(/первая синхронизация не завершена/)).toHaveCount(0);
   expect(writes).toBeGreaterThan(0);
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('thedad.sync.v1')!));
+  await page.getByRole('button', { name: 'Изменить адрес сервера' }).click();
+  await page.getByLabel('Новый адрес сервера').fill('http://192.168.1.2:8787');
+  await page.getByRole('button', { name: 'Проверить и сохранить' }).click();
+  await expect(page.getByText(/Для удалённого сервера требуется HTTPS/)).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('thedad.sync.v1')!))).toEqual(before);
+  await page.getByLabel('Новый адрес сервера').fill('https://new-sync.example');
+  await page.getByRole('button', { name: 'Проверить и сохранить' }).click();
+  await expect(page.getByRole('button', { name: 'Изменить адрес сервера' })).toBeVisible();
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('thedad.sync.v1')!));
+  expect(after).toMatchObject({ serverUrl: 'https://new-sync.example', syncId: before.syncId, authToken: before.authToken, encKey: before.encKey });
 });
 
 test('settings reflects successful background sync without reload', async ({ page }) => {

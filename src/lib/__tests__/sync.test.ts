@@ -61,6 +61,96 @@ async function withGoal(title: string) {
 }
 
 describe('синхронизация', () => {
+  it('accepts HTTPS and local loopback HTTP but rejects insecure or ambiguous server addresses', async () => {
+    const { validatedSyncServerUrl } = await import('../sync');
+    expect(validatedSyncServerUrl(' https://sync.example.com/api/ ')).toBe('https://sync.example.com/api');
+    expect(validatedSyncServerUrl('http://localhost:8787/')).toBe('http://localhost:8787');
+    expect(validatedSyncServerUrl('http://127.0.0.1:8787')).toBe('http://127.0.0.1:8787');
+    expect(validatedSyncServerUrl('http://[::1]:8787')).toBe('http://[::1]:8787');
+    for (const url of ['http://192.168.1.2:8787', 'http://sync.example.com', 'file:///tmp/vault', 'https://user:pass@sync.example.com', 'https://sync.example.com/?key=1', 'https://sync.example.com/#secret']) {
+      expect(() => validatedSyncServerUrl(url)).toThrow();
+    }
+  });
+
+  it('never sends credentials to remote HTTP and preserves an existing connection', async () => {
+    const sync = await import('../sync');
+    const existing = { serverUrl: 'http://192.168.1.2:8787', syncId: 'v1', authToken: 'token', encKey: btoa('x'.repeat(32)) };
+    localStorage.setItem('thedad.sync.v1', JSON.stringify(existing));
+    vi.mocked(fetch).mockClear();
+    await expect(sync.loginEmail('http://192.168.1.2:8787', 'a@b.ru', 'password123')).rejects.toThrow(/HTTPS/);
+    await expect(sync.registerEmail('http://192.168.1.2:8787', 'a@b.ru', 'password123')).rejects.toThrow(/HTTPS/);
+    await expect(sync.createVault('http://192.168.1.2:8787')).rejects.toThrow(/HTTPS/);
+    await expect(sync.pullNow()).rejects.toThrow(/HTTPS/);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sync.getSync()).toEqual(existing);
+    expect(sync.buildSyncLink()).toBeNull();
+  });
+
+  it('rejects insecure QR links before replacing the current configuration', async () => {
+    const sync = await import('../sync');
+    const existing = { serverUrl: 'https://safe.test', syncId: 'v1', authToken: 'token', encKey: btoa('x'.repeat(32)) };
+    localStorage.setItem('thedad.sync.v1', JSON.stringify(existing));
+    const payload = btoa(JSON.stringify({ s: 'http://192.168.1.2:8787', i: 'bad', t: 'secret', k: existing.encKey })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    history.replaceState(null, '', `/#sync=${payload}`);
+    vi.mocked(fetch).mockClear();
+    expect(await sync.importSyncFromHashIfPresent()).toBe(false);
+    expect(sync.getSync()).toEqual(existing);
+    expect(location.hash).toBe('');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('upgrades an existing HTTP address after checking the vault and retains the encryption key', async () => {
+    await withGoal('Не потерять');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    const previous = { ...sync.getSync()!, serverUrl: 'http://192.168.1.2:8787' };
+    localStorage.setItem('thedad.sync.v1', JSON.stringify(previous));
+    vi.mocked(fetch).mockClear();
+    await sync.changeSyncServerUrl('https://new-sync.test/');
+    const current = sync.getSync()!;
+    expect(current).toMatchObject({ serverUrl: 'https://new-sync.test', syncId: previous.syncId, authToken: previous.authToken, encKey: previous.encKey });
+    expect(current.lastSync).toBeUndefined();
+    const [url, options] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toBe(`https://new-sync.test/vault/${previous.syncId}`);
+    expect(options?.redirect).toBe('error');
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+    await sync.syncNowFresh();
+    const db = await import('../db');
+    expect(db.query<{ title: string }>('SELECT title FROM goals')[0].title).toBe('Не потерять');
+  });
+
+  it('does not change the address if the new vault is invalid or uses a different key', async () => {
+    await withGoal('Локальные данные');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    const previous = sync.getSync();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ciphertext: btoa('wrong'), revision: 1 }), { status: 200 })));
+    await expect(sync.changeSyncServerUrl('https://other.test')).rejects.toThrow(/ключ/);
+    expect(sync.getSync()).toEqual(previous);
+    const db = await import('../db');
+    expect(db.query<{ title: string }>('SELECT title FROM goals')[0].title).toBe('Локальные данные');
+  });
+
+  it('does not restore a connection disconnected while the new address is being checked', async () => {
+    await withGoal('Локальная цель');
+    const sync = await import('../sync');
+    await sync.createVault('https://sync.test');
+    let release!: () => void;
+    let started!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const waiting = new Promise<void>(resolve => { started = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      started();
+      await gate;
+      return server.handler(url, options);
+    }));
+    const changing = sync.changeSyncServerUrl('https://other.test');
+    await waiting;
+    sync.disconnectSync();
+    release();
+    await expect(changing).rejects.toThrow(/Подключение изменилось/);
+    expect(sync.getSync()).toBeNull();
+  });
   it('использует доступный телефону адрес для QR из расширения и десктопа', async () => {
     const { syncLinkBase } = await import('../sync');
     expect(syncLinkBase('chrome-extension://example/index.html#/settings')).toBe('https://thedad.ru/');

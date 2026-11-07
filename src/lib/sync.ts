@@ -80,11 +80,24 @@ async function deriveEncKey(password: string, saltB64: string): Promise<string> 
   return toB64(new Uint8Array(bits));
 }
 
+/** HTTP is safe only for a server on this device; remote credentials require HTTPS. */
+export function validatedSyncServerUrl(value: string): string {
+  let url: URL;
+  try { url = new URL(value.trim()); } catch { throw new Error('Укажите корректный HTTPS-адрес сервера.'); }
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const loopback = host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
+  if (url.username || url.password || url.search || url.hash) throw new Error('Адрес сервера не должен содержать пароль, параметры или фрагмент.');
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) {
+    throw new Error('Для удалённого сервера требуется HTTPS. HTTP разрешён только на этом устройстве (localhost).');
+  }
+  return url.href.replace(/\/+$/, '');
+}
+
 async function api(serverUrl: string, path: string, opts: RequestInit = {}): Promise<any> {
   // Content-Type ставим только при наличии тела — иначе Fastify отклоняет пустой JSON-body.
   const headers: Record<string, string> = { ...(opts.headers as Record<string, string> || {}) };
   if (opts.body != null) headers['Content-Type'] = 'application/json';
-  const res = await fetch(serverUrl.replace(/\/$/, '') + path, { ...opts, headers });
+  const res = await fetch(validatedSyncServerUrl(serverUrl) + path, { ...opts, headers, redirect: 'error' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const error = new Error(data?.error || `HTTP ${res.status}`) as Error & { status?: number };
@@ -97,6 +110,7 @@ async function api(serverUrl: string, path: string, opts: RequestInit = {}): Pro
 /* ===== Вход ===== */
 
 export async function registerEmail(serverUrl: string, email: string, password: string): Promise<void> {
+  serverUrl = validatedSyncServerUrl(serverUrl);
   const salt = toB64(crypto.getRandomValues(new Uint8Array(16)));
   const encKey = await deriveEncKey(password, salt);
   const { syncId, authToken } = await api(serverUrl, '/register', { method: 'POST', body: JSON.stringify({ email, password, salt }) });
@@ -105,6 +119,7 @@ export async function registerEmail(serverUrl: string, email: string, password: 
 }
 
 export async function loginEmail(serverUrl: string, email: string, password: string): Promise<void> {
+  serverUrl = validatedSyncServerUrl(serverUrl);
   const { syncId, authToken, salt } = await api(serverUrl, '/login', { method: 'POST', body: JSON.stringify({ email, password }) });
   const encKey = await deriveEncKey(password, salt);
   saveSync({ serverUrl, syncId, authToken, encKey, email });
@@ -115,6 +130,7 @@ export async function loginEmail(serverUrl: string, email: string, password: str
 
 /** Аноним/QR-хост: создаёт vault и случайный encKey. */
 export async function createVault(serverUrl: string): Promise<void> {
+  serverUrl = validatedSyncServerUrl(serverUrl);
   const { syncId, authToken } = await api(serverUrl, '/vault', { method: 'POST' });
   const encKey = toB64(crypto.getRandomValues(new Uint8Array(32)));
   saveSync({ serverUrl, syncId, authToken, encKey });
@@ -134,7 +150,7 @@ export function syncLinkBase(href: string): string {
 /** Explain common cases where a QR link cannot connect from a second device. */
 export function syncLinkWarning(serverUrl: string, pageUrl: string): string | null {
   try {
-    const server = new URL(serverUrl);
+    const server = new URL(validatedSyncServerUrl(serverUrl));
     const host = server.hostname.toLowerCase().replace(/^\[|\]$/g, '');
     if (host === 'localhost' || host.endsWith('.localhost') || host === '::1' || host === '0.0.0.0' || /^127\./.test(host)) {
       return 'Адрес сервера указывает на это устройство. На телефоне localhost будет означать сам телефон; укажите доступный ему адрес сервера.';
@@ -143,8 +159,8 @@ export function syncLinkWarning(serverUrl: string, pageUrl: string): string | nu
       return 'Страница открывается по HTTPS, а сервер указан по HTTP. Браузер телефона может заблокировать соединение; используйте HTTPS для сервера.';
     }
     return null;
-  } catch {
-    return 'Не удалось определить адрес сервера. Проверьте настройки подключения.';
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Не удалось определить адрес сервера. Проверьте настройки подключения.';
   }
 }
 
@@ -152,6 +168,7 @@ export function syncLinkWarning(serverUrl: string, pageUrl: string): string | nu
 export function buildSyncLink(): string | null {
   const c = getSync();
   if (!c) return null;
+  try { validatedSyncServerUrl(c.serverUrl); } catch { return null; }
   const payload = toB64Url(JSON.stringify({ s: c.serverUrl, i: c.syncId, t: c.authToken, k: c.encKey }));
   return `${syncLinkBase(location.href)}#sync=${payload}`;
 }
@@ -166,8 +183,8 @@ export async function importSyncFromHashIfPresent(): Promise<boolean> {
   try {
     obj = JSON.parse(fromB64Url(m[1]));
     if (!obj || ![obj.s, obj.i, obj.t, obj.k].every(value => typeof value === 'string' && value.length > 0)) return false;
-    const url = new URL(obj.s);
-    if (!['http:', 'https:'].includes(url.protocol) || fromB64(obj.k).length !== 32) return false;
+    obj.s = validatedSyncServerUrl(obj.s);
+    if (fromB64(obj.k).length !== 32) return false;
   } catch { return false; }
   const previous = getSync();
   const incoming: SyncConfig = { serverUrl: obj.s, syncId: obj.i, authToken: obj.t, encKey: obj.k };
@@ -179,6 +196,26 @@ export async function importSyncFromHashIfPresent(): Promise<boolean> {
     if (sameConnection(getSync(), incoming)) saveSync(previous);
     throw error;
   }
+}
+
+/** Change the endpoint only after verifying access and, when present, the encryption key. */
+export async function changeSyncServerUrl(value: string): Promise<void> {
+  const current = getSync();
+  if (!current) throw new Error('Синхронизация не настроена.');
+  const generation = connectionGeneration;
+  const serverUrl = validatedSyncServerUrl(value);
+  const result = await api(serverUrl, `/vault/${current.syncId}`, { headers: { Authorization: `Bearer ${current.authToken}` } });
+  assertSyncConnection(current, generation);
+  if (!Number.isSafeInteger(result?.revision) || result.revision < 0 || !(result.ciphertext === null || (typeof result.ciphertext === 'string' && result.ciphertext.length > 0))) {
+    throw new Error('Сервер вернул неверные данные хранилища. Адрес не изменён.');
+  }
+  if (result.ciphertext) {
+    try { await decryptBytes(fromB64(result.ciphertext), current.encKey); }
+    catch { throw new Error('Не удалось проверить ключ хранилища на новом сервере. Адрес не изменён.'); }
+    assertSyncConnection(current, generation);
+  }
+  const { lastSync: _lastSync, ...remaining } = current;
+  saveSync({ ...remaining, serverUrl });
 }
 
 /* ===== Обмен блобами ===== */

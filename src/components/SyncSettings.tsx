@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/lib/toast';
 import { persistBeforeReload } from '@/lib/db';
 import {
-  getSync, onSyncChange, disconnectSync, registerEmail, loginEmail, createVault,
+  getSync, onSyncChange, disconnectSync, registerEmail, loginEmail, createVault, changeSyncServerUrl,
   buildSyncLink, syncLinkWarning, pullNow, syncNowFresh, type SyncConfig,
 } from '@/lib/sync';
 import { RefreshCw, QrCode, LogOut, DownloadCloud, Cloud } from 'lucide-react';
@@ -20,6 +20,7 @@ export const SyncSettings: React.FC = () => {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  const [editingServer, setEditingServer] = useState(false);
   const refresh = () => setCfg(getSync());
   useEffect(() => onSyncChange(() => setCfg(getSync())), []);
 
@@ -30,14 +31,16 @@ export const SyncSettings: React.FC = () => {
     finally { setBusy(false); }
   };
 
-  const showQr = async () => {
-    const link = buildSyncLink();
-    if (!link) return;
-    const QRCode = (await import('qrcode')).default;
-    setQr(await QRCode.toDataURL(link, { width: 220, margin: 1 }));
-  };
-
-  useEffect(() => { if (cfg) void showQr(); else setQr(null); /* eslint-disable-next-line */ }, [cfg?.syncId]);
+  useEffect(() => {
+    let cancelled = false;
+    setQr(null);
+    const link = cfg ? buildSyncLink() : null;
+    if (link) void import('qrcode').then(({ default: QRCode }) => QRCode.toDataURL(link, { width: 220, margin: 1 }))
+      .then(value => { if (!cancelled) setQr(value); }).catch(() => { if (!cancelled) setQr(null); });
+    return () => { cancelled = true; };
+    // Timestamp-only updates do not change the QR payload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg?.syncId, cfg?.serverUrl, cfg?.authToken, cfg?.encKey]);
   const qrWarning = cfg ? syncLinkWarning(cfg.serverUrl, window.location.href) : null;
 
   if (cfg) {
@@ -51,6 +54,13 @@ export const SyncSettings: React.FC = () => {
 
         {!cfg.lastSync && <div className="text-xs text-warning" role="status">Подключение создано, но первая синхронизация не завершена. Повторите синхронизацию.</div>}
         {cfg.email && <p className="text-xs text-text-muted">При входе по email пароль передаётся серверу, который технически может вычислить ключ расшифровки. Используйте HTTPS и сервер, которому доверяете.</p>}
+        <div className="rounded-xl border border-border p-3 space-y-2">
+          {!editingServer ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setServer(cfg.serverUrl); setEditingServer(true); }}>Изменить адрес сервера</Button> : <>
+            <label className="block text-xs text-text-muted">Новый адрес сервера<Input className="mt-1" value={server} onChange={e => setServer(e.target.value)} /></label>
+            <p className="text-xs text-text-muted">Укажите HTTPS-адрес доверенного сервера с тем же хранилищем. Проверим доступ и, если в хранилище есть данные, ключ. Данные при смене адреса не переносятся.</p>
+            <div className="flex gap-2"><Button size="sm" disabled={busy || !server.trim()} onClick={() => run(async () => { await changeSyncServerUrl(server); setEditingServer(false); }, 'Адрес сервера обновлён')}>Проверить и сохранить</Button><Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditingServer(false)}>Отмена</Button></div>
+          </>}
+        </div>
 
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" disabled={busy} onClick={() => run(async () => {
@@ -87,6 +97,7 @@ export const SyncSettings: React.FC = () => {
       <div>
         <div className="text-[11px] text-text-muted mb-1">Адрес сервера</div>
         <Input value={server} onChange={(e) => setServer(e.target.value)} placeholder={DEFAULT_SERVER} />
+        <p className="mt-1 text-xs text-text-muted">Удалённый сервер должен использовать HTTPS; HTTP доступен только для localhost.</p>
       </div>
 
       <div className="rounded-xl border border-border p-4 space-y-2">
