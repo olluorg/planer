@@ -5,6 +5,9 @@ test('activity balance requires a profile and a food entry', async ({ page }) =>
   await page.goto('/tasks');
   await page.getByPlaceholder('Новая задача...').fill('Проверить план');
   await page.getByPlaceholder('Новая задача...').press('Enter');
+  // Navigation before the asynchronous database write completes can leave the
+  // dashboard in its empty state and skip the widgets this test exercises.
+  await expect(page.getByText('Проверить план', {exact: true})).toBeVisible();
   await page.goto('/');
   const widget = page.locator('[data-widget="activity"]');
   const calories = page.locator('[data-widget="calories"]');
