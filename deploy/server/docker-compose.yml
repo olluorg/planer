@@ -31,6 +31,7 @@ services:
       PORT: 8787
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?задайте ALLOWED_ORIGINS в .env}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-120}
+      TRUST_PROXY_CIDRS: ${TRUST_PROXY_CIDRS:-}
     expose:
       - "8787"   # только внутрь сети; снаружи — через Caddy
 

@@ -39,7 +39,9 @@ const token = () => randomBytes(32).toString('base64url');
 const hashPw = (pw, salt) => scryptSync(pw, salt, 64).toString('hex');
 const safeEq = (a, b) => { const ab = Buffer.from(a), bb = Buffer.from(b); return ab.length === bb.length && timingSafeEqual(ab, bb); };
 
-const app = Fastify({ bodyLimit: 60 * 1024 * 1024, trustProxy: true }); // до 60МБ на блоб БД
+// Trust forwarded addresses only when a private reverse-proxy deployment opts in.
+const trustedProxies = (process.env.TRUST_PROXY_CIDRS || '').trim();
+const app = Fastify({ bodyLimit: 60 * 1024 * 1024, trustProxy: trustedProxies || false }); // до 60МБ на блоб БД
 
 // CORS: список доменов через запятую в ALLOWED_ORIGINS. Пусто — разрешаем всё,
 // это режим локальной разработки; в проде список задавать обязательно, иначе

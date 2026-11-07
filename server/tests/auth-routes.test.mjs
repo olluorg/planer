@@ -48,3 +48,44 @@ test('credential routes reject malformed and oversized bodies without limiting v
     }
   }
 });
+
+for (const [trusted, expectedLastStatus] of [['', 429], ['127.0.0.1/32', 200]]) {
+  test(`forwarded IP affects rate limiting only with a trusted proxy: ${trusted || 'none'}`, async () => {
+    const port = await new Promise((resolve, reject) => {
+      const listener = createServer();
+      listener.once('error', reject);
+      listener.listen(0, '127.0.0.1', () => {
+        const selected = listener.address().port;
+        listener.close(() => resolve(selected));
+      });
+    });
+    const child = spawn(process.execPath, ['--import', new URL('./fake-pg.mjs', import.meta.url).href, fileURLToPath(new URL('../index.js', import.meta.url))], {
+      env: { ...process.env, PORT: String(port), TRUST_PROXY_CIDRS: trusted }, stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+    const base = `http://127.0.0.1:${port}`;
+    try {
+      let ready = false;
+      for (let attempt = 0; attempt < 100 && !ready; attempt++) {
+        if (child.exitCode !== null) throw new Error(`Server exited: ${child.exitCode}\n${stderr}`);
+        try { ready = (await fetch(`${base}/health`)).ok; } catch { /* still starting */ }
+        if (!ready) await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      assert.ok(ready);
+      const statuses = [];
+      for (let i = 1; i <= 6; i++) {
+        const response = await fetch(`${base}/vault`, { method: 'POST', headers: { 'x-forwarded-for': `198.51.100.${i}` } });
+        statuses.push(response.status);
+      }
+      assert.deepEqual(statuses.slice(0, 5), [200, 200, 200, 200, 200]);
+      assert.equal(statuses[5], expectedLastStatus);
+    } finally {
+      if (child.exitCode === null) {
+        const exited = new Promise(resolve => child.once('exit', resolve));
+        child.kill('SIGTERM');
+        await exited;
+      }
+    }
+  });
+}
